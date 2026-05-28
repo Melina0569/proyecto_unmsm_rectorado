@@ -1,0 +1,2958 @@
+/* DARK MODE - PANEL DE SOPORTE IGUAL QUE FLUJOGRAMAS */
+.dark #soporte-section > div {
+    background: #1e293b;
+    border-color: #475569;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255,255,255,0.05);
+}
+
+.dark #soporte-section > div::before {
+    background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%);
+}
+
+.dark #soporte-section > div > div:first-child {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #475569;
+}
+
+.dark #soporte-section h3 {
+    color: #f9fafb;
+}
+
+.dark #soporte-section h3 span {
+    background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dark #soporte-section p {
+    color: #94a3b8;
+}
+
+.dark #soporte-section button[class*="rounded-full"] {
+    background: #334155;
+    color: #cbd5e1;
+    border-color: #475569;
+}
+
+.dark #soporte-section button[class*="rounded-full"]:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+}
+
+.dark #soporte-section .border-b:nth-child(2) {
+    background: #0f172a;
+    border-color: #334155;
+}
+
+.dark #soporte-section input {
+    background: #1e293b;
+    border-color: #475569;
+    color: #f9fafb;
+}
+
+.dark #soporte-section input::placeholder {
+    color: #64748b;
+}
+
+.dark #soporte-section #soporte-list {
+    background: #0f172a;
+}
+/* PANEL DE SOPORTE - IGUAL QUE FLUJOGRAMAS */
+#soporte-section {
+    animation: slideDown 0.4s ease-out;
+    position: relative;
+}
+
+#soporte-section > div {
+    background: #ffffff;
+    border: 3px solid #cbd5e1;
+    border-radius: 2rem;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.25),
+        0 0 0 1px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    position: relative;
+    overflow: hidden;
+}
+
+#soporte-section > div::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #f97316 0%, #3b82f6 50%, #10b981 100%);
+}
+
+#soporte-section > div > div:first-child {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    border-bottom: 3px solid #cbd5e1;
+    padding: 2rem;
+}
+
+#soporte-section h3 {
+    color: #0f172a;
+    font-weight: 900;
+    font-size: 1.75rem;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+#soporte-section h3 span {
+    color: #1e40af;
+    font-weight: 900;
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+#soporte-section p {
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+#soporte-section button[class*="rounded-full"] {
+    background: #ffffff;
+    color: #64748b;
+    border: 2px solid #94a3b8;
+    width: 2.75rem;
+    height: 2.75rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+#soporte-section button[class*="rounded-full"]:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+    transform: rotate(90deg) scale(1.1);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+#soporte-section .border-b:nth-child(2) {
+    background: #f8fafc;
+    border-bottom: 2px solid #cbd5e1;
+    padding: 1.5rem 2rem;
+}
+
+#soporte-section input {
+    background: #ffffff;
+    border: 2px solid #94a3b8;
+    color: #0f172a;
+    font-weight: 600;
+    font-size: 1rem;
+    box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.06),
+        0 1px 2px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+#soporte-section input:focus {
+    border-color: #3b82f6;
+    box-shadow: 
+        0 0 0 4px rgba(59, 130, 246, 0.15), 
+        inset 0 2px 4px rgba(0, 0, 0, 0.06);
+    outline: none;
+}
+
+#soporte-section input::placeholder {
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+#soporte-section .text-slate-400 {
+    color: #64748b !important;
+    font-size: 1.25rem;
+}
+
+#soporte-section #soporte-list {
+    padding: 2rem;
+    background: #f8fafc;
+    min-height: 300px;
+}
+/* process-map.css - Estilos específicos para el Mapa de Procesos */
+
+/* ========== CONTENEDORES PRINCIPALES ========== */
+
+.perspective-view {
+    perspective: 1000px;
+}
+
+.process-container {
+    display: flex;
+    flex-direction: column;
+    border-radius: 100px 3rem 3rem 100px;
+    min-height: 180px;
+    overflow: visible;
+    margin-bottom: 5rem;
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 1400px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    transform: scale(1.02);
+    transition: transform 0.5s ease;
+}
+
+.process-container:hover {
+    transform: scale(1.03);
+}
+
+@media (min-width: 768px) {
+    .process-container {
+        flex-direction: row;
+    }
+}
+
+/* ========== ETIQUETA LATERAL ========== */
+
+.side-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 2rem 1.5rem;
+    color: white;
+    backdrop-filter: blur(12px);
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 100px 0 0 100px;
+    flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+    .side-label {
+        width: 11rem;
+    }
+}
+
+.side-label .icon-wrapper {
+    background: rgba(255, 255, 255, 0.3);
+    padding: 1rem;
+    border-radius: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.side-label .label-text {
+    font-size: 11px;
+    font-weight: 900;
+    text-align: center;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+}
+
+/* ========== GRIDS DE PROCESOS ========== */
+
+.process-grid-container {
+    flex: 1;
+    padding: 2.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+}
+
+/* Grid de procesos misionales (flechas) */
+.process-grid-container.missional {
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Grid de procesos de soporte - 5 columnas con segunda fila centrada */
+.process-grid-container.support-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 2.5rem;
+}
+
+.support-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1.25rem;
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    justify-items: center;
+}
+
+/* Wrapper principal */
+.support-grid-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centra las filas horizontalmente */
+    gap: 1.25rem;
+    width: 100%;
+    max-width: 1000px;
+}
+
+/* Cada fila */
+.support-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center; /* Centra las tarjetas en la fila */
+    align-items: center;
+    gap: 1.25rem;
+    width: 100%;
+}
+
+/* Primera fila: siempre 5 elementos */
+.support-row.first-row {
+    justify-content: space-between; /* O center si prefieres */
+}
+
+/* Segunda fila: centrada */
+.support-row.second-row {
+    justify-content: flex-start; /* Centra los 4 elementos */
+    padding-left: calc(30% - (4 * 170px + 3 * 1.25rem) / 2);
+}
+
+.support-row.second-row .process-card.small:first-child {
+    margin-left: auto;
+}
+
+.support-row.second-row .process-card.small:last-child {
+    margin-right: auto;
+}
+
+/* ========== TARJETAS DE PROCESO ========== */
+
+.process-card {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    background: white;
+    border: 2px solid #f1f5f9;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.process-card:hover {
+    border-color: white;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    transform: translateY(-8px);
+}
+
+.process-card:hover .process-actions {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Tarjetas estándar (procesos estratégicos) */
+.process-card.standard {
+    border-radius: 2rem;
+    padding: 2rem;
+    width: 100%;
+    height: 160px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+@media (min-width: 768px) {
+    .process-card.standard {
+        width: 18rem;
+    }
+}
+
+.process-card.standard .process-actions {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.2s ease;
+    z-index: 20;
+    border-radius: 2rem;
+    padding: 0.75rem;
+}
+
+.process-card.standard:hover .process-actions {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Tarjetas pequeñas (procesos de soporte) */
+.process-card.small {
+    border-radius: 1rem;
+    padding: 1.25rem;
+    min-height: 170px;
+    width: 170px; /* Ancho fijo */
+    flex-shrink: 0; /* No se encoge */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: white;
+    border: 2px solid #f8fafc;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.process-card.small:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* Contenido interno de tarjetas de soporte */
+.support-card-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* Código PS.XX */
+.process-card.small .process-code {
+    font-size: 0.75rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    color: #059669;
+}
+
+/* Título */
+.process-card.small .process-title {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #0f172a;
+    text-align: center;
+    text-transform: uppercase;
+    line-height: 1.3;
+    margin: 0;
+}
+
+/* Tarjetas flecha (procesos misionales) */
+.process-card.arrow-process {
+    clip-path: polygon(0% 0%, 94% 0%, 100% 50%, 94% 100%, 0% 100%, 6% 50%);
+    border: none;
+    width: 100%;
+    max-width: 48rem;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0 auto;
+    background: white;
+    position: relative;
+}
+
+.process-card.arrow-process::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px solid rgba(0, 0, 0, 0.05);
+    pointer-events: none;
+    clip-path: polygon(0% 0%, 94% 0%, 100% 50%, 94% 100%, 0% 100%, 6% 50%);
+}
+
+/* Contenido de flecha */
+.arrow-content {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    z-index: 1;
+}
+
+.arrow-code {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: #2563eb;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+}
+
+.arrow-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+    text-transform: uppercase;
+    line-height: 1.2;
+}
+
+/* ========== ACCIONES OVERLAY ========== */
+
+.process-actions {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.2s ease;
+    z-index: 20;
+}
+
+.process-card.arrow-process .process-actions {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.95);
+    display: flex;
+    flex-direction: row; /* Horizontal para flechas */
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.2s ease;
+    z-index: 20;
+    clip-path: polygon(0% 0%, 94% 0%, 100% 50%, 94% 100%, 0% 100%, 6% 50%);
+}
+
+.process-card.arrow-process:hover .process-actions {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.process-card.small .process-actions {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.2s ease;
+    z-index: 20;
+    border-radius: 1rem;
+    padding: 0.75rem;
+}
+
+.process-card.small:hover .process-actions {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Botones de acción */
+.process-actions button {
+    font-size: 10px;
+    font-weight: 900;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    width: 8rem;
+    border: none;
+    cursor: pointer;
+}
+
+.process-actions button.btn-primary-action {
+    background: white;
+    color: #0f172a;
+}
+
+.process-actions button.btn-primary-action:hover {
+    background: #f97316;
+    color: white;
+}
+
+.process-actions button.btn-secondary-action {
+    background: #ea580c;
+    color: white;
+}
+
+.process-actions button.btn-secondary-action:hover {
+    background: #c2410c;
+}
+
+/* ========== BOTONES PARA TARJETAS PEQUEÑAS (SOPORTE) - TAMAÑO UNIFORME Y BORDES REDONDEADOS ========== */
+
+/* Botones base para soporte - AHORA CON BORDES REDONDEADOS Y TAMAÑO UNIFORME */
+.btn-action-primary,
+.btn-action-secondary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    width: 100%;
+    padding: 0.4rem 0.65rem;
+    border-radius: 0.75rem; /* Bordes redondeados como los azules */
+    font-size: 0.45rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 28px; /* Altura uniforme */
+}
+
+.btn-action-primary {
+    background: #10b981;
+    color: white;
+}
+
+.btn-action-primary:hover {
+    background: #059669;
+}
+
+.btn-action-secondary {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.btn-action-secondary:hover {
+    background: white;
+}
+
+/* ========== BOTÓN FICHA TÉCNICA (TERCER BOTÓN) ========== */
+
+/* Estilo base */
+.btn-action-third {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem; /* Bordes redondeados iguales a los otros */
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #64748b;
+    color: white;
+    min-height: 32px; /* Altura uniforme */
+}
+
+.btn-action-third:hover {
+    background: #475569;
+    transform: translateY(-1px);
+}
+
+.btn-action-third .material-symbols-outlined {
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+/* ========== TAMAÑOS ESPECÍFICOS POR TIPO DE TARJETA ========== */
+
+/* En tarjetas PEQUEÑAS (soporte) - BOTONES CON TAMAÑO UNIFORME Y BORDES REDONDEADOS */
+.process-card.small .btn-action-third,
+.process-card.small .btn-action-primary,
+.process-card.small .btn-action-secondary {
+    padding: 0.4rem 0.65rem;      /* Padding uniforme */
+    font-size: 0.6rem;            /* Texto legible pero compacto */
+    border-radius: 0.75rem;       /* Bordes redondeados como los azules */
+    gap: 0.25rem;                 /* Espacio consistente */
+    min-height: 28px;             /* Altura uniforme */
+    width: 100%;                  /* Ancho completo */
+    max-width: 120px;             /* Ancho máximo uniforme */
+}
+
+.process-card.small .btn-action-third .material-symbols-outlined,
+.process-card.small .btn-action-primary .material-symbols-outlined,
+.process-card.small .btn-action-secondary .material-symbols-outlined {
+    font-size: 0.75rem;           /* Icono proporcional */
+}
+
+/* Colores específicos para soporte en tarjetas pequeñas */
+.process-card.small .btn-action-primary {
+    background: #10b981;
+    color: white;
+}
+
+.process-card.small .btn-action-third {
+    background: #10b981;
+    color: white;
+}
+.process-card.small .btn-action-third:hover {
+    background: #059669;
+}
+}
+
+.process-card.small .btn-action-primary:hover {
+    background: #059669;
+}
+
+.process-card.small .btn-action-secondary {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.process-card.small .btn-action-secondary:hover {
+    background: white;
+}
+
+/* Variante para procesos de soporte (verde) */
+.btn-action-third.support-btn {
+    background: #10b981;
+    color: white;
+}
+
+.btn-action-third.support-btn:hover {
+    background: #059669;
+}
+
+/* En tarjetas ESTÁNDAR (estratégicos) */
+.process-card.standard .btn-action-third {
+    padding: 0.625rem 1.25rem;
+    font-size: 10px;
+    width: 8rem;
+    border-radius: 0.75rem;
+}
+
+/* En tarjetas FLECHA (misionales) */
+.process-card.arrow-process .btn-action-third {
+    padding: 0.625rem 1.25rem;
+    font-size: 10px;
+    width: 9.5rem;
+    border-radius: 0.75rem;
+}
+
+/* ========== AJUSTES PARA OVERLAY CON 3 BOTONES ========== */
+
+.process-actions {
+    gap: 0.5rem;                  /* Espacio entre botones */
+    padding: 0.75rem;             /* Padding del contenedor */
+}
+
+.process-card.small .process-actions {
+    gap: 0.4rem;                  /* Espacio reducido para tarjetas de soporte */
+    padding: 0.75rem;
+}
+
+.process-card.arrow-process .process-actions {
+    gap: 0.5rem;
+}
+
+/* ========== TEXTOS Y CÓDIGOS ========== */
+
+.process-code {
+    font-size: 0.75rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.process-code.strategic { color: #ea580c; }
+.process-code.missional { color: #2563eb; }
+.process-code.support { color: #059669; }
+
+.process-title {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #0f172a;
+    text-align: center;
+    text-transform: uppercase;
+    line-height: 1.3;
+    margin: 0;
+}
+
+/* ========== GRADIENTES ========== */
+
+.gradient-strategic {
+    background: linear-gradient(135deg, #f97316 0%, #fb923c 50%, #fcd34d 100%);
+    box-shadow: 0 20px 50px -12px rgba(249, 115, 22, 0.4), 0 0 20px 2px rgba(249, 115, 22, 0.15);
+}
+
+.gradient-missional {
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #2dd4bf 100%);
+    box-shadow: 0 20px 50px -12px rgba(37, 99, 235, 0.4), 0 0 20px 2px rgba(37, 99, 235, 0.15);
+}
+
+.gradient-support {
+    background: linear-gradient(135deg, #84cc16 0%, #10b981 50%, #14b8a6 100%);
+    box-shadow: 0 20px 50px -12px rgba(16, 185, 129, 0.4), 0 0 20px 2px rgba(16, 185, 129, 0.15);
+}
+
+/* ========== POSICIONES PARA SEGUNDA FILA CENTRADA ========== */
+
+/* Cuando hay 9 procesos (Educación), la segunda fila (4 elementos) se centra */
+.support-grid:has(> :nth-child(9):last-child) > .process-card.small:nth-child(6) {
+    grid-column: 2;
+}
+
+.support-grid:has(> :nth-child(9):last-child) > .process-card.small:nth-child(7) {
+    grid-column: 3;
+}
+
+.support-grid:has(> :nth-child(9):last-child) > .process-card.small:nth-child(8) {
+    grid-column: 4;
+}
+
+.support-grid:has(> :nth-child(9):last-child) > .process-card.small:nth-child(9) {
+    grid-column: 5;
+}
+
+/* ========== RESPONSIVE ========== */
+
+@media (max-width: 1024px) {
+    .support-row {
+        justify-content: center !important;
+    }
+    
+    .support-row.second-row {
+        padding-left: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .process-card.small {
+        width: 140px;
+        min-height: 100px;
+    }
+    
+    /* Botones más pequeños en móviles pero manteniendo proporciones */
+    .process-card.small .btn-action-third,
+    .process-card.small .btn-action-primary,
+    .process-card.small .btn-action-secondary {
+        padding: 0.4rem 0.5rem;
+        font-size: 0.55rem;
+        min-height: 28px;
+        border-radius: 0.5rem;
+    }
+}
+
+/* ========== DARK MODE ========== */
+
+.dark .process-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.dark .process-title {
+    color: #f1f5f9;
+}
+
+.dark .arrow-title {
+    color: #ffffff;
+}
+
+.dark .process-card.arrow-process::before {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .btn-action-secondary {
+    background: #334155;
+    color: white;
+}
+
+.dark .btn-action-secondary:hover {
+    background: #475569;
+}
+
+/* Soporte - texto claro en modo oscuro */
+.dark .process-card.small .process-title {
+    color: #f1f5f9; /* Texto claro */
+}
+
+/* Botones específicos para procesos misionales (azules) */
+.btn-missional-primary {
+    background: white;
+    color: #1e40af;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem;
+    border: none;
+    cursor: pointer;
+    text-transform: uppercase;
+    width: 8rem;
+    transition: all 0.2 ease;
+}
+
+.btn-missional-primary:hover {
+    background: #2563eb;
+    color: white;
+}
+
+.btn-missional-secondary {
+    background: #2563eb;
+    color: white;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem;
+    border: none;
+    cursor: pointer;
+    text-transform: uppercase;
+    width: 8rem;
+    transition: all 0.2s ease;
+}
+
+.btn-missional-secondary:hover {
+    background: #1d4ed8;
+}
+
+/* Grid de soporte - 5 columnas base */
+.support-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1.25rem;
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    justify-items: center;
+}
+
+/* Layout especial para 9 elementos: 5 arriba, 4 abajo centrados */
+.support-grid.layout-9 > .process-card.small.pos-1 { grid-column: 2; }
+.support-grid.layout-9 > .process-card.small.pos-2 { grid-column: 3; }
+.support-grid.layout-9 > .process-card.small.pos-3 { grid-column: 4; }
+.support-grid.layout-9 > .process-card.small.pos-4 { grid-column: 5; }
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .support-grid {
+        grid-template-columns: repeat(3, 1fr);
+        max-width: 600px;
+    }
+    
+    /* Resetear posiciones en tablet/móvil */
+    .support-grid.layout-9 > .process-card.small {
+        grid-column: auto !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .support-grid {
+        grid-template-columns: repeat(2, 1fr);
+        max-width: 400px;
+    }
+}
+
+/* Código PE.01 más grande */
+.process-card.standard .process-code.strategic {
+    font-size: 1.2rem; /* Antes 0.75rem */
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+    color: #ea580c;
+}
+
+/* Título más grande */
+.process-card.standard .process-title {
+    font-size: 1rem; /* Antes 0.7rem */
+    font-weight: 800;
+    color: #0f172a;
+    text-align: center;
+    text-transform: uppercase;
+    line-height: 1.3;
+    margin: 0;
+}
+
+/* En modo oscuro */
+.dark .process-card.standard .process-title {
+    color: #f1f5f9; /* Texto claro */
+}
+
+.dark .process-card.standard .process-code.strategic {
+    color: #fb923c; /* Naranja claro */
+}
+
+/* Iconos en botones */
+.btn-action-primary .material-symbols-outlined,
+.btn-action-secondary .material-symbols-outlined {
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+/* Botones más anchos en flechas */
+.process-card.arrow-process .btn-action-primary,
+.process-card.arrow-process .btn-action-secondary {
+    width: 7rem;
+    padding: 0.625rem;
+}
+
+/* Colores para Estratégicos (naranja) */
+.process-card.standard .btn-action-primary.strategic-btn,
+.process-actions .btn-action-primary.strategic-btn {
+    background: #f97316;
+    color: white;
+}
+
+.process-card.standard .btn-action-primary.strategic-btn:hover,
+.process-actions .btn-action-primary.strategic-btn:hover {
+    background: #ea580c;
+}
+
+.process-card.standard .btn-action-secondary.strategic-btn,
+.process-actions .btn-action-secondary.strategic-btn {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.process-card.standard .btn-action-secondary.strategic-btn:hover,
+.process-actions .btn-action-secondary.strategic-btn:hover {
+    background: white;
+}
+
+/* Colores para Misionales (azul) */
+.process-card.arrow-process .btn-action-primary.missional-btn,
+.process-actions .btn-action-primary.missional-btn {
+    background: #2563eb;
+    color: white;
+}
+
+.process-card.arrow-process .btn-action-primary.missional-btn:hover,
+.process-actions .btn-action-primary.missional-btn:hover {
+    background: #1d4ed8;
+}
+
+.process-card.arrow-process .btn-action-secondary.missional-btn,
+.process-actions .btn-action-secondary.missional-btn {
+    background: #eff6ff;
+    color: #1e40af;
+}
+
+.process-card.arrow-process .btn-action-secondary.missional-btn:hover,
+.process-actions .btn-action-secondary.missional-btn:hover {
+    background: white;
+}
+
+/* Variante para procesos misionales (azul) */
+.btn-action-third.missional-btn {
+    background: #2563eb;
+    color: white;
+}
+
+.btn-action-third.missional-btn:hover {
+    background: #1d4ed8;
+}
+
+/* Variante para procesos estratégicos (naranja) */
+.btn-action-third.strategic-btn {
+    background: #f97316;
+    color: white;
+}
+
+.btn-action-third.strategic-btn:hover {
+    background: #ea580c;
+}
+
+/* ============================================
+   PANEL DE INDICADORES - DEBAJO DEL MAPA
+   ============================================ */
+
+#indicators-section {
+    animation: slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Items de indicador con animación escalonada */
+.indicator-item {
+    animation: fadeInUp 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+.indicator-item:nth-child(1) { animation-delay: 0.05s; }
+.indicator-item:nth-child(2) { animation-delay: 0.1s; }
+.indicator-item:nth-child(3) { animation-delay: 0.15s; }
+.indicator-item:nth-child(4) { animation-delay: 0.2s; }
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================
+   VERSIÓN CLARA - MÁS NOTABLE/CONTRASTE
+   ============================================ */
+
+/* Contenedor principal - IGUAL QUE FLUJOGRAMAS */
+#indicators-section > div {
+    background: #ffffff;
+    border: 3px solid #cbd5e1;
+    border-radius: 2rem;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.25),
+        0 0 0 1px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    overflow: hidden;
+    position: relative;
+}
+
+/* Línea decorativa superior (como flujogramas) */
+#indicators-section > div::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+}
+
+/* Header con fondo diferenciado */
+#indicators-section > div > div:first-child {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    border-bottom: 3px solid #cbd5e1;  /* ← CAMBIAR A 3px */
+    padding: 2rem;
+}
+
+/* Título principal más oscuro */
+#indicators-section h3 {
+    color: #0f172a;
+    font-weight: 900;
+    font-size: 1.75rem;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Nombre del proceso en azul oscuro */
+#indicators-section h3 span {
+    color: #1e40af;
+    font-weight: 900;
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Subtítulo más visible */
+#indicators-section p {
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+/* Botón cerrar más visible */
+#indicators-section button[class*="rounded-full"] {
+    background: #ffffff;
+    color: #64748b;
+    border: 2px solid #94a3b8;
+    width: 2.75rem;
+    height: 2.75rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+#indicators-section button[class*="rounded-full"]:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+    transform: rotate(90deg) scale(1.1);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Sección del buscador con fondo diferente */
+#indicators-section .border-b:nth-child(2) {
+    background: #f8fafc;
+    border-bottom: 2px solid #cbd5e1;
+    padding: 1.5rem 2rem;
+}
+
+/* Input de búsqueda más notable */
+#indicators-section input {
+    background: #ffffff;
+    border: 2px solid #94a3b8;  
+    color: #0f172a;
+    font-weight: 600;
+    font-size: 1rem;
+    box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.06),
+        0 1px 2px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+#indicators-section input:focus {
+    border-color: #3b82f6;
+    box-shadow: 
+        0 0 0 4px rgba(59, 130, 246, 0.15), 
+        inset 0 2px 4px rgba(0, 0, 0, 0.06);
+    outline: none;
+}
+
+#indicators-section input::placeholder {
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+/* Ícono de búsqueda más visible */
+#indicators-section .text-slate-400 {
+    color: #64748b !important;  
+    font-size: 1.25rem;
+}
+
+/* Lista de indicadores */
+#indicators-list {
+    padding: 2rem;  
+    background: #f8fafc;
+    min-height: 300px;
+}
+
+
+
+/* ============================================
+   ITEMS DE INDICADOR - VERSIÓN CLARA
+   ============================================ */
+
+/* Fondo blanco puro para destacar sobre el panel gris */
+.indicator-item {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
+                0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    margin-bottom: 16px;
+    border-radius: 16px;
+    transition: all 0.2s ease;
+}
+
+/* Línea lateral de color (como flujogramas) */
+.indicator-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 1.5rem;
+    bottom: 1.5rem;
+    width: 4px;
+    background: linear-gradient(180deg, #3b82f6 0%, #8b5cf6 100%);
+    border-radius: 0 2px 2px 0;
+    transition: all 0.3s ease;
+}
+
+.indicator-item:hover::before {
+    width: 6px;
+    top: 1rem;
+    bottom: 1rem;
+}
+
+.indicator-item:hover {
+    border-color: #3b82f6;
+    box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.15),
+        0 10px 10px -5px rgba(0, 0, 0, 0.08),
+        0 0 0 1px rgba(59, 130, 246, 0.1);
+    transform: translateY(-6px) scale(1.01);
+}
+
+/* Código del indicador - más llamativo */
+.indicator-item .inline-flex {
+    background: #0f172a !important; /* slate-900 */
+    color: #ffffff !important;
+    font-weight: 800;
+    font-size: 0.8rem;
+    padding: 6px 14px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Nombre del indicador más destacado */
+.indicator-item h4 {
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 1.125rem;
+    margin-top: 8px;
+    margin-bottom: 6px;
+}
+
+/* Descripción más legible */
+.indicator-item p {
+    color: #475569;
+    font-weight: 400;
+    line-height: 1.6;
+}
+
+/* ============================================
+   BOTONES - VERSIÓN CLARA
+   ============================================ */
+
+/* Botón Visualizar - más llamativo */
+.indicator-item button[class*="bg-blue-100"] {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 2px solid #bfdbfe;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+    transition: all 0.2s ease;
+}
+
+.indicator-item button[class*="bg-blue-100"]:hover {
+    background: #3b82f6;
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    transform: translateY(-2px);
+}
+
+/* Botón Descargar - más llamativo */
+.indicator-item button[class*="bg-slate-900"] {
+    background: #0f172a;
+    color: #ffffff;
+    border: 2px solid #1e293b;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+.indicator-item button[class*="bg-slate-900"]:hover {
+    background: #1e293b;
+    border-color: #334155;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+}
+
+/* ============================================
+   DARK MODE - PANEL DE INDICADORES
+   ============================================ */
+
+.dark #indicators-section > div {
+    background: #1e293b;
+    border-color: #475569;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255,255,255,0.05);
+}
+
+.dark #indicators-section > div::before {
+    background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%);
+}
+
+.dark #indicators-section > div > div:first-child {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #475569;
+}
+
+.dark #indicators-section h3 {
+    color: #f9fafb;
+}
+
+.dark #indicators-section h3 span {
+    background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dark #indicators-section p {
+    color: #94a3b8;
+}
+
+.dark #indicators-section button[class*="rounded-full"] {
+    background: #334155;
+    color: #cbd5e1;
+    border-color: #475569;
+}
+
+.dark #indicators-section button[class*="rounded-full"]:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+}
+
+.dark #indicators-section .border-b:nth-child(2) {
+    background: #0f172a;
+    border-color: #334155;
+}
+
+.dark #indicators-section input {
+    background: #1e293b;
+    border-color: #475569;
+    color: #f9fafb;
+}
+
+.dark #indicators-section input::placeholder {
+    color: #64748b;
+}
+
+.dark #indicators-list {
+    background: #0f172a;
+}
+
+.dark .indicator-item {
+    background: #1e293b;
+    border-color: #334155;
+    box-shadow: 
+        0 4px 6px -1px rgba(0, 0, 0, 0.3),
+        0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+.dark .indicator-item:hover {
+    border-color: #60a5fa;
+    box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(96, 165, 250, 0.2);
+    background: #27354f;
+}
+
+/* Línea lateral en Dark Mode */
+.dark .indicator-item::before {
+    background: linear-gradient(180deg, #60a5fa 0%, #a78bfa 100%);
+}
+
+.dark .indicator-item h4 {
+    color: #f9fafb;
+}
+
+.dark .indicator-item:hover h4 {
+    color: #93c5fd;
+}
+
+.dark .indicator-item p {
+    color: #94a3b8;
+}
+
+.dark .indicator-item .inline-flex {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.2) 0%, rgba(96, 165, 250, 0.1) 100%) !important;
+    color: #60a5fa !important;
+    border: 2px solid rgba(96, 165, 250, 0.3) !important;
+}
+
+.dark .indicator-item button[class*="bg-blue-100"] {
+    background: #1e293b;
+    color: #60a5fa;
+    border-color: #3b82f6;
+}
+
+.dark .indicator-item button[class*="bg-blue-100"]:hover {
+    background: #3b82f6;
+    color: #ffffff;
+}
+
+.dark .indicator-item button[class*="bg-slate-900"] {
+    background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);
+    color: #0f172a;
+    border-color: #e5e7eb;
+}
+
+.dark .indicator-item button[class*="bg-slate-900"]:hover {
+    background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%);
+    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
+}
+
+/* Modal de descarga en Dark Mode */
+.dark #download-modal {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.dark #download-modal > div {
+    background: #1e293b;
+    border: 1px solid #334155;
+}
+
+/* Ficha técnica en Dark Mode */
+.dark .ficha-section {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.dark .ficha-section h3 {
+    color: #94a3b8;
+}
+
+.dark .ficha-section table {
+    border-color: #334155;
+}
+
+.dark .ficha-section td,
+.dark .ficha-section th {
+    border-color: #334155;
+    color: #cbd5e1;
+}
+
+.dark .ficha-section td:first-child {
+    background: #0f172a;
+    color: #94a3b8;
+}
+
+/* Gráfico de tendencia en Dark Mode */
+.dark #tendencia-chart rect[fill="#f8fafc"] {
+    fill: #1e293b;
+    stroke: #334155;
+}
+
+.dark #tendencia-chart text[fill="#64748b"] {
+    fill: #94a3b8;
+}
+
+.dark #tendencia-chart text[fill="#3b82f6"] {
+    fill: #60a5fa;
+}
+
+.dark #tendencia-chart circle {
+    fill: #f472b6;
+    stroke: #1e293b;
+}
+
+.dark #tendencia-chart polyline {
+    stroke: #f472b6;
+}
+
+
+/* ============================================
+   RESPONSIVE - PANEL DE INDICADORES
+   ============================================ */
+
+@media (max-width: 768px) {
+    #indicators-section .indicator-item {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 1rem;
+    }
+    
+    #indicators-section .indicator-item > div:last-child {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    
+    #indicators-section h3 {
+        font-size: 1.25rem;
+    }
+}
+
+/* ============================================
+   FICHA TÉCNICA - TABLAS
+   ============================================ */
+
+/* Tablas de ficha técnica */
+#indicators-section table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#indicators-section th,
+#indicators-section td {
+    transition: background-color 0.2s ease;
+}
+
+/* Hover en filas de tabla de seguimiento */
+#indicators-section tbody tr:hover td {
+    background-color: #f1f5f9;
+}
+
+.dark #indicators-section tbody tr:hover td {
+    background-color: #334155;
+}
+
+/* Fórmula matemática */
+#indicators-section .formula-box {
+    font-family: 'Times New Roman', serif;
+}
+
+/* Badges de estado */
+#indicators-section .rounded-full {
+    font-weight: 600;
+    letter-spacing: 0.025em;
+}
+
+/* Responsive para tablas */
+@media (max-width: 1024px) {
+    #indicators-section table {
+        font-size: 0.75rem;
+    }
+    
+    #indicators-section th,
+    #indicators-section td {
+        padding: 0.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    #indicators-section .overflow-x-auto {
+        margin: 0 -1rem;
+        padding: 0 1rem;
+    }
+}
+
+/* ============================================
+   ANIMACIONES FLUIDAS PARA PANEL DE INDICADORES
+   ============================================ */
+
+/* Contenedor principal */
+#indicators-section {
+    transition: all 0.3s ease;
+}
+
+/* ============================================
+   LISTA DE INDICADORES - Animación escalonada
+   ============================================ */
+
+.indicator-item {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeInUpStagger 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.indicator-item:nth-child(1) { animation-delay: 0.1s; }
+.indicator-item:nth-child(2) { animation-delay: 0.18s; }
+.indicator-item:nth-child(3) { animation-delay: 0.26s; }
+.indicator-item:nth-child(4) { animation-delay: 0.34s; }
+.indicator-item:nth-child(5) { animation-delay: 0.42s; }
+
+@keyframes fadeInUpStagger {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Hover suave en items */
+.indicator-item {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.indicator-item:hover {
+    transform: translateX(8px) translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   TRANSICIÓN A FICHA TÉCNICA
+   ============================================ */
+
+/* Salida de la lista */
+.indicators-list-exit {
+    animation: listExit 0.4s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+}
+
+@keyframes listExit {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+}
+
+/* Entrada de la ficha técnica */
+.ficha-tecnica-enter {
+    animation: fichaEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+}
+
+@keyframes fichaEnter {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Secciones de la ficha técnica con animación escalonada */
+.ficha-section {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: sectionEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.ficha-section:nth-child(1) { animation-delay: 0.05s; }
+.ficha-section:nth-child(2) { animation-delay: 0.12s; }
+.ficha-section:nth-child(3) { animation-delay: 0.19s; }
+.ficha-section:nth-child(4) { animation-delay: 0.26s; }
+.ficha-section:nth-child(5) { animation-delay: 0.33s; }
+.ficha-section:nth-child(6) { animation-delay: 0.40s; }
+.ficha-section:nth-child(7) { animation-delay: 0.47s; }
+.ficha-section:nth-child(8) { animation-delay: 0.54s; }
+
+@keyframes sectionEnter {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================
+   BOTÓN VOLVER - Animación de entrada
+   ============================================ */
+
+.btn-volver-enter {
+    opacity: 0;
+    transform: translateX(-20px);
+    animation: btnVolverEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+}
+
+@keyframes btnVolverEnter {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* ============================================
+   FÓRMULA MATEMÁTICA - Animación especial
+   ============================================ */
+
+.formula-container {
+    opacity: 0;
+    transform: scale(0.9);
+    animation: formulaEnter 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s forwards;
+}
+
+@keyframes formulaEnter {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* ============================================
+   BADGES DE ESTADO - Animación de pulso suave
+   ============================================ */
+
+.estado-badge {
+    animation: badgePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes badgePulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.85;
+    }
+}
+
+/* ============================================
+   BOTONES - Transiciones suaves
+   ============================================ */
+
+#indicators-section button {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#indicators-section button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#indicators-section button:active {
+    transform: translateY(0) scale(0.98);
+}
+
+/* ============================================
+   DARK MODE - Ajustes
+   ============================================ */
+
+.dark .indicator-item:hover {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    .indicator-item,
+    .ficha-tecnica-enter,
+    .ficha-section,
+    .btn-volver-enter,
+    .formula-container {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* ============================================
+   GRÁFICO DE TENDENCIA - ANIMACIONES
+   ============================================ */
+
+/* Animación de entrada del gráfico */
+#tendencia-chart {
+    opacity: 0;
+    transform: scale(0.95);
+    animation: chartEnter 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
+}
+
+@keyframes chartEnter {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Animación de dibujo de la línea */
+#tendencia-chart polyline {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: drawLine 1.5s ease-out 0.8s forwards;
+}
+
+@keyframes drawLine {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* Animación de aparición de puntos */
+#tendencia-chart circle {
+    opacity: 0;
+    transform: scale(0);
+    transform-origin: center;
+    animation: pointAppear 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+#tendencia-chart circle:nth-of-type(1) { animation-delay: 1.2s; }
+#tendencia-chart circle:nth-of-type(2) { animation-delay: 1.4s; }
+#tendencia-chart circle:nth-of-type(3) { animation-delay: 1.6s; }
+#tendencia-chart circle:nth-of-type(4) { animation-delay: 1.8s; }
+#tendencia-chart circle:nth-of-type(5) { animation-delay: 2.0s; }
+
+@keyframes pointAppear {
+    from {
+        opacity: 0;
+        transform: scale(0);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Animación de etiquetas de valores */
+#tendencia-chart text[font-weight="600"] {
+    opacity: 0;
+    animation: labelFadeIn 0.4s ease-out forwards;
+}
+
+#tendencia-chart text:nth-of-type(1) { animation-delay: 1.4s; }
+#tendencia-chart text:nth-of-type(2) { animation-delay: 1.6s; }
+#tendencia-chart text:nth-of-type(3) { animation-delay: 1.8s; }
+
+@keyframes labelFadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Dark mode para el gráfico */
+.dark #tendencia-chart rect[fill="#f8fafc"] {
+    fill: #1e293b;
+    stroke: #334155;
+}
+
+.dark #tendencia-chart text[fill="#64748b"] {
+    fill: #94a3b8;
+}
+
+/* ============================================
+   MODAL DE DESCARGA - ESTADOS Y ANIMACIONES
+   ============================================ */
+
+#download-modal {
+    animation: modalBackdropIn 0.3s ease-out;
+}
+
+#download-modal > div {
+    animation: modalContentIn 0.3s ease-out;
+}
+
+@keyframes modalBackdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modalContentIn {
+    from { 
+        opacity: 0;
+        transform: scale(0.95) translateY(-10px);
+    }
+    to { 
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+#download-modal.animate-out {
+    animation: modalBackdropOut 0.2s ease-in forwards;
+}
+
+#download-modal.animate-out > div {
+    animation: modalContentOut 0.2s ease-in forwards;
+}
+
+@keyframes modalBackdropOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes modalContentOut {
+    from { 
+        opacity: 1;
+        transform: scale(1);
+    }
+    to { 
+        opacity: 0;
+        transform: scale(0.95);
+    }
+}
+
+/* Spinner animation */
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Estado del botón deshabilitado */
+#confirm-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.75;
+}
+
+/* Prevenir scroll cuando el modal está abierto */
+body.modal-open {
+    overflow: hidden;
+    padding-right: var(--scrollbar-width, 0px); /* Compensar scrollbar */
+}
+
+/* ============================================
+   PANEL DE FLUJOGRAMAS - DISEÑO MÁS VISIBLE
+   ============================================ */
+
+#flowcharts-section {
+    animation: slideDown 0.4s ease-out;
+    position: relative;
+}
+
+/* Contenedor principal más visible */
+#flowcharts-section > div {
+    background: #ffffff;
+    border: 3px solid #cbd5e1;
+    border-radius: 2rem;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.25),
+        0 0 0 1px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Línea decorativa superior para destacar */
+#flowcharts-section > div::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #f97316 0%, #3b82f6 50%, #10b981 100%);
+}
+
+/* Header con fondo más diferenciado */
+#flowcharts-section > div > div:first-child {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    border-bottom: 3px solid #cbd5e1;
+    padding: 2rem;
+}
+
+/* Título principal más destacado */
+#flowcharts-section h3 {
+    color: #0f172a;
+    font-weight: 900;
+    font-size: 1.75rem;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Nombre del proceso en color primario */
+#flowcharts-section h3 span {
+    color: #1e40af;
+    font-weight: 900;
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Subtítulo más visible */
+#flowcharts-section p {
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+/* Botón cerrar más visible e interactivo */
+#flowcharts-section button[class*="rounded-full"] {
+    background: #ffffff;
+    color: #64748b;
+    border: 2px solid #94a3b8;
+    width: 2.75rem;
+    height: 2.75rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+#flowcharts-section button[class*="rounded-full"]:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+    transform: rotate(90deg) scale(1.1);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Sección del buscador con fondo diferenciado */
+#flowcharts-section .border-b:nth-child(2) {
+    background: #f8fafc;
+    border-bottom: 2px solid #cbd5e1;
+    padding: 1.5rem 2rem;
+}
+
+/* Input de búsqueda más notable */
+#flowcharts-section input {
+    background: #ffffff;
+    border: 2px solid #94a3b8;
+    color: #0f172a;
+    font-weight: 600;
+    font-size: 1rem;
+    box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.06),
+        0 1px 2px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+#flowcharts-section input:focus {
+    border-color: #3b82f6;
+    box-shadow: 
+        0 0 0 4px rgba(59, 130, 246, 0.15), 
+        inset 0 2px 4px rgba(0, 0, 0, 0.06);
+    outline: none;
+}
+
+#flowcharts-section input::placeholder {
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+/* Ícono de búsqueda más visible */
+#flowcharts-section .text-slate-400 {
+    color: #64748b !important;
+    font-size: 1.25rem;
+}
+
+/* Contenedor de lista con padding generoso */
+#flowcharts-section #flowcharts-list {
+    padding: 2rem;
+    background: #f8fafc;
+    min-height: 300px;
+}
+
+/* ============================================
+   GRID DE TARJETAS - MÁS VISIBLES
+   ============================================ */
+
+.flowcharts-grid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1.75rem;
+}
+
+@media (min-width: 768px) {
+    .flowcharts-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .flowcharts-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Tarjeta de flujograma - MÁS VISIBLE */
+.flowchart-card-item {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 1.5rem;
+    padding: 1.75rem;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 
+        0 4px 6px -1px rgba(0, 0, 0, 0.08),
+        0 2px 4px -1px rgba(0, 0, 0, 0.04);
+}
+
+/* Línea lateral de color según tipo */
+.flowchart-card-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 1.5rem;
+    bottom: 1.5rem;
+    width: 4px;
+    border-radius: 0 2px 2px 0;
+    transition: all 0.3s ease;
+}
+
+.flowchart-card-item.strategic::before {
+    background: linear-gradient(180deg, #f97316 0%, #fb923c 100%);
+}
+
+.flowchart-card-item.missional::before {
+    background: linear-gradient(180deg, #2563eb 0%, #3b82f6 100%);
+}
+
+.flowchart-card-item.support::before {
+    background: linear-gradient(180deg, #059669 0%, #10b981 100%);
+}
+
+.flowchart-card-item:hover::before {
+    width: 6px;
+    top: 1rem;
+    bottom: 1rem;
+}
+
+.flowchart-card-item:hover {
+    border-color: #3b82f6;
+    box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.15),
+        0 10px 10px -5px rgba(0, 0, 0, 0.08),
+        0 0 0 1px rgba(59, 130, 246, 0.1);
+    transform: translateY(-6px) scale(1.01);
+}
+
+/* Header de la tarjeta */
+.flowchart-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    padding-left: 0.5rem;
+}
+
+/* Icono contenedor - MÁS GRANDE Y VISIBLE */
+.flowchart-icon-wrapper {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.flowchart-card-item:hover .flowchart-icon-wrapper {
+    transform: scale(1.1) rotate(-5deg);
+}
+
+/* Variantes de color para el icono según el tipo de proceso */
+.flowchart-icon-wrapper.strategic {
+    background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+    color: #ea580c;
+    border: 2px solid #fed7aa;
+}
+
+.flowchart-icon-wrapper.missional {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    color: #2563eb;
+    border: 2px solid #bfdbfe;
+}
+
+.flowchart-icon-wrapper.support {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    color: #059669;
+    border: 2px solid #bbf7d0;
+}
+
+/* Info del flujograma */
+.flowchart-info {
+    flex: 1;
+}
+
+.flowchart-info h5 {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.3;
+    margin-bottom: 0.375rem;
+    transition: color 0.3s ease;
+}
+
+.flowchart-card-item:hover .flowchart-info h5 {
+    color: #1e40af;
+}
+
+/* Código del procedimiento - MÁS VISIBLE */
+.flowchart-code {
+    font-size: 0.8rem;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    display: inline-block;
+}
+
+.flowchart-code.strategic {
+    color: #c2410c;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+}
+
+.flowchart-code.missional {
+    color: #1d4ed8;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+}
+
+.flowchart-code.support {
+    color: #047857;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+}
+
+/* Descripción */
+.flowchart-description {
+    color: #475569;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    margin-bottom: 1.5rem;
+    flex-grow: 1;
+    padding-left: 0.5rem;
+}
+
+/* ============================================
+   BOTONES DE ACCIÓN - ESTILOS MEJORADOS
+   ============================================ */
+
+.flowchart-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875rem;
+    margin-top: auto;
+    padding-left: 0.5rem;
+}
+
+.flowchart-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1rem;
+    border-radius: 0.875rem;
+    font-size: 0.7rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid transparent;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Efecto de ripple en botones */
+.flowchart-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.flowchart-btn:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+/* Botón Visualizar - MÁS VISIBLE */
+.flowchart-btn.view {
+    background: #ffffff;
+    color: #1e40af;
+    border: 2px solid #3b82f6;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.flowchart-btn.view:hover {
+    background: #3b82f6;
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+    transform: translateY(-2px);
+}
+
+.flowchart-btn.view:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+/* Botón Descargar - MÁS VISIBLE */
+.flowchart-btn.download {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #ffffff;
+    border: 2px solid #0f172a;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.flowchart-btn.download:hover {
+    background: linear-gradient(135deg, #000000 0%, #0f172a 100%);
+    border-color: #000000;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    transform: translateY(-2px);
+}
+
+.flowchart-btn.download:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Iconos en botones */
+.flowchart-btn .material-symbols-outlined {
+    font-size: 1.1rem;
+    transition: transform 0.3s ease;
+}
+
+.flowchart-btn:hover .material-symbols-outlined {
+    transform: scale(1.2);
+}
+
+/* ============================================
+   MODAL DE VISUALIZACIÓN DE FLUJOGRAMA
+   ============================================ */
+
+#flowchart-viewer-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    opacity: 0;
+    animation: modalFadeIn 0.3s ease forwards;
+}
+
+@keyframes modalFadeIn {
+    to { opacity: 1; }
+}
+
+#flowchart-viewer-modal > div {
+    background: #ffffff;
+    border-radius: 2rem;
+    max-width: 900px;
+    width: 100%;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255,255,255,0.1);
+    transform: scale(0.9) translateY(20px);
+    animation: modalContentIn 0.4s ease 0.1s forwards;
+}
+
+@keyframes modalContentIn {
+    to { 
+        transform: scale(1) translateY(0);
+    }
+}
+
+.flowchart-viewer-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 2px solid #e2e8f0;
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.flowchart-viewer-header h4 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.flowchart-viewer-content {
+    padding: 2rem;
+    overflow-y: auto;
+    max-height: calc(90vh - 200px);
+}
+
+.flowchart-canvas {
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 1rem;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.flowchart-canvas img {
+    max-width: 100%;
+    max-height: 500px;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.flowchart-placeholder {
+    text-align: center;
+    color: #94a3b8;
+}
+
+.flowchart-placeholder .material-symbols-outlined {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.flowchart-viewer-footer {
+    padding: 1.5rem 2rem;
+    border-top: 2px solid #e2e8f0;
+    background: #f8fafc;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+/* ============================================
+   ANIMACIONES
+   ============================================ */
+
+.flowchart-card-item {
+    opacity: 0;
+    transform: translateY(30px);
+    animation: cardEnter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.flowchart-card-item:nth-child(1) { animation-delay: 0.08s; }
+.flowchart-card-item:nth-child(2) { animation-delay: 0.16s; }
+.flowchart-card-item:nth-child(3) { animation-delay: 0.24s; }
+.flowchart-card-item:nth-child(4) { animation-delay: 0.32s; }
+.flowchart-card-item:nth-child(5) { animation-delay: 0.40s; }
+.flowchart-card-item:nth-child(6) { animation-delay: 0.48s; }
+
+@keyframes cardEnter {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* ============================================
+   DARK MODE - PANEL DE FLUJOGRAMAS MEJORADO
+   ============================================ */
+
+.dark #flowcharts-section > div {
+    background: #1e293b;
+    border-color: #475569;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255,255,255,0.05);
+}
+
+.dark #flowcharts-section > div::before {
+    background: linear-gradient(90deg, #fb923c 0%, #60a5fa 50%, #34d399 100%);
+}
+
+.dark #flowcharts-section > div > div:first-child {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #475569;
+}
+
+.dark #flowcharts-section h3 {
+    color: #f9fafb;
+}
+
+.dark #flowcharts-section h3 span {
+    background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dark #flowcharts-section p {
+    color: #94a3b8;
+}
+
+.dark #flowcharts-section button[class*="rounded-full"] {
+    background: #334155;
+    color: #cbd5e1;
+    border-color: #475569;
+}
+
+.dark #flowcharts-section button[class*="rounded-full"]:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+}
+
+.dark #flowcharts-section .border-b:nth-child(2) {
+    background: #0f172a;
+    border-color: #334155;
+}
+
+.dark #flowcharts-section input {
+    background: #1e293b;
+    border-color: #475569;
+    color: #f9fafb;
+}
+
+.dark #flowcharts-section input::placeholder {
+    color: #64748b;
+}
+
+.dark #flowcharts-section #flowcharts-list {
+    background: #0f172a;
+}
+
+.dark .flowchart-card-item {
+    background: #1e293b;
+    border-color: #334155;
+    box-shadow: 
+        0 4px 6px -1px rgba(0, 0, 0, 0.3),
+        0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+.dark .flowchart-card-item:hover {
+    border-color: #60a5fa;
+    box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(96, 165, 250, 0.2);
+    background: #27354f;
+}
+
+.dark .flowchart-icon-wrapper.strategic {
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%);
+    color: #fb923c;
+    border-color: rgba(251, 146, 60, 0.3);
+}
+
+.dark .flowchart-icon-wrapper.missional {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.2) 0%, rgba(96, 165, 250, 0.1) 100%);
+    color: #60a5fa;
+    border-color: rgba(96, 165, 250, 0.3);
+}
+
+.dark .flowchart-icon-wrapper.support {
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.2) 0%, rgba(52, 211, 153, 0.1) 100%);
+    color: #34d399;
+    border-color: rgba(52, 211, 153, 0.3);
+}
+
+.dark .flowchart-info h5 {
+    color: #f9fafb;
+}
+
+.dark .flowchart-card-item:hover .flowchart-info h5 {
+    color: #93c5fd;
+}
+
+.dark .flowchart-code.strategic {
+    color: #fb923c;
+    background: rgba(251, 146, 60, 0.15);
+    border-color: rgba(251, 146, 60, 0.3);
+}
+
+.dark .flowchart-code.missional {
+    color: #60a5fa;
+    background: rgba(96, 165, 250, 0.15);
+    border-color: rgba(96, 165, 250, 0.3);
+}
+
+.dark .flowchart-code.support {
+    color: #34d399;
+    background: rgba(52, 211, 153, 0.15);
+    border-color: rgba(52, 211, 153, 0.3);
+}
+
+.dark .flowchart-description {
+    color: #94a3b8;
+}
+
+.dark .flowchart-btn.view {
+    background: #1e293b;
+    color: #60a5fa;
+    border-color: #3b82f6;
+}
+
+.dark .flowchart-btn.view:hover {
+    background: #3b82f6;
+    color: #ffffff;
+}
+
+.dark .flowchart-btn.download {
+    background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);
+    color: #0f172a;
+    border-color: #e5e7eb;
+}
+
+.dark .flowchart-btn.download:hover {
+    background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%);
+    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
+}
+
+/* Dark mode para modal */
+.dark #flowchart-viewer-modal {
+    background: rgba(0, 0, 0, 0.85);
+}
+
+.dark #flowchart-viewer-modal > div {
+    background: #1e293b;
+    border: 1px solid #334155;
+}
+
+.dark .flowchart-viewer-header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #334155;
+}
+
+.dark .flowchart-viewer-header h4 {
+    color: #f9fafb;
+}
+
+.dark .flowchart-viewer-content {
+    background: #0f172a;
+}
+
+.dark .flowchart-canvas {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.dark .flowchart-placeholder {
+    color: #64748b;
+}
+
+.dark .flowchart-viewer-footer {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .flowchart-actions {
+        grid-template-columns: 1fr;
+    }
+    
+    .flowchart-card-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .flowchart-icon-wrapper {
+        width: 3.5rem;
+        height: 3.5rem;
+    }
+    
+    .flowchart-info h5 {
+        font-size: 1rem;
+    }
+    
+    #flowcharts-section > div {
+        border-radius: 1.5rem;
+    }
+    
+    #flowcharts-section > div > div:first-child,
+    #flowcharts-section .border-b:nth-child(2),
+    #flowcharts-section #flowcharts-list {
+        padding: 1.25rem;
+    }
+}
+
+/* ============================================
+   ANIMACIONES MODAL FLUJOGRAMAS - FLUIDAS
+   ============================================ */
+
+@keyframes modalBackdropIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes modalContentIn {
+    0% { 
+        opacity: 0;
+        transform: scale(0.85) translateY(30px);
+    }
+    60% {
+        transform: scale(1.02) translateY(-5px);
+    }
+    100% { 
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes modalBackdropOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes modalContentOut {
+    from { 
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    to { 
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+    }
+}
+
+/* ============================================
+   PANEL DE FICHA TÉCNICA - DEBAJO DEL MAPA
+   ============================================ */
+
+#ficha-tecnica-section {
+    animation: slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Animación de salida */
+#ficha-tecnica-section.hidden {
+    animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+#ficha-tecnica-section > div {
+    position: relative !important;
+}
+
+#ficha-tecnica-section > div::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #f97316 0%, #3b82f6 50%, #10b981 100%);
+    z-index: 10;
+}
+
+/* Header específico de ficha técnica */
+#ficha-tecnica-section > div > div:first-child {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+}
+
+/* Info del archivo */
+#ficha-tecnica-section .file-info-box {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+    transition: all 0.3s ease;
+}
+
+#ficha-tecnica-section .file-info-box:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Botón descargar */
+#ficha-tecnica-section #btn-download-ficha {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #ffffff;
+    border: 2px solid #0f172a;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#ficha-tecnica-section #btn-download-ficha:hover {
+    background: linear-gradient(135deg, #000000 0%, #0f172a 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+#ficha-tecnica-section #btn-download-ficha:active {
+    transform: translateY(0);
+}
+
+/* Contenedor del PDF */
+#ficha-tecnica-section .pdf-viewer-box {
+    background: #ffffff;
+    border: 2px dashed #cbd5e1;
+    border-radius: 0.75rem;
+    transition: all 0.3s ease;
+}
+
+#ficha-tecnica-section .pdf-viewer-box:hover {
+    border-color: #94a3b8;
+}
+
+/* Placeholder */
+#ficha-tecnica-section .pdf-placeholder-box {
+    background: #f8fafc;
+}
+
+#ficha-tecnica-section .pdf-placeholder-box .icon-pdf-box {
+    background: #fef3c7;
+    border: 2px solid #fde68a;
+    color: #d97706;
+}
+
+/* ============================================
+   DARK MODE - FICHA TÉCNICA PANEL
+   ============================================ */
+
+.dark #ficha-tecnica-section > div {
+    background: #1e293b;
+    border-color: #475569;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.dark #ficha-tecnica-section > div::before {
+    background: linear-gradient(90deg, #fb923c 0%, #60a5fa 50%, #34d399 100%);
+}
+
+.dark #ficha-tecnica-section > div > div:first-child {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #475569;
+}
+
+.dark #ficha-tecnica-section h3 {
+    color: #f9fafb;
+}
+
+.dark #ficha-tecnica-section h3 span {
+    color: #60a5fa;
+}
+
+.dark #ficha-tecnica-section .text-slate-500 {
+    color: #94a3b8;
+}
+
+.dark #ficha-tecnica-section button[onclick*="closeFichaTecnicaPanel"] {
+    background: #334155;
+    border-color: #475569;
+    color: #cbd5e1;
+}
+
+.dark #ficha-tecnica-section button[onclick*="closeFichaTecnicaPanel"]:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+}
+
+.dark #ficha-tecnica-section .file-info-box {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.dark #ficha-tecnica-section .file-info-box p:first-child {
+    color: #f9fafb;
+}
+
+.dark #ficha-tecnica-section .file-info-box p:last-child {
+    color: #94a3b8;
+}
+
+.dark #ficha-tecnica-section #btn-download-ficha {
+    background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);
+    color: #0f172a;
+    border-color: #e5e7eb;
+}
+
+.dark #ficha-tecnica-section #btn-download-ficha:hover {
+    background: linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%);
+    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
+}
+
+.dark #ficha-tecnica-section .pdf-viewer-box {
+    background: #0f172a;
+    border-color: #334155;
+}
+
+.dark #ficha-tecnica-section .pdf-placeholder-box {
+    background: #1e293b;
+}
+
+.dark #ficha-tecnica-section .pdf-placeholder-box h4 {
+    color: #cbd5e1;
+}
+
+.dark #ficha-tecnica-section .pdf-placeholder-box p {
+    color: #94a3b8;
+}

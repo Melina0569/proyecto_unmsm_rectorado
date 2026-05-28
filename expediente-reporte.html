@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Hoja de Reporte - Expediente | SIGPRO UNMSM</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <!-- jsPDF para exportar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1978e5",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#111821",
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                    },
+                },
+            },
+        };
+    </script>
+    
+    <link rel="stylesheet" href="css/facultades-expedientes/expediente-reporte.css">
+    <link rel="stylesheet" href="css/facultades-expedientes/profile-menu.css">
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
+    
+    <div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+        <div class="layout-container flex h-full grow flex-col">
+            
+            <!-- HEADER -->
+            <header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60 sticky top-0 z-50">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                    
+                    <div class="flex items-center gap-2">
+                        <div class="bg-gradient-to-br from-primary to-blue-800 p-1.5 rounded-lg shadow-lg">
+                            <span class="material-symbols-outlined text-white text-2xl">analytics</span>
+                        </div>
+                        <span class="text-xl font-bold tracking-tight text-[#1a365d] dark:text-white">SIGPRO</span>
+                    </div>
+
+                    <!-- Nav -->
+                    <nav class="flex items-center gap-6">
+                        <a class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white transition-colors" href="facultades-inicio.html">Inicio</a>
+                        <a class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white transition-colors" href="facultades-documentos.html">Documentos</a>
+                        <a class="text-sm font-semibold text-primary border-b-2 border-primary pb-1" href="facultades-expedientes.html">Repositorio</a>
+                        <a class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white transition-colors" href="facultades-nuevo.html">Nuevo</a>
+                    </nav>
+
+                    <!-- Controles -->
+                    <div class="flex items-center gap-4">
+                        <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                            <span class="material-symbols-outlined text-slate-600 dark:text-slate-400 block dark:hidden">dark_mode</span>
+                            <span class="material-symbols-outlined text-slate-300 hidden dark:block">light_mode</span>
+                        </button>
+                        <button type="button" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center border border-slate-300 dark:border-slate-600 hover:border-primary dark:hover:border-primary transition-colors" aria-label="Perfil">
+                            <span class="material-symbols-outlined text-slate-500 dark:text-slate-400 text-sm">person</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- MAIN CONTENT -->
+            <main class="flex flex-1 justify-center py-8">
+                <div class="layout-content-container flex flex-col w-full max-w-[1200px] px-6">
+                    
+                    <!-- Breadcrumb y título -->
+                    <div class="flex flex-wrap justify-between items-end gap-3 mb-8">
+                        <div class="flex flex-col gap-2">
+                            <nav class="flex text-xs font-medium text-slate-500 gap-2 items-center">
+                                <a href="facultades-expedientes.html" class="hover:text-primary">Repositorio</a>
+                                <span class="material-symbols-outlined text-xs">chevron_right</span>
+                                <span class="text-primary">Expediente de Reporte</span>
+                            </nav>
+                            <h1 class="text-slate-900 dark:text-slate-100 text-4xl font-black leading-tight tracking-[-0.033em]">
+                                Hoja de Reporte
+                            </h1>
+                            <p class="text-slate-500 dark:text-slate-400 text-base font-normal">
+                                Contenido aprobado del reporte y cuadro de complemento para repositorio.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button onclick="exportarPDF()" class="flex items-center justify-center rounded-lg px-4 h-10 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold gap-2 hover:bg-slate-50 transition-colors">
+                                <span class="material-symbols-outlined text-sm">download</span> 
+                                Exportar PDF
+                            </button>
+                            <button onclick="window.print()" class="flex items-center justify-center rounded-lg px-4 h-10 bg-primary text-white text-sm font-bold gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors">
+                                <span class="material-symbols-outlined text-sm">print</span> 
+                                Imprimir
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- RESUMEN DE REPORTE -->
+                    <section class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
+                        <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">description</span>
+                                <h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight">Datos del Reporte</h2>
+                            </div>
+                            <span id="codigo-display" class="text-primary text-sm font-bold tracking-widest bg-primary/10 px-3 py-1 rounded-full">HR-0000</span>
+                        </div>
+                        <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                            <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Semestre</p>
+                                <p id="rep-semestre" class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">-</p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Fecha de Aprobación</p>
+                                <p id="rep-fecha" class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">-</p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4 lg:col-span-2">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Responsable</p>
+                                <p id="rep-responsable" class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">-</p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4 lg:col-span-2">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Unidad orgánica Responsable</p>
+                                <p id="rep-unidad" class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">-</p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Estado</p>
+                                <p id="rep-estado" class="mt-1 text-sm font-semibold text-emerald-700 dark:text-emerald-400">APROBADO</p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4 md:col-span-2 lg:col-span-5">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Cargo</p>
+                                <p id="rep-cargo" class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">-</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CONTENIDO DEL REPORTE -->
+                    <section class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
+                        <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">edit_note</span>
+                            <h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight">Contenido Cargado en Hoja-Reportes</h2>
+                        </div>
+                        <div class="p-6 space-y-5">
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Actividades Realizadas</p>
+                                <div id="rep-actividades" class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4 text-sm leading-relaxed whitespace-pre-wrap">-</div>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Resultados Obtenidos</p>
+                                <div id="rep-resultados" class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4 text-sm leading-relaxed whitespace-pre-wrap">-</div>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Observaciones</p>
+                                <div id="rep-observaciones" class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4 text-sm leading-relaxed whitespace-pre-wrap">-</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- APARTADO EXCEL Y ADJUNTOS -->
+                    <section class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
+                        <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">attach_file</span>
+                            <h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight">Documentación Adjunta</h2>
+                        </div>
+                        <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <span class="material-symbols-outlined text-emerald-600">picture_as_pdf</span>
+                                    <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Documento Principal PDF</h3>
+                                </div>
+                                <p id="excel-empty" class="text-sm text-slate-500">No se registró un documento principal en PDF.</p>
+                                <ul id="excel-list" class="space-y-2"></ul>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <span class="material-symbols-outlined text-primary">folder</span>
+                                    <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Archivos de Soporte</h3>
+                                </div>
+                                <p id="soporte-empty" class="text-sm text-slate-500">No hay archivos de soporte adicionales.</p>
+                                <ul id="soporte-list" class="space-y-2"></ul>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CUADRO COMPLEMENTARIO -->
+                    <section class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-10">
+                        <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">table_rows</span>
+                                <h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight">Cuadro para Completar por Usuario</h2>
+                            </div>
+                            <button onclick="agregarFilaCuadro()" class="flex items-center justify-center rounded-lg px-4 h-10 bg-primary text-white text-sm font-bold gap-2 shadow-sm hover:bg-primary/90 transition-all">
+                                <span class="material-symbols-outlined text-[20px]">add_circle</span>
+                                Agregar Fila
+                            </button>
+                        </div>
+                        <div class="px-6 pt-5">
+                            <h3 class="text-blue-700 dark:text-blue-400 text-sm font-black uppercase tracking-wide">2. Registro de Asignaciones de Recursos Ordinarios</h3>
+                        </div>
+                        <div class="overflow-x-auto px-6 pt-4">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 dark:bg-slate-800/30 text-slate-600 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                                        <th class="px-4 py-3 text-center w-16">N°</th>
+                                        <th class="px-4 py-3 min-w-[160px]">Fecha de Asignación</th>
+                                        <th class="px-4 py-3 min-w-[220px]">Concepto (Mantenimiento / Planilla / Otros)</th>
+                                        <th class="px-4 py-3 min-w-[320px]">Descripción del Gasto</th>
+                                        <th class="px-4 py-3 min-w-[170px]">Monto Asignado (S/.)</th>
+                                        <th class="px-4 py-3 min-w-[170px]">Monto Ejecutado (S/.)</th>
+                                        <th class="px-4 py-3 min-w-[220px]">Porcentaje de Ejecución Presupuestaria de (RDR)</th>
+                                        <th class="px-4 py-3 min-w-[220px]">Observaciones</th>
+                                        <th class="px-4 py-3 text-center w-20">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-cuadro" class="text-sm divide-y divide-slate-100 dark:divide-slate-800"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="px-6 pt-6 pb-2">
+                            <h3 class="text-blue-700 dark:text-blue-400 text-sm font-black uppercase tracking-wide">3. Resumen de Asignaciones del Semestre</h3>
+                        </div>
+                        <div class="px-6 pb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div class="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                <div class="grid grid-cols-2 text-sm">
+                                    <div class="px-4 py-3 font-bold bg-blue-50 dark:bg-blue-900/20 border-b border-slate-200 dark:border-slate-700">Número de veces que se asignaron recursos (n)</div>
+                                    <div id="resumen-veces-asignaron" class="px-4 py-3 text-right font-semibold border-b border-slate-200 dark:border-slate-700">0</div>
+
+                                    <div class="px-4 py-3 font-bold bg-blue-50 dark:bg-blue-900/20 border-b border-slate-200 dark:border-slate-700">Monto Total Semestral Asignado</div>
+                                    <div id="resumen-total-asignado" class="px-4 py-3 text-right font-semibold border-b border-slate-200 dark:border-slate-700">S/. 0.00</div>
+
+                                    <div class="px-4 py-3 font-bold bg-blue-50 dark:bg-blue-900/20">Monto Total Semestral Ejecutado</div>
+                                    <div id="resumen-total-ejecutado" class="px-4 py-3 text-right font-semibold">S/. 0.00</div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                <div class="grid grid-cols-2 text-sm">
+                                    <div class="px-4 py-3 font-bold bg-blue-50 dark:bg-blue-900/20 border-b border-slate-200 dark:border-slate-700">Promedio por asignación</div>
+                                    <div id="resumen-promedio-asignacion" class="px-4 py-3 text-right font-semibold border-b border-slate-200 dark:border-slate-700">S/. 0.00</div>
+
+                                    <div class="px-4 py-3 font-bold bg-blue-50 dark:bg-blue-900/20">Promedio por Ejecución</div>
+                                    <div id="resumen-promedio-ejecucion" class="px-4 py-3 text-right font-semibold">S/. 0.00</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+                            <button onclick="guardarCuadroComplementario()" class="flex items-center justify-center rounded-lg px-4 h-10 bg-emerald-600 text-white text-sm font-bold gap-2 hover:bg-emerald-700 transition-colors">
+                                <span class="material-symbols-outlined text-[20px]">save</span>
+                                Guardar Cuadro
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </main>
+
+            <!-- Footer -->
+            <footer class="bg-[#1a365d] dark:bg-slate-950 text-white/70 py-10 mt-12 relative z-10 border-t border-slate-700">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                    <div class="flex items-center justify-center gap-3 mb-4">
+                        <span class="material-symbols-outlined text-accent text-3xl">school</span>
+                        <span class="text-white font-bold tracking-widest text-sm uppercase">Oficina General de Planificación - UNMSM</span>
+                    </div>
+                    <p class="text-sm">© 2026 Sistema de Racionalización v2.0</p>
+                    <div class="mt-6 flex justify-center gap-8 text-xs font-medium uppercase tracking-wide">
+                        <a class="hover:text-white transition-colors" href="#">Términos</a>
+                        <a class="hover:text-white transition-colors" href="#">Privacidad</a>
+                        <a class="hover:text-white transition-colors" href="#">Ayuda</a>
+                    </div>
+                </div>
+            </footer>
+
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- JavaScript -->
+    <script src="js/components/api.js"></script>
+    <script src="js/facultades-expedientes/profile-menu.js"></script>
+    <script src="js/facultades-expedientes/expediente-reporte.js"></script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Ficha de Indicador | SIGPRO UNMSM</title>
+
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1a365d',
+                        accent: '#2563eb'
+                    },
+                    fontFamily: {
+                        display: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+
+    <link rel="stylesheet" href="css/facultades-nuevo/ficha-indicador.css?v=5">
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 min-h-screen p-6 md:p-12">
+    <div class="max-w-5xl mx-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div class="bg-slate-100 dark:bg-slate-800 p-6 border-b border-slate-300 dark:border-slate-700">
+                <h1 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg">
+                        <span class="material-symbols-outlined text-white text-xl">summarize</span>
+                    </div>
+                    Ficha de Indicador
+                </h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                    Complete todos los campos obligatorios para la auditoría institucional.
+                </p>
+            </div>
+
+            <form id="ficha-form" class="p-8">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-6">
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Código <span class="text-xs font-normal text-slate-400">(Auto-generado)</span>
+                        </label>
+                        <input type="text" name="codigo" id="codigo-field" readonly
+                            class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                            placeholder="IND-2026-001"/>
+                    </div>
+
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Versión <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="version" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                            placeholder="Ej. 1.0"/>
+                    </div>
+
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Tipo de Proceso <span class="text-red-500">*</span>
+                        </label>
+                        <select name="tipoProceso" id="tipo-proceso-select" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all">
+                            <option value="">Seleccione...</option>
+                            <option value="estrategico">Estratégico</option>
+                            <option value="misional">Misional</option>
+                            <option value="de-apoyo">Soporte</option>
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Proceso <span class="text-red-500">*</span>
+                        </label>
+                        <select name="macroProceso" id="macro-proceso-select" required disabled
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                            <option value="">Primero seleccione Tipo de Proceso</option>
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Seleccione Indicador
+                        </label>
+                        <select name="indicadorTemplate" id="indicador-template-select" disabled
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                            <option value="">Primero seleccione Proceso</option>
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Responsable <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="unidadResponsable" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                            placeholder="Ej. Dirección de Registros Académicos"/>
+                    </div>
+
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Objetivo <span class="text-red-500">*</span>
+                        </label>
+                        <textarea name="objetivoProceso" required rows="3"
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none"
+                            placeholder="Describa el objetivo principal del proceso..."></textarea>
+                    </div>
+
+                    <div class="md:col-span-8">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Nombre del Indicador <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="nombreIndicador" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                            placeholder="Nombre descriptivo del indicador"/>
+                    </div>
+
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Frecuencia <span class="text-red-500">*</span>
+                        </label>
+                        <select name="frecuencia" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all">
+                            <option value="">Seleccione...</option>
+                            <option value="mensual">Mensual</option>
+                            <option value="bimestral">Bimestral</option>
+                            <option value="trimestral">Trimestral</option>
+                            <option value="semestral">Semestral</option>
+                            <option value="anual">Anual</option>
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-12 mt-4">
+                        <div class="bg-slate-100 dark:bg-slate-800 p-4 -mx-8 mb-6 border-y border-slate-300 dark:border-slate-700">
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined text-emerald-600">functions</span>
+                                Variables y Fórmula del Indicador
+                            </h3>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                                    Definición de Variables
+                                </label>
+                                <textarea id="variables-input" name="variables" rows="4"
+                                    class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none"
+                                    placeholder="Ejemplo:&#10;Matriculados = Número de estudiantes matriculados&#10;Admitidos = Total de estudiantes admitidos"></textarea>
+                                <p class="text-xs text-slate-400 mt-1">Describa el significado de cada variable</p>
+                            </div>
+
+                            <div class="bg-slate-100 dark:bg-slate-800 rounded-xl p-4 flex flex-col items-center justify-center border border-slate-200 dark:border-slate-700 min-h-[160px]">
+                                <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2">Visualización</span>
+                                <div id="formula-preview" class="text-center">
+                                    <span class="text-slate-400 text-sm">Ingrese una fórmula...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                                Definición de la Fórmula <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="formula-definicion" name="formulaDefinicion" required
+                                class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                                placeholder="Ej: DEVENGADO / PIM * 100"/>
+                            <p class="text-xs text-slate-400 mt-1">Use / para fracciones. Ej: Numerador / Denominador</p>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Fuente <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="fuente" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                            placeholder="Ej: Sistema de Matrícula, Reportes Académicos"/>
+                    </div>
+
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Meta <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="text" name="meta" required
+                                class="w-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 font-bold rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                                placeholder="Ej: >= 95%"/>
+                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600 dark:text-emerald-400">%</span>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="p-8 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-4">
+                <button type="button" id="btn-finalizar"
+                    class="bg-gradient-to-r from-emerald-600 to-teal-800 hover:from-emerald-700 hover:to-teal-900 text-white px-12 py-4 rounded-xl font-bold tracking-wide flex items-center gap-3 shadow-lg shadow-emerald-600/30 transition-all transform hover:scale-105 active:scale-95">
+                    <span class="material-symbols-outlined text-xl">check_circle</span>
+                    FINALIZAR Y CREAR FICHA
+                </button>
+
+                <a href="facultades-documentos.html" id="btn-expedientes"
+                    class="hidden bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white px-8 py-3 rounded-xl font-semibold tracking-wide flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-all transform hover:scale-105 animate-bounce">
+                    <span class="material-symbols-outlined text-lg">folder_open</span>
+                    Ver en Documentos
+                    <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                </a>
+
+                <p class="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
+                    Todos los campos con * son obligatorios
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <script src="js/components/api.js"></script>
+    <script src="js/facultades-nuevo/ficha-indicador.js"></script>
+</body>
+</html>

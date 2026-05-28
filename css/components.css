@@ -1,0 +1,386 @@
+/* components.css - Componentes reutilizables */
+
+/* ========== BOTONES ========== */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    transition: all var(--transition-base);
+    cursor: pointer;
+}
+
+.btn-primary {
+    background-color: var(--color-primary);
+    color: white;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary:hover {
+    background-color: var(--color-primary-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-secondary {
+    background-color: var(--color-secondary);
+    color: white;
+}
+
+.btn-accent {
+    background-color: var(--color-accent);
+    color: white;
+}
+
+.btn-ghost {
+    background-color: transparent;
+    color: var(--text-secondary);
+}
+
+.btn-ghost:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* ========== CARDS ========== */
+
+.card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-6);
+    transition: all var(--transition-base);
+}
+
+.card-hover:hover {
+    transform: translateY(-8px);
+    box-shadow: var(--shadow-xl);
+}
+
+/* Facultad Card específica */
+.faculty-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-2xl);
+}
+
+.faculty-card__header {
+    height: 0.5rem;
+}
+
+.faculty-card__content {
+    padding: var(--space-8);
+    flex-grow: 1;
+}
+
+.faculty-card__stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+    text-align: center;
+    background-color: var(--bg-primary);
+    padding: var(--space-4);
+    border-radius: var(--radius-xl);
+}
+
+/* ========== ICONOS ========== */
+
+.icon-box {
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.875rem;
+}
+
+/* ========== BADGES ========== */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-3);
+    font-size: 0.625rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    border-radius: var(--radius-full);
+    letter-spacing: 0.05em;
+}
+
+/* ========== NAVEGACIÓN ========== */
+
+.nav {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dark .nav {
+    background-color: rgba(15, 23, 42, 0.8);
+}
+
+/* ========== LAYOUT ========== */
+
+.container {
+    width: 100%;
+    max-width: 80rem;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+}
+
+@media (min-width: 640px) {
+    .container {
+        padding-left: var(--space-6);
+        padding-right: var(--space-6);
+    }
+}
+
+.grid-faculties {
+    display: grid;
+    gap: var(--space-8);
+}
+
+@media (min-width: 768px) {
+    .grid-faculties {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .grid-faculties {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* ========== UTILIDADES DE TEXTO ========== */
+
+.text-gradient {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    background-clip: text;
+    color: transparent;
+}
+
+/* Line clamp moderno */
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-clamp: 2;
+}
+
+/* ========== GLASS EFFECT ========== */
+
+.glass {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================================
+   ESTILOS PARA TRES BOTONES EN TARJETAS DE FACULTAD
+   ============================================================ */
+
+/* Contenedor de acciones con 3 botones */
+.faculty-card__actions--three {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    padding: 0 1.25rem 1.25rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Base para los 3 botones */
+.btn-flows,
+.btn-indicators,
+.btn-processes {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.625rem 0.25rem;
+    border-radius: 0.625rem;
+    font-size: 0.5625rem; /* 9px - más pequeño para que quepa */
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1;
+}
+
+/* Iconos más pequeños en botones */
+.btn-flows .material-symbols-outlined,
+.btn-indicators .material-symbols-outlined,
+.btn-processes .material-symbols-outlined {
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+/* Botón Flujogramas - Ámbar */
+.btn-flows {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.btn-flows:hover {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(245, 158, 11, 0.4);
+}
+
+/* Botón Indicadores - Azul */
+.btn-indicators {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+}
+
+.btn-indicators:hover {
+    background: linear-gradient(135deg, #1e40af 0%, #3730a3 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(30, 58, 138, 0.4);
+}
+
+/* Botón Procesos - Verde */
+.btn-processes {
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(13, 148, 136, 0.3);
+}
+
+.btn-processes:hover {
+    background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(13, 148, 136, 0.4);
+}
+
+/* Active states */
+.btn-flows:active,
+.btn-indicators:active,
+.btn-processes:active {
+    transform: translateY(0) scale(0.96);
+}
+
+/* ========== BOTONES EN VISTA LISTA ========== */
+
+.actions--three {
+    display: flex;
+    gap: 0.375rem;
+    justify-content: flex-end;
+}
+
+.btn-list-flows,
+.btn-list-indicators,
+.btn-list-processes {
+    width: 2.25rem;
+    height: 2.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: white;
+    flex-shrink: 0;
+}
+
+.btn-list-flows {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.btn-list-flows:hover {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    transform: translateY(-2px);
+}
+
+.btn-list-indicators {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
+}
+
+.btn-list-indicators:hover {
+    background: linear-gradient(135deg, #1e40af 0%, #3730a3 100%);
+    transform: translateY(-2px);
+}
+
+.btn-list-processes {
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+    box-shadow: 0 2px 4px rgba(13, 148, 136, 0.3);
+}
+
+.btn-list-processes:hover {
+    background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+    transform: translateY(-2px);
+}
+
+/* ========== RESPONSIVE ========== */
+
+/* Tablets medianas - ajustar tamaño de fuente */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .btn-flows,
+    .btn-indicators,
+    .btn-processes {
+        font-size: 0.5rem; /* 8px en tablets */
+        padding: 0.5rem 0.125rem;
+    }
+    
+    .btn-flows .material-symbols-outlined,
+    .btn-indicators .material-symbols-outlined,
+    .btn-processes .material-symbols-outlined {
+        font-size: 0.75rem;
+    }
+}
+
+/* Móviles - apilar botones verticalmente */
+@media (max-width: 640px) {
+    .faculty-card__actions--three {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .btn-flows,
+    .btn-indicators,
+    .btn-processes {
+        font-size: 0.75rem;
+        padding: 0.875rem;
+    }
+    
+    .btn-flows .material-symbols-outlined,
+    .btn-indicators .material-symbols-outlined,
+    .btn-processes .material-symbols-outlined {
+        font-size: 1rem;
+    }
+}
+
+/* Pantallas grandes - más espacio para texto */
+@media (min-width: 1280px) {
+    .btn-flows,
+    .btn-indicators,
+    .btn-processes {
+        font-size: 0.625rem; /* 10px */
+        padding: 0.75rem 0.375rem;
+    }
+}

@@ -1,0 +1,78 @@
+@import url('./hoja-reportes.css');
+
+html.dark {
+    color-scheme: dark;
+}
+
+#formula-preview {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+    box-shadow:
+        0 10px 25px -5px rgba(0, 0, 0, 0.08),
+        0 8px 10px -6px rgba(0, 0, 0, 0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    border-radius: 1rem;
+    padding: 1.5rem !important;
+    transition: all 0.3s ease;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#formula-preview .bg-white,
+#formula-preview .dark\:bg-slate-900 {
+    animation: formulaAppear 0.3s ease;
+}
+
+@keyframes formulaAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+#formula-preview {
+    background-image:
+        radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 20%),
+        radial-gradient(circle at 90% 80%, rgba(20, 184, 166, 0.05) 0%, transparent 20%);
+}
+
+.dark #formula-preview {
+    background-image:
+        radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.1) 0%, transparent 20%),
+        radial-gradient(circle at 90% 80%, rgba(20, 184, 166, 0.1) 0%, transparent 20%);
+}
+
+#formula-definicion {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+}
+
+#formula-definicion::placeholder {
+    font-size: 0.8125rem;
+}
+
+#variables-input {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    padding: 0.75rem;
+}
+
+#btn-finalizar {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    min-width: 15rem;
+}
+
+@media (max-width: 640px) {
+    #btn-finalizar {
+        width: 100%;
+    }
+}

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Racio Caracterizacion | SIGPRO</title>
+
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1152d4",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622"
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"]
+                    }
+                }
+            }
+        };
+    </script>
+
+    <link rel="stylesheet" href="css/racio-inicio.css" />
+    <link rel="stylesheet" href="css/racio-repositorio.css" />
+    <link rel="stylesheet" href="css/racio-expedientes/racio-flujograma.css" />
+    <link rel="stylesheet" href="css/racio-expedientes/racio-caracterizacion.css" />
+</head>
+
+<body class="bg-background-light text-slate-900 font-display min-h-screen flex flex-col" id="racio-body">
+
+    <!-- HEADER -->
+    <header class="admin-header bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="bg-blue-600 text-white p-1 rounded flex items-center justify-center">
+                    <span class="material-symbols-outlined">school</span>
+                </div>
+                <span class="font-bold text-xl text-gray-800 tracking-tight">SIGPRO</span>
+            </div>
+            <nav class="hidden md:flex space-x-8 text-sm font-medium text-gray-600">
+                <a class="hover:text-blue-600 transition-colors" href="racio-inicio.html" target="_self">Inicio</a>
+                <a class="hover:text-blue-600 transition-colors" href="racio-facultades-documentos.html" target="_self">Facultades</a>
+                <a class="hover:text-blue-600 transition-colors" href="racio-expedientes.html" target="_self">Expedientes</a>
+                <a class="text-blue-600 border-b-2 border-blue-600 pb-1" href="racio-repositorio.html" target="_self">Repositorio</a>
+            </nav>
+            <div class="flex items-center gap-3">
+                <button id="theme-toggle" aria-label="Activar modo oscuro" class="theme-toggle-btn w-10 h-10 rounded-full border border-slate-200 bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 transition-all duration-300 flex items-center justify-center" type="button">
+                    <span id="theme-icon" class="material-symbols-outlined text-xl">dark_mode</span>
+                </button>
+
+                <div class="relative">
+                    <button id="profile-toggle" type="button" aria-haspopup="menu" aria-expanded="false" class="profile-trigger flex items-center gap-2 rounded-full border border-slate-200 bg-white pl-2 pr-3 py-1.5 hover:border-blue-300 hover:shadow-md transition-all duration-300">
+                        <div id="profile-avatar" class="w-8 h-8 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">RA</div>
+                        <div class="hidden md:block text-left leading-tight">
+                            <div id="profile-name" class="text-xs font-semibold text-slate-800">Administrador</div>
+                            <div id="profile-role" class="text-[10px] text-slate-500">Racionalizacion</div>
+                        </div>
+                        <span class="material-symbols-outlined text-slate-500 text-base">expand_more</span>
+                    </button>
+
+                    <div id="profile-menu" role="menu" class="profile-menu absolute right-0 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                        <div class="px-3 py-2 border-b border-slate-100">
+                            <div id="profile-menu-name" class="text-sm font-semibold text-slate-800">Administrador</div>
+                            <div id="profile-menu-email" class="text-xs text-slate-500 truncate">admin@unmsm.edu.pe</div>
+                        </div>
+                        <button id="logout-button" type="button" role="menuitem" class="w-full mt-2 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+                            <span class="material-symbols-outlined text-base">logout</span>
+                            Cerrar sesion
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- CABECERA -->
+        <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-4 border-b border-gray-200">
+            <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="material-symbols-outlined text-blue-600">account_tree</span>
+                    <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Repositorio / Detalle</span>
+                </div>
+                <h1 class="text-3xl font-black tracking-tight text-gray-900">DETALLE DE LA CARACTERIZACION</h1>
+                
+            </div>
+            <a href="racio-repositorio.html" id="back-button" target="_self"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold hover:border-primary hover:text-primary hover:shadow-md transition-all duration-200">
+                <span class="material-symbols-outlined text-base">arrow_back</span>
+                Volver al Repositorio
+            </a>
+        </div>
+
+        <!-- DATOS DE CARACTERIZACION -->
+        <section class="flujo-card">
+            <div class="flujo-card-header">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">info</span>
+                    <h2 class="flujo-card-title">Informacion Tecnica</h2>
+                </div>
+                <span class="flujo-code-pill" id="detail-code-pill">-</span>
+            </div>
+            <div class="flujo-card-body" id="detail-info-body">
+                <!-- El contenido se inserta aqui por JS -->
+            </div>
+        </section>
+
+        <!-- DOCUMENTO CARGADO -->
+        <section class="flujo-card">
+            <div class="flujo-card-header">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">picture_as_pdf</span>
+                    <h2 class="flujo-card-title">Documento Cargado</h2>
+                </div>
+                <a id="btn-descargar-pdf" href="#" download class="flujo-download-btn hidden">
+                    <span class="material-symbols-outlined text-sm">download</span>
+                    Descargar PDF
+                </a>
+            </div>
+            <div class="flujo-card-body p-6">
+                <div id="pdf-empty" class="pdf-empty-state hidden">
+                    <div class="pdf-empty-content">
+                        <span class="material-symbols-outlined text-5xl text-slate-300 mb-3">description</span>
+                        <p class="text-slate-500 font-semibold">No hay documento adjunto para esta caracterizacion.</p>
+                    </div>
+                </div>
+                <iframe id="pdf-viewer" class="pdf-iframe hidden" title="Visor de caracterizacion"></iframe>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="admin-footer bg-white border-t border-gray-200 mt-12 py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-sm text-gray-500 font-medium">
+                © 2026 Oficina General de Planificacion - UNMSM | Sistema de Racionalizacion v2.0
+            </p>
+        </div>
+    </footer>
+
+    <!-- MODAL LOGOUT -->
+    <div id="logout-modal" class="logout-modal" aria-hidden="true">
+        <div id="logout-modal-backdrop" class="logout-modal-backdrop"></div>
+        <div class="logout-modal-panel" role="dialog" aria-modal="true" aria-labelledby="logout-modal-title" aria-describedby="logout-modal-description">
+            <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+                <span class="material-symbols-outlined">logout</span>
+            </div>
+            <h3 id="logout-modal-title" class="text-lg font-bold text-slate-800 text-center">Estas seguro de cerrar sesion?</h3>
+            <p id="logout-modal-description" class="text-sm text-slate-500 text-center mt-2">Se cerrara la sesion del administrador y volveras al portal de acceso.</p>
+            <div class="mt-6 flex items-center justify-center gap-3">
+                <button id="logout-cancel" type="button" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">No, cancelar</button>
+                <button id="logout-confirm" type="button" class="px-4 py-2 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors">Si, cerrar sesion</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/components/api.js"></script>
+    <script src="js/racio-expedientes/racio-caracterizacion.js"></script>
+</body>
+</html>

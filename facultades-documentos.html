@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>SIGPRO - Document Management Dashboard</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    
+    <!-- Configuración de Tailwind -->
+    <script>
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    primary: "#1a365d",
+                    accent: "#2563eb",
+                    "background-light": "#f8fafc",
+                    "background-dark": "#0f172a",
+                },
+                fontFamily: {
+                    display: ["Inter", "sans-serif"],
+                },
+                borderRadius: {
+                    DEFAULT: "0.75rem",
+                    'xl': '1.25rem',
+                    '2xl': '1.5rem',
+                },
+                animation: {
+                    'blob': 'blob 7s infinite',
+                    'levitate': 'levitate 3s ease-in-out infinite',
+                    'float': 'float 6s ease-in-out infinite',
+                },
+                keyframes: {
+                    blob: {
+                        '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                        '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                        '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                        '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                    },
+                    levitate: {
+                        '0%, 100%': { transform: 'translateY(0)', filter: 'drop-shadow(0 5px 15px rgba(0,0,0,0.1))' },
+                        '50%': { transform: 'translateY(-10px)', filter: 'drop-shadow(0 25px 15px rgba(0,0,0,0.2))' },
+                    },
+                    float: {
+                        '0%, 100%': { transform: 'translateY(0)' },
+                        '50%': { transform: 'translateY(-20px)' },
+                    }
+                }
+            },
+        },
+    };
+</script>
+    
+    <!-- CSS Personalizado -->
+    <link rel="stylesheet" href="css/facultades-documentos.css"/>
+    
+    <!-- Optimizaciones de Animaciones -->
+    <style>
+        :root {
+            --transition-duration: 0.3s;
+        }
+        
+        #modal-pdf-preview {
+            --tw-backdrop-blur: blur(4px);
+        }
+        
+        #modal-pdf-preview:not(.hidden) {
+            animation: fadeIn var(--transition-duration) ease-out forwards;
+        }
+        
+        #modal-pdf-preview.visible-overlay {
+            opacity: 1 !important;
+        }
+        
+        .modal-content {
+            will-change: transform, opacity;
+        }
+        
+        .modal-content.visible-content {
+            transform: scale(1) !important;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 min-h-screen flex flex-col font-sans transition-colors duration-200">
+    
+    <!-- Background Effects -->
+    <div class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/20 rounded-full blur-[120px] animate-blob"></div>
+        <div class="absolute top-[20%] right-[-10%] w-[30%] h-[50%] bg-purple-400/20 rounded-full blur-[120px] animate-blob" style="animation-delay: 2s;"></div>
+        <div class="absolute bottom-[-10%] left-[20%] w-[40%] h-[40%] bg-indigo-400/20 rounded-full blur-[120px] animate-blob" style="animation-delay: 4s;"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            
+            <!-- Logo -->
+            <div class="flex items-center gap-2">
+                <div class="bg-gradient-to-br from-primary to-blue-800 p-1.5 rounded-lg shadow-lg">
+                    <span class="material-symbols-outlined text-white text-2xl">analytics</span>
+                </div>
+                <span class="text-xl font-bold tracking-tight text-primary dark:text-white">SIGPRO</span>
+            </div>
+            
+            <!-- NAVEGACIÓN - SIN 'hidden md:flex', SIEMPRE VISIBLE -->
+            <nav class="flex items-center gap-6">
+                <a class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white transition-colors" href="facultades-inicio.html">Inicio</a>
+                <a class="text-sm font-semibold text-primary border-b-2 border-primary pb-1" href="facultades-documentos.html">Documentos</a>
+                <a class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white transition-colors" href="facultades-expedientes.html">Repositorio</a>
+                <a class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white transition-colors" href="facultades-nuevo.html">Nuevo</a>
+            </nav>
+            
+            <!-- Controles -->
+                <div class="flex items-center gap-4">
+                    
+                    <!-- Theme toggle -->
+                    <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <span class="material-symbols-outlined text-slate-600 dark:text-slate-400 block dark:hidden">dark_mode</span>
+                        <span class="material-symbols-outlined text-slate-300 hidden dark:block">light_mode</span>
+                    </button>
+
+                    <!-- PERFIL CON DROPDOWN -->
+                    <div class="relative" id="profile-container">
+                        
+                        <!-- Botón avatar -->
+                        <button id="profile-btn" type="button" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center border border-slate-300 dark:border-slate-600 hover:border-primary dark:hover:border-primary transition-colors">
+                            <span class="material-symbols-outlined text-slate-500 dark:text-slate-400 text-sm">person</span>
+                        </button>
+
+                        <!-- Dropdown -->
+                        <div id="profile-dropdown" class="hidden absolute right-0 mt-2 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50">
+                            
+                            <!-- Info usuario -->
+                            <div class="p-4 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
+                                <div class="flex items-center gap-3">
+                                    <div id="profile-avatar" class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                                        <span id="profile-iniciales">JP</span>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div id="profile-nombre" class="font-semibold text-slate-900 dark:text-white text-sm">Juan Pérez</div>
+                                        <div id="profile-email" class="text-xs text-slate-500 dark:text-slate-400 truncate">juan@unmsm.edu.pe</div>
+                                    </div>
+                                </div>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    <span id="profile-rol" class="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">Administrador</span>
+                                    <span id="profile-facultad" class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Ingenieria de Sistemas</span>
+                                </div>
+                            </div>
+
+                            <!-- Menú -->
+                            <div class="p-2">
+                                <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-300">
+                                    <span class="material-symbols-outlined text-slate-400 text-sm">settings</span>
+                                    Configuración
+                                </a>
+                                <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-300">
+                                    <span class="material-symbols-outlined text-slate-400 text-sm">school</span>
+                                    Cambiar facultad
+                                </a>
+                            </div>
+
+                            <!-- BOTÓN LOGOUT (este debe existir) -->
+                            <div class="p-2 border-t border-slate-200 dark:border-slate-700">
+                                <button id="logout-btn" class="logout-action w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 transition-all duration-300">
+                                    <span class="material-symbols-outlined text-sm">logout</span>
+                                    Cerrar sesión
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    </header>
+
+    <!-- Modal de Cerrar Sesión (FUERA del header, al nivel global) -->
+    <div id="logout-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-200">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm mx-4 transform transition-all duration-200 scale-100 opacity-100">
+            
+            <!-- Icono -->
+            <div class="mx-auto w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+                <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-3xl">logout</span>
+            </div>
+            
+            <!-- Texto -->
+            <h3 class="text-xl font-bold text-center text-slate-900 dark:text-white mb-2">
+                ¿Cerrar sesión?
+            </h3>
+            <p class="text-sm text-center text-slate-500 dark:text-slate-400 mb-6 px-2">
+                ¿Estás seguro de que deseas salir de tu cuenta? Deberás iniciar sesión nuevamente.
+            </p>
+            
+            <!-- Botones -->
+            <div class="flex gap-3">
+                <button id="logout-cancel" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                    Cancelar
+                </button>
+                <button id="logout-confirm" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 transition-colors shadow-lg shadow-red-600/30 hover:shadow-red-600/40">
+                    Sí, cerrar sesión
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-grow relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Search & Filter Section -->
+        <div class="flex flex-col md:flex-row gap-4 mb-8">
+            <div class="relative flex-grow group">
+                <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">search</span>
+                <input class="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700 rounded-xl focus:ring-2 focus:ring-blue-600 focus:shadow-lg focus:shadow-blue-500/20 outline-none transition-all shadow-md" placeholder="Buscar por código..." type="text" id="search-input"/>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-sm text-slate-500 font-medium whitespace-nowrap">Ordenar por:</span>
+                <div class="relative inline-block" id="sort-dropdown">
+                    <button id="sort-button" class="appearance-none pl-4 pr-10 py-2.5 bg-white dark:bg-slate-800 border-0 ring-1 ring-slate-200 dark:ring-slate-700 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none transition-all shadow-sm text-sm font-medium cursor-pointer hover:ring-slate-300 dark:hover:ring-slate-600 flex items-center gap-2">
+                        <span id="sort-label">Más antiguos</span>
+                        <span class="material-symbols-outlined text-lg transition-transform duration-300" id="sort-arrow">expand_more</span>
+                    </button>
+                    <div id="sort-menu" class="absolute top-full mt-2 left-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg opacity-0 invisible transition-all duration-300 transform origin-top scale-y-95 z-50 min-w-max">
+                        <button class="sort-option w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors" data-value="antiguos">Más antiguos</button>
+                        <button class="sort-option w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors" data-value="recientes">Más recientes</button>
+                        <button class="sort-option w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors" data-value="estado">Estado</button>
+                    </div>
+                    <select id="sort-select" class="hidden">
+                        <option value="antiguos">Más antiguos</option>
+                        <option value="recientes">Más recientes</option>
+                        <option value="estado">Estado</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" id="stats-container">
+            
+            <!-- Pendiente Card -->
+            <button class="lava-card group relative overflow-hidden flex flex-col items-center justify-center p-6 bg-gradient-to-br from-orange-400 to-rose-500 dark:from-orange-600 dark:to-rose-700 rounded-2xl shadow-lg border border-white/20 text-white" data-filter="pendiente">
+                <div class="lava-blob bg-yellow-300 w-24 h-24 top-0 left-0 -ml-8 -mt-8" style="animation-delay: 2s;"></div>
+                <div class="lava-blob bg-rose-300 w-24 h-24 bottom-0 right-0 -mr-8 -mb-8" style="animation-delay: 4s;"></div>
+                
+                <div class="icon-wrapper-3d">
+                    <span class="material-symbols-outlined text-3xl">pending_actions</span>
+                </div>
+                <span class="text-[10px] font-extrabold tracking-widest uppercase mb-1 mt-2">Pendiente</span>
+                <span class="text-3xl font-black" id="count-pendiente">0</span>
+            </button>
+
+            <!-- En Proceso Card -->
+            <button class="lava-card group relative overflow-hidden flex flex-col items-center justify-center p-6 bg-gradient-to-br from-blue-500 to-indigo-600 dark:from-blue-700 dark:to-indigo-800 rounded-2xl shadow-lg border border-white/20 text-white" data-filter="en_proceso">
+                <div class="lava-blob bg-cyan-300 w-24 h-24 top-0 right-0 -mr-6 -mt-6"></div>
+                <div class="lava-blob bg-indigo-300 w-20 h-20 bottom-0 left-0 -ml-6 -mb-6" style="animation-delay: 2s;"></div>
+                
+                <div class="icon-wrapper-3d" style="animation-delay: 0.5s;">
+                    <span class="material-symbols-outlined text-3xl">sync</span>
+                </div>
+                <span class="text-[10px] font-extrabold tracking-widest uppercase mb-1 mt-2">En Proceso</span>
+                <span class="text-3xl font-black" id="count-en-proceso">0</span>
+            </button>
+
+            <!-- Completado Card -->
+            <button class="lava-card group relative overflow-hidden flex flex-col items-center justify-center p-6 bg-gradient-to-br from-emerald-400 to-teal-600 dark:from-emerald-600 dark:to-teal-800 rounded-2xl shadow-lg border border-white/20 text-white" data-filter="completado">
+                <div class="lava-blob bg-green-200 w-24 h-24 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style="animation-delay: 4s;"></div>
+                
+                <div class="icon-wrapper-3d" style="animation-delay: 1s;">
+                    <span class="material-symbols-outlined text-3xl">check_circle</span>
+                </div>
+                <span class="text-[10px] font-extrabold tracking-widest uppercase mb-1 mt-2">Completado</span>
+                <span class="text-3xl font-black" id="count-completado">0</span>
+            </button>
+
+            <!-- Todos Card -->
+            <button class="lava-card group relative overflow-hidden flex flex-col items-center justify-center p-6 bg-gradient-to-br from-blue-600 to-indigo-800 dark:from-blue-800 dark:to-indigo-950 rounded-2xl shadow-xl shadow-blue-500/30 border border-white/10 text-white" data-filter="todos">
+                <div class="lava-blob bg-white w-32 h-32 top-0 left-0 opacity-10 blur-2xl"></div>
+                <div class="lava-blob bg-cyan-400 w-24 h-24 bottom-0 right-0 opacity-20 blur-xl" style="animation-delay: 2s;"></div>
+                
+                <div class="icon-wrapper-3d" style="animation-delay: 1.5s;">
+                    <span class="material-symbols-outlined text-3xl">folder_copy</span>
+                </div>
+                <span class="text-[10px] font-extrabold tracking-widest uppercase mb-1 mt-2 opacity-90">Todos</span>
+                <span class="text-3xl font-black" id="count-todos">0</span>
+            </button>
+        </div>
+
+        <!-- VISTA DASHBOARD -->
+        <div id="dashboard-view">
+            <div class="glass-card rounded-2xl overflow-hidden bg-white dark:bg-slate-800 shadow-xl">
+                <div class="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span class="material-symbols-outlined text-blue-600">table_chart</span>
+                        Documentos del Sistema
+                    </h2>
+                    <button id="refresh-btn" class="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="Actualizar">
+                        <span class="material-symbols-outlined text-slate-500">refresh</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-separate border-spacing-y-3 px-6 pb-6" id="documents-table">
+                        <thead>
+                            <tr class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4 text-left cursor-pointer hover:text-slate-600" data-sort="fecha">Fecha ↕</th>
+                                <th class="py-3 px-4 text-left cursor-pointer hover:text-slate-600" data-sort="codigo">Código ↕</th>
+                                <th class="py-3 px-4 text-left">Progreso</th>
+                                <th class="py-3 px-4 text-left">Generado por</th>
+                                <th class="py-3 px-4 text-left">Estado</th>
+                                <th class="py-3 px-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="documents-tbody">
+                            <!-- Datos cargados dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                    <span class="text-sm text-slate-500" id="pagination-info">Cargando...</span>
+                    <div class="flex gap-2">
+                        <button id="prev-page" class="px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">Anterior</button>
+                        <button id="next-page" class="px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">Siguiente</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA DETALLE -->
+        <div id="detail-view" class="hidden animate-slide-up">
+            <div class="gradient-mesh rounded-2xl p-8 mb-8 text-white shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-8 opacity-10">
+                    <span class="material-symbols-outlined text-[160px]">description</span>
+                </div>
+                <div class="relative z-10">
+                    <div class="flex flex-wrap items-start justify-between gap-6">
+                        <div>
+                            <nav class="flex items-center gap-2 text-white/70 text-sm mb-4">
+                                <a class="hover:text-white transition-colors cursor-pointer" onclick="showDashboard()">Expedientes</a>
+                                <span class="material-symbols-outlined text-xs">chevron_right</span>
+                                <span class="text-white font-medium">Detalle de Reporte</span>
+                            </nav>
+                            <h2 class="text-4xl font-black tracking-tight mb-2">Reporte de Expediente</h2>
+                            <p class="text-white/80 font-medium max-w-xl leading-relaxed">Gestión y seguimiento detallado del proceso institucional.</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <a href="facultades-documentos.html" 
+                                class="bg-white/20 hover:bg-white/30 backdrop-blur-md px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 inline-flex">
+                                    <span class="material-symbols-outlined text-lg">arrow_back</span> Atrás
+                            </a>
+                            <div class="relative inline-block">
+                                <!-- Cadenas decorativas -->
+                                <div class="absolute -top-3 left-4 w-1 h-6 bg-gradient-to-b from-slate-400 to-slate-600 rounded-full transform -rotate-12"></div>
+                                <div class="absolute -top-3 right-4 w-1 h-6 bg-gradient-to-b from-slate-400 to-slate-600 rounded-full transform rotate-12"></div>
+                                
+                                <!-- Botón bloqueado -->
+                                <button disabled
+                                        class="bg-slate-200 text-slate-400 px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 cursor-not-allowed border-2 border-slate-300 shadow-inner relative overflow-hidden">
+                                    
+                                    <!-- Efecto de sello/bloqueo -->
+                                    <div class="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]"></div>
+                                    
+                                    <span class="material-symbols-outlined text-lg relative z-10">lock</span>
+                                    <span class="relative z-10">Descargar PDF</span>
+                                    
+                                    <!-- Badge -->
+                                    <span class="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-wider shadow-lg transform rotate-12 border-2 border-white">
+                                        Próx.
+                                    </span>
+                                </button>
+                                
+                                <!-- Cadenas inferiores -->
+                                <div class="absolute -bottom-2 left-6 w-0.5 h-4 bg-slate-500"></div>
+                                <div class="absolute -bottom-2 right-6 w-0.5 h-4 bg-slate-500"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mt-10">
+                        <div class="glass-card-detail rounded-xl p-5 shadow-sm">
+                            <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Código</p>
+                            <p class="text-xl font-black text-blue-700" id="detail-codigo">--</p>
+                            <div class="mt-2 flex items-center text-[10px] font-bold text-green-600 bg-green-50 w-fit px-2 py-0.5 rounded-full">
+                                <span class="material-symbols-outlined text-xs mr-0.5">verified</span> ACTIVO
+                            </div>
+                        </div>
+                        <div class="glass-card-detail rounded-xl p-5 shadow-sm">
+                            <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Asunto</p>
+                            <p class="text-xl font-black text-slate-900 dark:text-white" id="detail-asunto">--</p>
+                        </div>
+                        <div class="glass-card-detail rounded-xl p-5 shadow-sm">
+                            <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Estado</p>
+                            <p class="text-xl font-black text-amber-600" id="detail-estado">--</p>
+                            <p class="text-slate-400 text-[10px] mt-2 italic" id="detail-subestado">--</p>
+                        </div>
+                        <div class="glass-card-detail rounded-xl p-5 shadow-sm">
+                            <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Actualización</p>
+                            <p class="text-xl font-black text-slate-900 dark:text-white" id="detail-fecha">--</p>
+                            <p class="text-blue-600 text-[10px] mt-2 font-bold">HACE 2 HORAS</p>
+                        </div>
+                        <div class="glass-card-detail rounded-xl p-5 shadow-sm">
+                            <div class="flex justify-between items-start mb-2">
+                                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider">Progreso</p>
+                                <span class="text-blue-700 font-black text-sm" id="detail-progreso-text">0%</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2 mb-2">
+                                <div class="bg-blue-700 h-2 rounded-full transition-all duration-500" id="detail-progreso-bar" style="width: 0%"></div>
+                            </div>
+                            <p class="text-slate-400 text-[10px]" id="detail-etapa">Etapa: --</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="flex items-center gap-8 mb-6 border-b border-slate-200 dark:border-slate-700 px-2">
+                <button id="tab-historial" onclick="mostrarTab('historial')" class="py-3 px-1 text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition-all relative">
+                    HISTORIAL
+                </button>
+                <button id="tab-rectificaciones" onclick="mostrarTab('rectificaciones')" class="py-3 px-1 text-sm font-bold text-slate-400 hover:text-slate-600 border-b-2 border-transparent transition-all">
+                    RECTIFICACIONES
+                    <span id="badge-rectificaciones" class="hidden ml-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full">3</span>
+                </button>
+            </div>
+
+            <!-- HISTORIAL TABLE (visible by default) -->
+            <div id="content-historial" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mb-8">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 dark:bg-slate-700/50">
+                            <tr>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">FECHA</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">PROGRESO</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">ESTADO</th>
+                                <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">GENERADO POR</th>
+                                <th class="px-6 py-4 text-center">
+                                    <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest">ARCHIVOS</div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-700" id="detail-historial-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- RECTIFICACIONES TABLE (hidden by default) -->
+            <div id="content-rectificaciones" class="hidden">
+                <!-- Solo la tabla inicialmente -->
+                <div id="rectificaciones-tabla-container" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mb-8">
+                    <div class="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined text-amber-600">edit_note</span>
+                                Historial de Rectificaciones
+                            </h3>
+                            <p class="text-sm text-slate-500 mt-1">Seleccione una rectificación para revisar los detalles</p>
+                        </div>
+                        <span id="rect-count-badge" class="bg-amber-100 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">0 pendientes</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 dark:bg-slate-700/50">
+                                <tr>
+                                    <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">FECHA DE CORRECCIÓN</th>
+                                    <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">OBSERVACIÓN</th>
+                                    <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">ESTADO</th>
+                                    <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">RESPONSABLE</th>
+                                    <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">ACCIÓN</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rectificaciones-tbody" class="divide-y divide-slate-100 dark:divide-slate-700">
+                                <!-- Se carga dinámicamente desde API -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="rect-empty" class="hidden p-12 text-center">
+                        <div class="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="material-symbols-outlined text-3xl text-slate-400">check_circle</span>
+                        </div>
+                        <p class="text-slate-500 font-medium">No hay rectificaciones registradas</p>
+                        <p class="text-xs text-slate-400 mt-1">El expediente no requiere correcciones</p>
+                    </div>
+                </div>
+
+                <!-- Panel de detalle (oculto inicialmente) -->
+                <div id="rectificaciones-detalle-panel" class="hidden grid grid-cols-12 gap-6 animate-slide-up">
+                    <!-- Botón volver -->
+                    <div class="col-span-12 mb-2">
+                        <button onclick="volverAListaRectificaciones()" class="flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-amber-600 transition-colors">
+                            <span class="material-symbols-outlined">arrow_back</span>
+                            Volver a la lista
+                        </button>
+                    </div>
+                    
+                    <!-- Left Panel: Documentos en Corrección -->
+                    <div class="col-span-12 lg:col-span-4 space-y-4">
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-amber-600">edit_document</span> 
+                                    Documentos en Corrección
+                                </h3>
+
+                            </div>
+                            <div id="rect-documentos-lista" class="space-y-3">
+                                <!-- Se carga dinámicamente -->
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Right Panel: Detalle de Rectificación -->
+                    <div class="col-span-12 lg:col-span-8">
+                        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden h-full flex flex-col">
+                            <div class="p-8 flex-1 overflow-y-auto bg-[#f8fafc] dark:bg-slate-900">
+                                <div class="flex items-center gap-3 mb-8">
+                                    <span class="material-symbols-outlined text-amber-600 text-2xl">notes</span>
+                                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Detalle de Rectificación</h2>
+                                </div>
+                                <div class="bg-white dark:bg-slate-800 rounded-xl p-8 border border-slate-200 dark:border-slate-700 shadow-sm space-y-8">
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">ASUNTO</label>
+                                        <div id="rect-detalle-asunto" class="detalle-caja p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            --
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">OBSERVACIONES</label>
+                                        <div id="rect-detalle-observacion" class="detalle-caja p-6 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-sm leading-relaxed text-slate-600 dark:text-slate-400 min-h-[120px]">
+                                            Seleccione una rectificación para ver los detalles.
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">ARCHIVOS ENVIADOS</label>
+                                        <div id="rect-detalle-archivos" class="flex gap-4 flex-wrap">
+                                            <!-- Se carga dinámicamente -->
+                                        </div>
+                                    </div>
+                                    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl p-4 flex items-center gap-3 shadow-lg shadow-blue-200/40 dark:shadow-blue-900/40 ring-1 ring-blue-100 dark:ring-blue-900/40">
+                                        <span class="material-symbols-outlined text-blue-600">mail</span>
+                                        <p class="text-xs text-slate-600 dark:text-slate-400">
+                                            Se ha enviado una copia de dicha notificación al correo <a id="rect-detalle-email" class="text-blue-600 font-bold hover:underline" href="#">facultad@unmsm.edu.pe</a>
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <!-- BOTÓN RESPONDER -->
+                                <div class="mt-10 flex justify-center">
+                                    <button id="rect-btn-responder" class="bg-amber-600 text-white px-10 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-amber-600/30 hover:bg-amber-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <span class="material-symbols-outlined text-lg">reply</span>
+                                        RESPONDER
+                                    </button>
+                                </div>
+
+                                <!-- FORMULARIO DE RESPUESTA - Dentro del panel, inicialmente oculto -->
+                                <div id="formulario-respuesta" class="hidden mt-8 bg-white dark:bg-slate-800 rounded-xl p-8 border border-slate-300 dark:border-slate-600 shadow-xl dark:shadow-black/30 shadow-slate-300/30 space-y-8 animate-slide-up">
+                                    <div class="flex items-center gap-3 mb-2 border-b border-slate-100 dark:border-slate-700 pb-4">
+                                        <span class="material-symbols-outlined text-primary">edit_note</span>
+                                        <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Nueva Respuesta</h3>
+                                    </div>
+                                    <div class="grid grid-cols-12 gap-6">
+                                        <div class="col-span-12 md:col-span-2">
+                                            <label class="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest pt-2 block">ASUNTO:</label>
+                                        </div>
+                                        <div class="col-span-12 md:col-span-10">
+                                            <input id="resp-asunto" type="text" value="Corrección sobre el proceso" class="w-full p-2 bg-slate-200 dark:bg-slate-700 rounded-sm text-sm font-medium text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="Escribe un asunto..." />
+                                        </div>
+                                        <div class="col-span-12 md:col-span-2">
+                                            <label class="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest pt-2 block">OBSERVACIONES:</label>
+                                        </div>
+                                        <div class="col-span-12 md:col-span-10">
+                                            <textarea id="resp-observaciones" class="w-full h-40 bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-sm focus:ring-2 focus:ring-primary/20 text-sm" placeholder="Escriba aquí sus observaciones..."></textarea>
+                                        </div>
+                                        <div class="col-span-12 md:col-span-3">
+                                            <label class="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest pt-2 block">INSERTAR IMAGEN O PDF:</label>
+                                        </div>
+                                        <div class="col-span-12 md:col-span-9">
+                                            <div class="h-20 bg-slate-200 dark:bg-slate-700 rounded-sm border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center cursor-pointer hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors" onclick="document.getElementById('resp-file-input').click()">
+                                                <span class="material-symbols-outlined text-slate-400">upload_file</span>
+                                                <input type="file" id="resp-file-input" class="hidden" accept=".pdf,.jpg,.jpeg,.png">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-center mt-6 gap-4">
+                                        <button onclick="toggleFormularioRespuesta()" class="bg-slate-300 hover:bg-slate-400 text-slate-800 px-8 py-2 rounded-full font-bold text-sm tracking-widest transition-all">
+                                            CANCELAR
+                                        </button>
+                                        <button onclick="enviarRespuesta()" class="bg-primary hover:bg-primary/90 text-white px-12 py-2 rounded-full font-bold text-sm tracking-widest transition-all shadow-lg shadow-primary/30">
+                                            ENVIAR
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+           
+
+            <!-- SECCIÓN DE DOCUMENTOS - Oculta inicialmente -->
+                <div id="seccion-documentos" class="hidden">
+                    <div class="grid grid-cols-12 gap-6">
+                        <!-- Panel lateral de documentos -->
+                        <div class="col-span-12 lg:col-span-4 space-y-4">
+                            <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-blue-600">folder_open</span> 
+                                        Documentos Adjuntos
+                                    </h3>
+                                    <button onclick="cerrarDocumentos()" class="text-slate-400 hover:text-slate-600">
+                                        <span class="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+                                <div class="space-y-3" id="detail-documentos-adjuntos">
+                                    <!-- Lista de documentos se carga aquí -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visor de documentos -->
+                        <div class="col-span-12 lg:col-span-8">
+                            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden h-full flex flex-col">
+                                <div class="flex-1 p-6 md:p-8 bg-slate-100 dark:bg-slate-950">
+                                    <div class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden" id="document-viewer">
+                                        <div class="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
+                                            <div>
+                                                <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                    <span class="material-symbols-outlined text-blue-600">info</span>
+                                                    Información Técnica
+                                                </h3>
+                                                <p class="text-xs text-slate-500 mt-1">N° transacción: <span id="viewer-transaccion">--</span></p>
+                                            </div>
+                                            <span id="viewer-version" class="px-4 py-1.5 rounded-full text-base font-black text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300">--</span>
+                                        </div>
+
+                                        <div id="viewer-contenido" class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-8"></div>
+
+                                        <div class="hidden">
+                                            <span id="viewer-descripcion">--</span>
+                                            <span id="viewer-codigo">--</span>
+                                            <span id="viewer-operacion">--</span>
+                                            <span id="viewer-fecha">--</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="px-6 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] text-slate-500 font-medium">
+                                    Vista de revisión institucional
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        </div>
+
+    </main>
+
+    <!-- Footer  -->
+    <footer class="bg-primary dark:bg-slate-950 text-white/70 py-10 mt-12 relative z-10 border-t border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div class="flex items-center justify-center gap-3 mb-4">
+                <span class="material-symbols-outlined text-accent text-3xl">school</span>
+                <span class="text-white font-bold tracking-widest text-sm uppercase">Oficina General de Planificación - UNMSM</span>
+            </div>
+            <p class="text-sm">© 2026 Sistema de Racionalización v2.0</p>
+            <div class="mt-6 flex justify-center gap-8 text-xs font-medium uppercase tracking-wide">
+                <a class="hover:text-white transition-colors" href="#">Términos</a>
+                <a class="hover:text-white transition-colors" href="#">Privacidad</a>
+                <a class="hover:text-white transition-colors" href="#">Ayuda</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- Modal: Vista Previa de PDF -->
+    <div id="modal-pdf-preview" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 pt-8 transition-all duration-300 opacity-0 modal-overlay overflow-y-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-7xl w-full h-[90vh] flex flex-col shadow-2xl transform transition-all duration-300 scale-95 modal-content">
+            <!-- Header -->
+            <div class="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <span class="material-symbols-outlined text-red-500 text-2xl flex-shrink-0">picture_as_pdf</span>
+                    <div class="min-w-0 flex-1">
+                        <h3 id="pdf-preview-nombre" class="font-bold text-slate-900 dark:text-white truncate"></h3>
+                        <p id="pdf-preview-info" class="text-xs text-slate-500 mt-1"></p>
+                    </div>
+                </div>
+                <button onclick="cerrarPreview()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex-shrink-0 p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            
+            <!-- Contenido PDF -->
+            <div class="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
+                <embed id="pdf-preview-embed" type="application/pdf" class="w-full h-full" />
+            </div>
+            
+            <!-- Footer -->
+            <div class="flex items-center justify-between p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                <span id="pdf-preview-pages" class="text-sm text-slate-600 dark:text-slate-400"></span>
+                <div class="flex gap-2">
+                    <button onclick="descargarPdfPreview()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm">download</span>
+                        Descargar
+                    </button>
+                    <button onclick="cerrarPreview()" class="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white font-medium">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/facultades-documentos.js"></script>
+    <script src="js/components/api.js"></script>
+</body>
+</html>

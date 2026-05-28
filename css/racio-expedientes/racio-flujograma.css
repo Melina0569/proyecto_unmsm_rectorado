@@ -1,0 +1,304 @@
+/* ═══════════════════════════════════════════════════════════════
+   RACIO FLUJOGRAMA - ESTILOS ESPECÍFICOS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────────────
+   ANIMACIONES PERFIL Y MODAL
+   ─────────────────────────────────────────────────────────────── */
+
+#profile-menu {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+    pointer-events: none;
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#profile-menu.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+#logout-modal {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+#logout-modal.is-open {
+    opacity: 1;
+    visibility: visible;
+}
+
+#logout-modal .logout-modal-panel {
+    transform: scale(0.92) translateY(10px);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+                opacity 0.25s ease;
+}
+
+#logout-modal.is-open .logout-modal-panel {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+}
+
+#logout-modal-backdrop {
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+#logout-modal.is-open #logout-modal-backdrop {
+    opacity: 1;
+}
+
+#profile-toggle.open {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+#profile-toggle .material-symbols-outlined {
+    transition: transform 0.2s ease;
+}
+
+#profile-toggle.open .material-symbols-outlined {
+    transform: rotate(180deg);
+}
+
+/* ───────────────────────────────────────────────────────────────
+   TARJETA PRINCIPAL - MÁS SOMBRA Y VISIBILIDAD
+   ─────────────────────────────────────────────────────────────── */
+
+.flujo-card {
+    background: #ffffff;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 
+                0 10px 25px rgba(0, 0, 0, 0.08), 
+                0 25px 50px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.flujo-card:hover {
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.08), 
+                0 15px 35px rgba(0, 0, 0, 0.12), 
+                0 35px 60px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+}
+
+.flujo-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: #f1f5f9;
+    border-bottom: 2px solid rgba(148, 163, 184, 0.25);
+}
+
+.flujo-card-title {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.4;
+}
+
+.flujo-code-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    background: rgba(17, 82, 212, 0.12);
+    color: #1152d4;
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    border: 1.5px solid rgba(17, 82, 212, 0.2);
+    box-shadow: 0 2px 4px rgba(17, 82, 212, 0.1);
+}
+
+.flujo-card-body {
+    padding: 1.5rem;
+}
+
+.flujo-download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.1rem;
+    border-radius: 0.6rem;
+    background: #1152d4;
+    color: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 800;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(17, 82, 212, 0.3);
+}
+
+.flujo-download-btn:hover {
+    background: #0e43aa;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(17, 82, 212, 0.4);
+}
+
+/* ───────────────────────────────────────────────────────────────
+   GRID DE INFORMACIÓN - EXACTAMENTE 4 CAMPOS
+   ─────────────────────────────────────────────────────────────── */
+
+.flujo-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+}
+
+.flujo-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem 0 0.75rem 1rem;
+    border-left: 4px solid rgba(17, 82, 212, 0.25);
+    background: rgba(241, 245, 249, 0.5);
+    border-radius: 0 0.5rem 0.5rem 0;
+    transition: background 0.2s ease, border-left-color 0.2s ease;
+}
+
+.flujo-field:hover {
+    background: rgba(241, 245, 249, 0.9);
+    border-left-color: rgba(17, 82, 212, 0.5);
+}
+
+.flujo-field-full {
+    grid-column: 1 / -1;
+}
+
+.flujo-field-label {
+    font-size: 0.7rem;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #475569;
+}
+
+.flujo-field-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.4;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   PDF VIEWER
+   ─────────────────────────────────────────────────────────────── */
+
+.pdf-empty-state {
+    min-height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(241, 245, 249, 0.5);
+    border-radius: 0.75rem;
+    border: 2px dashed rgba(148, 163, 184, 0.3);
+}
+
+.pdf-empty-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.pdf-iframe {
+    width: 100%;
+    height: 720px;
+    border: 2px solid rgba(148, 163, 184, 0.2);
+    border-radius: 0.75rem;
+    background: #f8fafc;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* ───────────────────────────────────────────────────────────────
+   RESPONSIVE
+   ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+    .flujo-info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .flujo-card-header {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    
+    .flujo-download-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .pdf-iframe {
+        height: 500px;
+    }
+}
+
+/* ───────────────────────────────────────────────────────────────
+   MODO OSCURO
+   ─────────────────────────────────────────────────────────────── */
+
+.theme-dark .flujo-card {
+    background: rgba(15, 23, 42, 0.95);
+    border-color: rgba(148, 163, 184, 0.3);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2), 
+                0 10px 25px rgba(0, 0, 0, 0.3), 
+                0 25px 50px rgba(0, 0, 0, 0.2);
+}
+
+.theme-dark .flujo-card:hover {
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.3), 
+                0 15px 35px rgba(0, 0, 0, 0.4), 
+                0 35px 60px rgba(0, 0, 0, 0.3);
+}
+
+.theme-dark .flujo-card-header {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: rgba(148, 163, 184, 0.25);
+}
+
+.theme-dark .flujo-card-title {
+    color: #e2e8f0;
+}
+
+.theme-dark .flujo-code-pill {
+    background: rgba(96, 165, 250, 0.2);
+    color: #93c5fd;
+    border-color: rgba(96, 165, 250, 0.3);
+}
+
+.theme-dark .flujo-field {
+    background: rgba(30, 41, 59, 0.5);
+    border-left-color: rgba(96, 165, 250, 0.3);
+}
+
+.theme-dark .flujo-field:hover {
+    background: rgba(30, 41, 59, 0.8);
+    border-left-color: rgba(96, 165, 250, 0.6);
+}
+
+.theme-dark .flujo-field-label {
+    color: #94a3b8;
+}
+
+.theme-dark .flujo-field-value {
+    color: #e2e8f0;
+}
+
+.theme-dark .pdf-empty-state {
+    background: rgba(30, 41, 59, 0.5);
+    border-color: rgba(148, 163, 184, 0.2);
+}
+
+.theme-dark .pdf-iframe {
+    background: #0f172a;
+    border-color: rgba(148, 163, 184, 0.25);
+}

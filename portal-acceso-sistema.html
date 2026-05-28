@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Solicitud de Acceso al Sistema</title>
+    
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    
+    <!-- Configuración Tailwind INLINE -->
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1152d4",
+                        secondary: "#0a1e4d",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622"
+                    },
+                    fontFamily: {
+                        display: ["Inter", "system-ui", "sans-serif"]
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.25rem",
+                        lg: "0.5rem",
+                        xl: "0.75rem",
+                        "2xl": "1rem",
+                        full: "9999px"
+                    }
+                }
+            }
+        };
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/portal-inicio-racio.css">
+</head>
+
+<body class="font-display bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-100 min-h-screen flex flex-col relative overflow-x-hidden bg-gradient-mesh">
+    
+    <!-- Burbujas de fondo -->
+    <div class="background-bubbles">
+        <div class="bubble bubble-1"></div>
+        <div class="bubble bubble-2"></div>
+        <div class="bubble bubble-3"></div>
+        <div class="bubble bubble-4"></div>
+    </div>
+
+    <!-- Botón modo oscuro -->
+    <button id="theme-toggle" class="fixed top-6 right-6 z-50 w-14 h-14 rounded-full glass-card flex items-center justify-center cursor-pointer group hover:scale-110 transition-all duration-300" aria-label="Cambiar tema">
+        <span class="material-symbols-outlined text-2xl text-amber-500 dark:hidden group-hover:rotate-90 transition-transform duration-300">
+            light_mode
+        </span>
+        <span class="material-symbols-outlined text-2xl text-blue-300 hidden dark:block group-hover:-rotate-12 transition-transform duration-300">
+            dark_mode
+        </span>
+    </button>
+
+    <!-- Contenido principal -->
+    <main class="flex-grow flex items-center justify-center px-6 py-12">
+        
+        <!-- Card de solicitud -->
+        <div class="glass-card w-full max-w-[600px] rounded-2xl p-8 md:p-10 relative z-10">
+            
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-slate-800 dark:text-white leading-tight mb-3">
+                    Solicitud de Acceso al Sistema
+                </h1>
+                <p class="text-slate-500 dark:text-slate-400 text-sm">
+                    Complete el formulario para solicitar sus credenciales de acceso
+                </p>
+            </div>
+
+            <!-- Formulario -->
+            <form id="solicitudForm" class="space-y-5">
+                
+                <!-- Facultad -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider" for="facultad">
+                        Facultad
+                    </label>
+                    <div class="relative">
+                        <select 
+                            class="w-full pl-4 pr-10 py-3.5 bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none dark:text-white text-sm appearance-none cursor-pointer"
+                            id="facultad"
+                            name="facultad"
+                        >
+                            <option value="">Seleccione su facultad</option>
+                            <option value="medicina">Facultad de Medicina</option>
+                            <option value="derecho">Facultad de Derecho</option>
+                            <option value="ingenieria">Facultad de Ingeniería</option>
+                            <option value="economia">Facultad de Ciencias Económicas</option>
+                            <option value="educacion">Facultad de Educación</option>
+                            <option value="ciencias">Facultad de Ciencias</option>
+                            <option value="letras">Facultad de Letras</option>
+                            <option value="quimica">Facultad de Química</option>
+                            <option value="farmacia">Facultad de Farmacia</option>
+                            <option value="odontologia">Facultad de Odontología</option>
+                            <option value="veterinaria">Facultad de Medicina Veterinaria</option>
+                        </select>
+                        <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none">expand_more</span>
+                    </div>
+                </div>
+
+                <!-- Fila: Correo y Responsable -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider" for="correo">
+                            Correo Institucional
+                        </label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">mail</span>
+                            <input 
+                                class="w-full pl-11 pr-4 py-3.5 bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none dark:text-white placeholder:text-slate-400 text-sm" 
+                                id="correo" 
+                                name="correo" 
+                                placeholder="usuario@unmsm.edu.pe" 
+                                type="email"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider" for="responsable">
+                            Responsable
+                        </label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">person</span>
+                            <input 
+                                class="w-full pl-11 pr-4 py-3.5 bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none dark:text-white placeholder:text-slate-400 text-sm" 
+                                id="responsable" 
+                                name="responsable" 
+                                placeholder="Nombres y apellidos" 
+                                type="text"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cargo -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider" for="cargo">
+                        Cargo
+                    </label>
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">work</span>
+                        <input 
+                            class="w-full pl-11 pr-4 py-3.5 bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none dark:text-white placeholder:text-slate-400 text-sm" 
+                            id="cargo" 
+                            name="cargo" 
+                            placeholder="Ej. Director de Unidad" 
+                            type="text"
+                        />
+                    </div>
+                </div>
+
+                <!-- Mensaje -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider" for="mensaje">
+                        Mensaje de Solicitud
+                    </label>
+                    <div class="relative">
+                        <textarea 
+                            class="w-full p-4 bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none dark:text-white placeholder:text-slate-400 text-sm resize-none"
+                            id="mensaje"
+                            name="mensaje"
+                            rows="4"
+                            placeholder="Describa brevemente el motivo de su solicitud..."
+                        ></textarea>
+                    </div>
+                </div>
+
+                <!-- Botón enviar -->
+                <button type="submit" class="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-secondary text-white font-semibold text-sm uppercase tracking-wide btn-glow flex items-center justify-center gap-2 mt-6 shadow-lg shadow-primary/30">
+                    <span>Enviar Solicitud</span>
+                    <span class="material-symbols-outlined text-lg">send</span>
+                </button>
+
+                <!-- Volver -->
+                <div class="text-center mt-4">
+                    <a href="portal-inicio-facultades.html" class="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-blue-400 transition-colors">
+                        <span class="material-symbols-outlined text-sm">arrow_back</span>
+                        Volver al inicio
+                    </a>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="glass-footer w-full py-6 mt-auto relative z-10">
+        <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="h-7 w-7 bg-primary rounded flex items-center justify-center">
+                    <span class="material-symbols-outlined text-white text-xs">auto_awesome</span>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    © 2026 Universidad Nacional Mayor de San Marcos
+                </p>
+            </div>
+            <div class="flex gap-6 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                <a class="hover:text-primary transition-colors" href="#">Términos</a>
+                <a class="hover:text-primary transition-colors" href="#">Privacidad</a>
+                <a class="hover:text-primary transition-colors" href="#">Ayuda</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/portal-inicio-racio.js"></script>
+</body>
+</html>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Ficha de Indicador - Expediente | SIGPRO UNMSM</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <!-- jsPDF para exportar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1978e5",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#111821",
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                    },
+                },
+            },
+        };
+    </script>
+    
+    <link rel="stylesheet" href="css/facultades-expedientes/expediente-indicador.css">
+    <link rel="stylesheet" href="css/facultades-expedientes/profile-menu.css">
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
+    
+    <div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+        <div class="layout-container flex h-full grow flex-col">
+            
+            <!-- HEADER -->
+            <header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60 sticky top-0 z-50">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                    
+                    <div class="flex items-center gap-2">
+                        <div class="bg-gradient-to-br from-primary to-blue-800 p-1.5 rounded-lg shadow-lg">
+                            <span class="material-symbols-outlined text-white text-2xl">analytics</span>
+                        </div>
+                        <span class="text-xl font-bold tracking-tight text-[#1a365d] dark:text-white">SIGPRO</span>
+                    </div>
+
+                    <!-- Nav -->
+                    <nav class="flex items-center gap-6">
+                        <a class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white transition-colors" href="facultades-inicio.html">Inicio</a>
+                        <a class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white transition-colors" href="facultades-documentos.html">Documentos</a>
+                        <a class="text-sm font-semibold text-primary border-b-2 border-primary pb-1" href="facultades-expedientes.html">Repositorio</a>
+                        <a class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white transition-colors" href="facultades-nuevo.html">Nuevo</a>
+                    </nav>
+
+                    <!-- Controles -->
+                    <div class="flex items-center gap-4">
+                        <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                            <span class="material-symbols-outlined text-slate-600 dark:text-slate-400 block dark:hidden">dark_mode</span>
+                            <span class="material-symbols-outlined text-slate-300 hidden dark:block">light_mode</span>
+                        </button>
+                        <button type="button" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center border border-slate-300 dark:border-slate-600 hover:border-primary dark:hover:border-primary transition-colors" aria-label="Perfil">
+                            <span class="material-symbols-outlined text-slate-500 dark:text-slate-400 text-sm">person</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- MAIN CONTENT -->
+            <main class="flex flex-1 justify-center py-8">
+                <div class="layout-content-container flex flex-col w-full max-w-[1200px] px-6">
+                    
+                    <!-- Breadcrumb y título -->
+                    <div class="flex flex-wrap justify-between items-end gap-3 mb-8">
+                        <div class="flex flex-col gap-2">
+                            <nav class="flex text-xs font-medium text-slate-500 gap-2 items-center">
+                                <a href="facultades-expedientes.html" class="hover:text-primary">Repositorio</a>
+                                <span class="material-symbols-outlined text-xs">chevron_right</span>
+                                <span class="text-primary">Expediente de Indicador</span>
+                            </nav>
+                            <h1 class="text-slate-900 dark:text-slate-100 text-4xl font-black leading-tight tracking-[-0.033em]">
+                                Ficha de Indicador
+                            </h1>
+                            <p class="text-slate-500 dark:text-slate-400 text-base font-normal">
+                                Detalle técnico y seguimiento del indicador institucional
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button onclick="exportarPDF()" class="flex items-center justify-center rounded-lg px-4 h-10 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold gap-2 hover:bg-slate-50 transition-colors">
+                                <span class="material-symbols-outlined text-sm">download</span> 
+                                Exportar PDF
+                            </button>
+                            <button onclick="window.print()" class="flex items-center justify-center rounded-lg px-4 h-10 bg-primary text-white text-sm font-bold gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors">
+                                <span class="material-symbols-outlined text-sm">print</span> 
+                                Imprimir
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- INFORMACIÓN TÉCNICA -->
+                    <section id="ficha-info" class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
+                        <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">info</span>
+                                <h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight">Información Técnica</h2>
+                            </div>
+                            <span id="codigo-display" class="text-primary text-sm font-bold tracking-widest bg-primary/10 px-3 py-1 rounded-full">IND-2026-001</span>
+                        </div>
+                        
+                        <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-8" id="info-tecnica-grid">
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">VERSIÓN</p>
+                                <p id="info-version" class="text-slate-900 dark:text-slate-100 text-sm font-semibold">-</p>
+                            </div>
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">TIPO DE PROCESO</p>
+                                <p id="info-tipo" class="text-slate-900 dark:text-slate-100 text-sm font-semibold">-</p>
+                            </div>
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">PROCESO</p>
+                                <p id="info-proceso" class="text-slate-900 dark:text-slate-100 text-sm font-semibold">-</p>
+                            </div>
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">OFICINA O UNIDAD RESPONSABLE</p>
+                                <p id="info-unidad" class="text-slate-900 dark:text-slate-100 text-sm font-semibold">-</p>
+                            </div>
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1 lg:col-span-2">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">OBJETIVO DEL PROCESO</p>
+                                <p id="info-objetivo" class="text-slate-900 dark:text-slate-100 text-sm font-semibold line-clamp-2">-</p>
+                            </div>
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1 lg:col-span-2">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">NOMBRE DEL INDICADOR</p>
+                                <p id="info-nombre" class="text-slate-900 dark:text-slate-100 text-sm font-semibold">-</p>
+                            </div>
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">FRECUENCIA</p>
+                                <span id="info-frecuencia" class="w-fit px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase">-</span>
+                            </div>
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1 lg:col-span-3">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">VARIABLES</p>
+                                <p id="info-variables" class="text-slate-900 dark:text-slate-100 text-sm font-semibold whitespace-pre-line">-</p>
+                            </div>
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1 lg:col-span-2">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">FÓRMULA DEL INDICADOR</p>
+                                <div id="info-formula" class="bg-slate-50 dark:bg-slate-800 rounded p-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-mono">
+                                    -
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">FUENTE</p>
+                                <p id="info-fuente" class="text-slate-900 dark:text-slate-100 text-sm font-semibold">-</p>
+                            </div>
+                            <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1">
+                                <p class="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider">META</p>
+                                <div id="info-meta" class="text-slate-900 dark:text-slate-100 text-sm font-bold text-primary">-</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- SEGUIMIENTO DE DATOS -->
+                    <section class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
+                        <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">table_rows</span>
+                                <h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight">Seguimiento de Datos</h2>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="agregarDatoMensual()" class="flex items-center justify-center rounded-lg px-4 h-10 bg-primary text-white text-sm font-bold gap-2 shadow-sm hover:bg-primary/90 transition-all">
+                                    <span class="material-symbols-outlined text-[20px]">add_circle</span> 
+                                    AGREGAR DATO
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse" id="tabla-seguimiento">
+                                <thead>
+                                    <tr class="bg-slate-50 dark:bg-slate-800/30 text-slate-600 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+                                        <th class="px-4 py-3 text-center w-12">N°</th>
+                                        <th class="px-4 py-3 min-w-[120px]">Fecha</th>
+                                        <th class="px-4 py-3">Devengado (S/)</th>
+                                        <th class="px-4 py-3">PIM (S/)</th>
+                                        <th class="px-4 py-3">Resultado</th>
+                                        <th class="px-4 py-3">Meta Periodo</th>
+                                        <th class="px-4 py-3">Estado</th>
+                                        <th class="px-4 py-3 min-w-[200px]">Análisis y Observaciones</th>
+                                        <th class="px-4 py-3 min-w-[200px]">Acciones de Mejora</th>
+                                        <th class="px-4 py-3 text-center w-16">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-seguimiento" class="text-sm divide-y divide-slate-100 dark:divide-slate-800">
+                                    <!-- Filas dinámicas -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="p-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                            <p class="text-xs text-slate-500">
+                                Mostrando <span id="contador-registros">0</span> registros mensuales
+                            </p>
+                            <div class="flex gap-2">
+                                <button onclick="sincronizarConAPI()" class="flex items-center justify-center rounded-lg px-4 h-10 bg-blue-600 text-white text-sm font-bold gap-2 hover:bg-blue-700 transition-colors">
+                                    <span class="material-symbols-outlined text-[20px]">sync</span> 
+                                    Sincronizar
+                                </button>
+                                <button onclick="guardarDatos()" class="flex items-center justify-center rounded-lg px-4 h-10 bg-emerald-600 text-white text-sm font-bold gap-2 hover:bg-emerald-700 transition-colors">
+                                    <span class="material-symbols-outlined text-[20px]">save</span> 
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- LEYENDA DE ESTADO -->
+                    <section class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
+                        <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">legend_toggle</span>
+                                <h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight">Leyenda de Estado</h2>
+                            </div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Se asigna según el valor del indicador</p>
+                        </div>
+                        <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="flex items-center gap-3 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/20 px-4 py-3">
+                                <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                                <div>
+                                    <p class="text-sm font-bold text-red-700 dark:text-red-300">Riesgo</p>
+                                    <p class="text-xs text-red-600/80 dark:text-red-300/80">Menor a 75</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+                                <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                                <div>
+                                    <p class="text-sm font-bold text-amber-700 dark:text-amber-300">Estable</p>
+                                    <p class="text-xs text-amber-600/80 dark:text-amber-300/80">Desde 75 hasta 89.99</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3">
+                                <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                                <div>
+                                    <p class="text-sm font-bold text-emerald-700 dark:text-emerald-300">Óptimo</p>
+                                    <p class="text-xs text-emerald-600/80 dark:text-emerald-300/80">90 o más</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- GRÁFICOS -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                        <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                            <h3 class="text-slate-900 dark:text-slate-100 font-bold mb-4 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">trending_up</span> 
+                                Tendencia de Resultados
+                            </h3>
+                            <div class="h-64 w-full" id="grafico-tendencia"></div>
+                        </div>
+
+                        <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                                <h3 class="text-slate-900 dark:text-slate-100 font-bold mb-4 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">speed</span> 
+                                Estado del Indicador
+                            </h3>
+                            <div class="flex items-center justify-center h-64 relative">
+                                <div class="text-center z-10">
+                                    <p id="estado-promedio" class="text-4xl font-black text-primary">Sin datos</p>
+                                    <p class="text-sm font-bold text-slate-500 uppercase mt-1">Promedio</p>
+                                    <p id="estado-texto" class="text-xs mt-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800">-</p>
+                                </div>
+                                <svg class="absolute inset-0 w-full h-full" viewBox="0 0 200 200">
+                                    <circle cx="100" cy="100" r="80" fill="none" stroke="#e2e8f0" stroke-width="12" class="dark:stroke-slate-700"/>
+                                    <circle id="circulo-progreso" cx="100" cy="100" r="80" fill="none" stroke="#1978e5" stroke-width="12" 
+                                            stroke-dasharray="502" stroke-dashoffset="502" stroke-linecap="round"
+                                            transform="rotate(-90 100 100)" class="transition-all duration-1000"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </main>
+
+            <!-- Footer -->
+            <footer class="bg-[#1a365d] dark:bg-slate-950 text-white/70 py-10 mt-12 relative z-10 border-t border-slate-700">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                    <div class="flex items-center justify-center gap-3 mb-4">
+                        <span class="material-symbols-outlined text-accent text-3xl">school</span>
+                        <span class="text-white font-bold tracking-widest text-sm uppercase">Oficina General de Planificación - UNMSM</span>
+                    </div>
+                    <p class="text-sm">© 2026 Sistema de Racionalización v2.0</p>
+                    <div class="mt-6 flex justify-center gap-8 text-xs font-medium uppercase tracking-wide">
+                        <a class="hover:text-white transition-colors" href="#">Términos</a>
+                        <a class="hover:text-white transition-colors" href="#">Privacidad</a>
+                        <a class="hover:text-white transition-colors" href="#">Ayuda</a>
+                    </div>
+                </div>
+            </footer>
+
+        </div>
+    </div>
+
+    <!-- MODAL: Agregar/Editar Dato -->
+    <div id="modal-dato" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">add_chart</span>
+                    <span id="modal-titulo">Agregar Dato</span>
+                </h3>
+                <button onclick="cerrarModal()" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                    <span class="material-symbols-outlined text-slate-500">close</span>
+                </button>
+            </div>
+            
+            <form id="form-dato" class="space-y-4">
+                <input type="hidden" id="dato-id">
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Fecha (Mes/Año)</label>
+                        <input type="month" id="input-fecha" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Meta del Periodo (%)</label>
+                        <input type="number" id="input-meta" step="0.01" min="0" max="100" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Devengado (S/)</label>
+                        <input type="number" id="input-devengado" step="0.01" min="0" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">PIM (S/)</label>
+                        <input type="number" id="input-pim" step="0.01" min="0" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none">
+                    </div>
+                </div>
+                
+                <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Resultado Calculado</label>
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="input-resultado" readonly
+                            class="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-mono text-primary font-bold">
+                        <span class="text-xs text-slate-400">%</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">Se calcula automáticamente: (Devengado / PIM) × 100%</p>
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Análisis y Observaciones</label>
+                    <textarea id="input-analisis" rows="2"
+                        class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none resize-none"
+                        placeholder="Describa el análisis del periodo..."></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Acciones de Mejora</label>
+                    <textarea id="input-acciones" rows="2"
+                        class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none resize-none"
+                        placeholder="Describa las acciones a tomar..."></textarea>
+                </div>
+                
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="cerrarModal()" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors shadow-lg shadow-primary/30">
+                        Guardar Dato
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- JavaScript -->
+    <script src="js/components/api.js"></script>
+    <script src="js/facultades-expedientes/profile-menu.js"></script>
+    <script src="js/facultades-expedientes/expediente-indicador.js"></script>
+</body>
+</html>

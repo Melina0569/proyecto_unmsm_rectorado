@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Sistema de Gestión por Procesos - UNMSM</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+    
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1e3a8a",
+                        secondary: "#0d9488",
+                        accent: "#f59e0b",
+                        "background-light": "#f8fafc",
+                        "background-dark": "#0f172a",
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                        sans: ["Inter", "sans-serif"],
+                    },
+                },
+            },
+        };
+    </script>
+    
+    <!-- Estilos -->
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/animations.css">
+    <link rel="stylesheet" href="css/views.css">
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    
+    <!-- Navegación -->
+    <nav class="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-2">
+                    <span class="material-icons-round text-primary text-3xl">account_tree</span>
+                    <span class="font-bold text-xl tracking-tight text-primary dark:text-white">SIGPRO</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a class="text-sm font-medium text-primary dark:text-secondary" href="index.html">Inicio</a>
+                    <a class="text-sm font-medium hover:text-primary dark:hover:text-secondary" href="portal-inicio.html">Portal</a>
+                    <a class="text-sm font-medium hover:text-primary dark:hover:text-secondary" href="flows.html">Flujogramas</a>
+                    <a class="text-sm font-medium hover:text-primary dark:hover:text-secondary" href="indicators.html">Indicadores</a>
+                    <button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800" id="theme-toggle">
+                        <span class="material-icons-round text-xl block dark:hidden">dark_mode</span>
+                        <span class="material-icons-round text-xl hidden dark:block">light_mode</span>
+                    </button>
+                    <a class="bg-primary hover:bg-blue-800 text-white px-5 py-2 rounded-full text-sm font-semibold transition-all shadow-md hover:shadow-lg" href="portal-inicio.html">
+                        Acceder
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header/Hero -->
+    <header class="hero-hue" id="hero-hue">
+        <div class="hero-blob hero-blob--one"></div>
+        <div class="hero-blob hero-blob--two"></div>
+        <div class="hero-blob hero-blob--three"></div>
+        <canvas id="wave-canvas" aria-hidden="true"></canvas>
+
+        <div class="hero-hue__ui max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="hero-hue__top">
+                <div class="hero-title-block">
+                    <span class="hero-eyebrow">SIGPRO • UNMSM</span>
+                    <h1 class="hero-main-title">Sistema de Gestión<br><em>por Procesos</em></h1>
+                    <p class="hero-description">Plataforma centralizada para la optimización de procesos y registro de indicadores de las 20 facultades de la Decana de América.</p>
+                </div>
+
+                <div class="hero-ring-block">
+                    <div class="hero-ring-wrap">
+                        <svg class="hero-ring-svg" viewBox="0 0 140 140" id="ring-svg">
+                            <defs>
+                                <filter id="glow">
+                                    <feGaussianBlur stdDeviation="2.5" result="b"/>
+                                    <feMerge>
+                                        <feMergeNode in="b"/>
+                                        <feMergeNode in="SourceGraphic"/>
+                                    </feMerge>
+                                </filter>
+                            </defs>
+                            <g id="hue-segs"></g>
+                            <circle cx="70" cy="70" r="52" fill="none" stroke="rgba(0,0,0,0.09)" stroke-width="14"/>
+                            <circle id="ring-handle" cx="70" cy="18" r="8" fill="white" stroke-width="2.5" filter="url(#glow)"/>
+                        </svg>
+                        <div class="hero-ring-center">
+                            <div class="hero-ring-center-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hero-bottom-row hero-bottom-row--compact">
+                <a class="hero-cta group" href="portal-inicio.html">
+                    <span class="material-symbols-outlined font-bold group-hover:translate-x-1 transition-transform">login</span>
+                    Acceder al Sistema
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Features -->
+    <section class="py-20 bg-slate-50 dark:bg-slate-900/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-[0_12px_28px_-14px_rgba(15,23,42,0.32)] border border-slate-300/85 dark:border-slate-600/80 ring-1 ring-slate-300/35 dark:ring-slate-500/35 hover:shadow-[0_26px_50px_-20px_rgba(15,23,42,0.45)] hover:-translate-y-1 transition-all duration-300 group">
+                    <div class="w-14 h-14 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center mb-6 shadow-md ring-1 ring-slate-200/70 dark:ring-slate-600/70 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
+                        <span class="material-icons-round text-3xl">insights</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 dark:text-white">Indicadores de Gestión</h3>
+                    <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+                        Monitoreo de indicadores estratégicos, de soporte y operativos.
+                    </p>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-[0_12px_28px_-14px_rgba(15,23,42,0.32)] border border-slate-300/85 dark:border-slate-600/80 ring-1 ring-slate-300/35 dark:ring-slate-500/35 hover:shadow-[0_26px_50px_-20px_rgba(15,23,42,0.45)] hover:-translate-y-1 transition-all duration-300 group">
+                    <div class="w-14 h-14 bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 rounded-xl flex items-center justify-center mb-6 shadow-md ring-1 ring-slate-200/70 dark:ring-slate-600/70 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
+                        <span class="material-icons-round text-3xl">hub</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 dark:text-white">Mapeo de Procesos</h3>
+                    <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+                        Análisis, diseño y almacenamiento de flujogramas de procedimientos administrativos.
+                    </p>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-[0_12px_28px_-14px_rgba(15,23,42,0.32)] border border-slate-300/85 dark:border-slate-600/80 ring-1 ring-slate-300/35 dark:ring-slate-500/35 hover:shadow-[0_26px_50px_-20px_rgba(15,23,42,0.45)] hover:-translate-y-1 transition-all duration-300 group">
+                    <div class="w-14 h-14 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center mb-6 shadow-md ring-1 ring-slate-200/70 dark:ring-slate-600/70 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
+                        <span class="material-icons-round text-3xl">storage</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 dark:text-white">Base de Datos Central</h3>
+                    <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+                        Consolidación de información en una infraestructura segura y accesible para toda la universidad.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="stats-blur py-12 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+                <div>
+                    <div id="stat-faculties" class="text-4xl font-extrabold text-secondary mb-1">20</div>
+                    <div class="text-sm font-medium opacity-80 uppercase tracking-wider">Facultades</div>
+                </div>
+                <div>
+                    <div id="stat-indicators" class="text-4xl font-extrabold text-secondary mb-1">150+</div>
+                    <div class="text-sm font-medium opacity-80 uppercase tracking-wider">Indicadores</div>
+                </div>
+                <div>
+                    <div id="stat-flows" class="text-4xl font-extrabold text-secondary mb-1">45</div>
+                    <div class="text-sm font-medium opacity-80 uppercase tracking-wider">Flujogramas</div>
+                </div>
+                <div>
+                    <div id="stat-active-users" class="text-4xl font-extrabold text-secondary mb-1">20</div>
+                    <div class="text-sm font-medium opacity-80 uppercase tracking-wider">Usuarios Activos</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Facultades - Sección principal con Grid/Lista -->
+    <section class="py-20 bg-white dark:bg-background-dark" id="facultades">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            <!-- Header con título y controles -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-4">
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="inline-block w-8 h-1 bg-primary rounded"></span>
+                        <span class="text-primary font-bold tracking-widest text-xs uppercase">Unidades Académicas</span>
+                    </div>
+                    <h2 class="text-4xl font-black dark:text-white">Facultades (20)</h2>
+                    <p class="text-slate-600 dark:text-slate-400 mt-2">Explora los procesos y resultados por cada unidad académica</p>
+                </div>
+                
+                <!-- Toggle Grid/List -->
+                <div class="view-toggle">
+                    <button id="btn-grid" class="view-toggle__btn active">
+                        <span class="material-symbols-outlined text-lg">grid_view</span>
+                        Grid
+                    </button>
+                    <button id="btn-list" class="view-toggle__btn">
+                        <span class="material-symbols-outlined text-lg">format_list_bulleted</span>
+                        Lista
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contenedor de facultades (Grid o Lista) -->
+            <div id="faculties-container" class="mb-8 transition-opacity duration-200">
+                <!-- Se renderiza dinámicamente con JS -->
+            </div>
+
+            <!-- Info y paginación -->
+            <div class="flex flex-col items-center gap-6">
+                <div id="showing-text" class="text-slate-400 text-sm font-medium">
+                    <!-- Se actualiza dinámicamente -->
+                </div>
+                
+                <!-- Botón expandir -->
+                <button id="btn-expand" class="btn-expand group">
+                    <span class="btn-text">Ver todas las facultades</span>
+                    <span class="material-icons-round group-hover:translate-y-1 transition-transform">expand_more</span>
+                </button>
+                
+                <!-- Paginación -->
+                <div id="pagination" class="pagination">
+                    <!-- Se renderiza dinámicamente -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-300 py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12">
+                <div class="col-span-1 md:col-span-1">
+                    <div class="flex items-center gap-2 mb-6">
+                        <span class="material-icons-round text-secondary text-3xl">account_tree</span>
+                        <span class="font-bold text-xl tracking-tight text-white">SIGPRO</span>
+                    </div>
+                    <p class="text-sm leading-relaxed mb-6">
+                        Oficina de Racionalización de la Universidad Nacional Mayor de San Marcos.
+                    </p>
+                    
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-6 uppercase text-xs tracking-widest">Oficina de Racionalización</h4>
+                    <ul class="space-y-4 text-sm">
+                        <li class="flex gap-3">
+                            <span class="material-icons-round text-secondary text-lg">location_on</span>
+                            Ciudad Universitaria, Lima
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="material-icons-round text-secondary text-lg">call</span>
+                            (01) 619-7000 Anexo 450
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="material-icons-round text-secondary text-lg">mail</span>
+                            racionalizacion.ogpl@unmsm.edu.pe
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-6 uppercase text-xs tracking-widest">Enlaces Rápidos</h4>
+                    <ul class="space-y-4 text-sm">
+                        <li><a class="hover:text-white transition-colors" href="portal-inicio.html">Portal de Racionalización</a></li>
+                        <li><a class="hover:text-white transition-colors" href="indicators.html">Indicadores de Gestión</a></li>
+                        <li><a class="hover:text-white transition-colors" href="flows.html">Repositorio de Flujogramas</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-6 uppercase text-xs tracking-widest">Soporte</h4>
+                    <ul class="space-y-4 text-sm">
+                        <li><a class="hover:text-white transition-colors" href="#">Manual de Usuario</a></li>
+                        <li><a class="hover:text-white transition-colors" href="#">Preguntas Frecuentes</a></li>
+                        <li><a class="hover:text-white transition-colors" href="#">Recursos</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="mt-16 pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-medium">
+                <p>© 2026 UNMSM - Sistema de Gestión por Procesos. Todos los derechos reservados.</p>
+                <div class="flex gap-6">
+                    <a class="hover:text-white transition-colors" href="#">Términos de Uso</a>
+                    <a class="hover:text-white transition-colors" href="#">Privacidad</a>
+                    <a class="hover:text-white transition-colors" href="#">Cookies</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/views.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

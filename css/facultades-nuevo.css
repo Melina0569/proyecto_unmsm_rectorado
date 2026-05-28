@@ -1,0 +1,457 @@
+/* ============================================
+   SIGPRO - Facultades Nuevo Stylesheet
+   ============================================ */
+
+/* Base y utilidades */
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ============================================
+   HEADER - PARIDAD CON DOCUMENTOS
+   ============================================ */
+
+/* Logo icon - gradiente exacto */
+header .bg-gradient-to-br {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    box-shadow: 0 10px 15px -3px rgba(30, 64, 175, 0.3);
+}
+
+header nav a:hover {
+    color: #1e40af;
+}
+
+.dark header nav a:hover {
+    color: #60a5fa;
+}
+
+header nav a.border-primary {
+    color: #1e40af;
+    border-bottom: 2px solid #1e40af;
+    padding-bottom: 0.25rem;
+}
+
+.dark header nav a.border-primary {
+    color: #60a5fa;
+    border-bottom-color: #60a5fa;
+}
+
+/* Watermark Section */
+.watermark-section {
+    position: relative;
+    padding: 4rem 2rem;
+    margin-top: 3rem;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    background: linear-gradient(135deg, rgba(26, 54, 93, 0.03) 0%, rgba(37, 99, 235, 0.03) 100%);
+    border: 1px dashed rgba(37, 99, 235, 0.2);
+}
+
+.dark .watermark-section {
+    background: linear-gradient(135deg, rgba(26, 54, 93, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%);
+    border-color: rgba(37, 99, 235, 0.3);
+}
+
+.watermark-bg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.03;
+    pointer-events: none;
+    font-size: 8rem;
+    font-weight: 900;
+    color: #1a365d;
+    text-transform: uppercase;
+    letter-spacing: 0.5rem;
+    transform: rotate(-5deg);
+    user-select: none;
+}
+
+.dark .watermark-bg {
+    opacity: 0.05;
+    color: #60a5fa;
+}
+
+.watermark-content {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+}
+
+.watermark-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1.5rem;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    border-radius: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 20px 40px -10px rgba(37, 99, 235, 0.3);
+    animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+/* Glass Card Effect */
+.glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.15),
+        0 12px 24px -8px rgba(0, 0, 0, 0.1),
+        0 4px 8px -2px rgba(0, 0, 0, 0.05);
+}
+
+.dark .glass-card {
+    background: rgba(15, 23, 42, 0.7);
+    border-color: rgba(51, 65, 85, 0.5);
+    box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        0 12px 24px -8px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Quick Action Cards */
+.quick-action-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid transparent;
+}
+
+.quick-action-card:hover {
+    box-shadow: 
+        0 35px 60px -15px rgba(0, 0, 0, 0.2),
+        0 15px 30px -10px rgba(0, 0, 0, 0.12),
+        0 6px 12px -4px rgba(0, 0, 0, 0.08) !important;
+    transform: translateY(-2px);
+}
+
+.dark .quick-action-card:hover {
+    box-shadow:
+        0 35px 60px -15px rgba(0, 0, 0, 0.6),
+        0 15px 30px -10px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+.quick-action-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(37, 99, 235, 0.3);
+    box-shadow: 0 20px 40px -15px rgba(37, 99, 235, 0.2);
+}
+
+/* Active State Indicator */
+.nav-item-active {
+    position: relative;
+}
+
+.nav-item-active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(to right, transparent, #2563eb, transparent);
+    border-radius: 2px;
+}
+
+/* Animation Delays for Blobs */
+.animation-delay-2000 {
+    animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+    animation-delay: 4s;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .watermark-bg {
+        font-size: 4rem;
+    }
+}
+
+#recent-docs-section {
+    margin-top: 0.5rem;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+#recent-docs-section:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+
+/* Toast Animations */
+.toast-enter {
+    animation: toastEnter 0.3s ease forwards;
+}
+
+.toast-exit {
+    animation: toastExit 0.3s ease forwards;
+}
+
+@keyframes toastEnter {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes toastExit {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+/* Focus States for Accessibility */
+button:focus-visible,
+a:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
+/* Smooth Scroll */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Selection Color */
+::selection {
+    background: rgba(37, 99, 235, 0.2);
+    color: inherit;
+}
+
+.dark ::selection {
+    background: rgba(96, 165, 250, 0.3);
+}
+
+/* Profile dropdown animation */
+#profile-dropdown {
+    transform-origin: top right;
+    will-change: transform, opacity;
+}
+
+#profile-dropdown.show-profile {
+    animation: profileDropdownIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+#profile-dropdown.hide-profile {
+    animation: profileDropdownOut 0.18s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    pointer-events: none;
+}
+
+@keyframes profileDropdownIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes profileDropdownOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+    }
+}
+
+/* ============================================
+   LOGOUT MODAL ANIMATIONS
+   ============================================ */
+
+/* Logout action: feedback fluido */
+#logout-btn.logout-action {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(90deg, rgba(254, 242, 242, 0.55), rgba(254, 226, 226, 0.9));
+    border: 1px solid rgba(239, 68, 68, 0.22);
+}
+
+.dark #logout-btn.logout-action {
+    background: linear-gradient(90deg, rgba(127, 29, 29, 0.15), rgba(153, 27, 27, 0.25));
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+#logout-btn.logout-action::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.35) 45%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.45s ease;
+}
+
+#logout-btn.logout-action:hover {
+    transform: translateX(2px);
+    box-shadow: 0 10px 24px -14px rgba(220, 38, 38, 0.65);
+}
+
+#logout-btn.logout-action:hover::before {
+    transform: translateX(120%);
+}
+
+#logout-btn.logout-action:active {
+    transform: translateX(1px) scale(0.99);
+}
+
+#logout-modal {
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#logout-modal.show-modal {
+    animation: backdropFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+#logout-modal.hide-modal {
+    animation: backdropFadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+#logout-modal > div {
+    animation: modalScaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transform-origin: center center;
+}
+
+#logout-modal.hide-modal > div {
+    animation: modalScaleOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes backdropFadeIn {
+    from {
+        background-color: rgba(0, 0, 0, 0);
+        backdrop-filter: blur(0px);
+    }
+    to {
+        background-color: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+    }
+}
+
+@keyframes backdropFadeOut {
+    from {
+        background-color: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+    }
+    to {
+        background-color: rgba(0, 0, 0, 0);
+        backdrop-filter: blur(0px);
+    }
+}
+
+@keyframes modalScaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.85) translateY(-40px) rotateX(10deg);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0) rotateX(0deg);
+    }
+}
+
+@keyframes modalScaleOut {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0) rotateX(0deg);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.85) translateY(20px) rotateX(-10deg);
+    }
+}
+
+/* Animacion del icono en el modal */
+#logout-modal .mx-auto.w-14 {
+    animation: iconPulse 0.6s ease-out forwards;
+}
+
+@keyframes iconPulse {
+    0% {
+        transform: scale(0) rotate(-180deg);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.15) rotate(0deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+/* Animacion de los botones */
+#logout-modal .flex.gap-3 button {
+    animation: buttonSlideIn 0.5s ease-out forwards;
+    opacity: 0;
+}
+
+#logout-modal .flex.gap-3 button:first-child {
+    animation-delay: 0.15s;
+}
+
+#logout-modal .flex.gap-3 button:last-child {
+    animation-delay: 0.3s;
+}
+
+@keyframes buttonSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Hover efectos en botones del modal */
+#logout-modal button:hover {
+    transform: translateY(-2px);
+}
+
+#logout-modal button:active {
+    transform: translateY(0);
+}
+
+/* ==========================================
+   FOOTER - Exacto a facultades-inicio
+   ========================================== */
+
+footer {
+    background-color: #1e40af;  
+    color: rgba(255, 255, 255, 0.7);
+    border-top: 1px solid #1e3a8a;
+}
+
+.dark footer {
+    background-color: #020617;  
+    border-top-color: #1e293b;
+}
+
+/* Footer branding icon color */
+footer .text-accent {
+    color: #60a5fa;
+}

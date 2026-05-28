@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<title>Ficha de Inventario | SIGPRO UNMSM</title>
+
+	<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+	<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+	<script>
+		tailwind.config = {
+			darkMode: 'class',
+			theme: {
+				extend: {
+					colors: {
+						primary: '#1a365d',
+						accent: '#2563eb'
+					},
+					fontFamily: {
+						display: ['Inter', 'sans-serif']
+					}
+				}
+			}
+		};
+	</script>
+
+	<link rel="stylesheet" href="css/facultades-nuevo/ficha-inventario.css">
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 min-h-screen p-6 md:p-12">
+	<div class="max-w-5xl mx-auto">
+		<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+			<div class="bg-slate-100 dark:bg-slate-800 p-6 border-b border-slate-300 dark:border-slate-700">
+				<h1 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+					<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg">
+						<span class="material-symbols-outlined text-white text-xl">inventory_2</span>
+					</div>
+					Ficha de Inventario
+				</h1>
+				<p class="text-sm text-slate-500 dark:text-slate-400 mt-2">
+					Código autogenerado de la ficha de inventario.
+				</p>
+			</div>
+
+			<form id="ficha-form" class="p-8">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div>
+						<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+							Código <span class="text-xs font-normal text-slate-400">(Auto-generado)</span>
+						</label>
+						<input type="text" name="codigo" id="codigo-field" readonly
+							class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
+							placeholder="INV-FISI-2026-001"/>
+					</div>
+
+					<div>
+						<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+							Versión <span class="text-red-500">*</span>
+						</label>
+						<input type="text" name="version" required
+							class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+							placeholder="Ej. 1.0"/>
+					</div>
+
+					<div>
+						<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+							Fecha de elaboración <span class="text-red-500">*</span>
+						</label>
+						<input type="date" name="fechaElaboracion" required
+							class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"/>
+					</div>
+
+					<div class="md:col-span-2">
+						<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+							Archivos Adjuntos
+						</label>
+						<div id="upload-area" class="rounded-2xl flex flex-col items-center justify-center py-10 px-4 cursor-pointer group border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-emerald-500 dark:hover:border-emerald-400 transition-all" onclick="document.getElementById('file-input').click()">
+							<div class="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4 transition-colors group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20">
+								<span class="material-symbols-outlined text-3xl text-slate-400 group-hover:text-emerald-500">attach_file</span>
+							</div>
+							<p class="text-base font-semibold text-slate-700 dark:text-slate-200">Haga clic para adjuntar archivos</p>
+							<p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Puede seleccionar uno o varios archivos</p>
+							<input type="file" id="file-input" name="adjuntos" class="hidden" multiple>
+						</div>
+						<div id="file-list" class="mt-4 hidden space-y-2"></div>
+					</div>
+				</div>
+			</form>
+
+			<div class="p-8 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-4">
+				<button type="button" id="btn-finalizar"
+					class="bg-gradient-to-r from-emerald-600 to-teal-800 hover:from-emerald-700 hover:to-teal-900 text-white px-12 py-4 rounded-xl font-bold tracking-wide flex items-center gap-3 shadow-lg shadow-emerald-600/30 transition-all transform hover:scale-105 active:scale-95">
+					<span class="material-symbols-outlined text-xl">check_circle</span>
+					FINALIZAR Y GENERAR REPORTE
+				</button>
+				<a href="facultades-documentos.html" id="btn-expedientes"
+					class="hidden bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white px-8 py-3 rounded-xl font-semibold tracking-wide flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-all transform hover:scale-105 animate-bounce">
+					<span class="material-symbols-outlined text-lg">folder_open</span>
+					Ver en Documentos
+					<span class="material-symbols-outlined text-lg">arrow_forward</span>
+				</a>
+				<p class="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
+					El código se genera automáticamente al cargar la ficha.
+				</p>
+			</div>
+		</div>
+	</div>
+
+	<div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+	<script src="js/components/api.js"></script>
+	<script src="js/facultades-nuevo/ficha-inventario.js"></script>
+</body>
+</html>

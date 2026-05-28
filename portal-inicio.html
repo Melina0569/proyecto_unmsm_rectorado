@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Gestión Institucional | Portal Universitario</title>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+    <!-- Configuración Tailwind INLINE -->
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1152d4",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622"
+                    },
+                    fontFamily: {
+                        display: ["Public Sans", "system-ui", "sans-serif"]
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.25rem",
+                        lg: "0.5rem",
+                        xl: "0.75rem",
+                        full: "9999px"
+                    }
+                }
+            }
+        };
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1" rel="stylesheet">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/portal-inicio.css">
+</head>
+
+<body class="font-display bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-100 min-h-screen flex flex-col relative overflow-x-hidden bg-gradient-mesh">
+     
+    <!-- Burbujas -->
+    <div class="background-bubbles">
+        <div class="bubble bubble-1"></div>
+        <div class="bubble bubble-2"></div>
+        <div class="bubble bubble-3"></div>
+        <div class="bubble bubble-4"></div>
+    </div>
+
+    <!-- Botón Dark Mode -->
+    <button id="theme-toggle" class="fixed top-6 right-6 z-50 w-14 h-14 rounded-full glass-card flex items-center justify-center cursor-pointer group hover:scale-110 transition-all duration-300" aria-label="Cambiar tema">
+        <!-- Icono Sol (Light Mode) -->
+        <span class="material-icons text-2xl text-amber-500 dark:hidden group-hover:rotate-90 transition-transform duration-300">
+            light_mode
+        </span>
+        <!-- Icono Luna (Dark Mode) -->
+        <span class="material-icons text-2xl text-blue-300 hidden dark:block group-hover:-rotate-12 transition-transform duration-300">
+            dark_mode
+        </span>
+    </button>
+
+    <main class="flex-grow flex flex-col items-center justify-center px-6 py-12">
+
+        <!-- Header -->
+        <div class="text-center mb-16">
+
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-primary/10 rounded-2xl mb-6">
+                <span class="material-icons text-primary text-5xl">
+                    account_balance
+                </span>
+            </div>
+
+            <h1 class="text-5xl md:text-6xl font-extrabold text-[#0a1e4d] dark:text-white tracking-tight mb-4">
+                Gestión Institucional
+            </h1>
+
+            <p class="text-lg text-slate-500 dark:text-slate-400 max-w-lg mx-auto leading-relaxed">
+                Bienvenido al ecosistema digital universitario. Seleccione su perfil institucional para acceder a sus herramientas y servicios.
+            </p>
+
+        </div>
+
+        <!-- Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl">
+
+            <!-- Facultad -->
+            <div class="glass-card p-10 rounded-xl flex flex-col items-center text-center dark:bg-white/5 dark:border-white/10 relative overflow-hidden">
+
+                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center mb-8 shadow-lg shadow-primary/20">
+                    <span class="material-icons text-white text-4xl">
+                        school
+                    </span>
+                </div>
+
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-4">
+                    Facultad
+                </h2>
+
+                <p class="text-slate-600 dark:text-slate-400 mb-8 flex-grow leading-relaxed">
+                    Portal dedicado a personal docente, investigadores y decanatos. Gestión académica y administrativa de facultades.
+                </p>
+
+                <a href="portal-inicio-facultades.html" class="w-full py-4 px-8 rounded-lg bg-gradient-to-r from-primary to-[#051937] text-white font-semibold text-lg btn-glow flex items-center justify-center gap-2">
+                    Acceder
+                    <span class="material-icons text-sm">arrow_forward</span>
+                </a>
+
+            </div>
+
+            <!-- Administrativo -->
+            <div class="glass-card p-10 rounded-xl flex flex-col items-center text-center dark:bg-white/5 dark:border-white/10 relative overflow-hidden">
+
+                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-[#0a1e4d] flex items-center justify-center mb-8 shadow-lg shadow-primary/20">
+                    <span class="material-icons text-white text-4xl">
+                        admin_panel_settings
+                    </span>
+                </div>
+
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-4">
+                    Administrativo
+                </h2>
+
+                <p class="text-slate-600 dark:text-slate-400 mb-8 flex-grow leading-relaxed">
+                    Acceso para personal administrativo, recursos humanos y tesorería. Herramientas de gestión operativa y financiera.
+                </p>
+
+                <a href="portal-inicio-racio.html" class="w-full py-4 px-8 rounded-lg bg-gradient-to-r from-primary to-[#051937] text-white font-semibold text-lg btn-glow flex items-center justify-center gap-2">
+                    Acceder
+                    <span class="material-icons text-sm">arrow_forward</span>
+                </a>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer con sombra glassmorphism -->
+    <footer class="glass-footer w-full py-6 mt-auto">
+
+        <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+
+            <div class="flex items-center gap-4">
+
+                <div class="h-8 w-8 bg-primary rounded flex items-center justify-center">
+                    <span class="material-icons text-white text-xs">
+                        auto_awesome
+                    </span>
+                </div>
+
+                <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                    © 2026 Universidad Nacional Mayor de San Marcos - Sistema de Racionalización v2.0
+                </p>
+
+            </div>
+
+            <div class="flex gap-8 text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+
+                <a class="hover:text-primary transition-colors" href="#">
+                    Términos de Uso
+                </a>
+
+                <a class="hover:text-primary transition-colors" href="#">
+                    Privacidad
+                </a>
+
+                <a class="hover:text-primary transition-colors" href="#">
+                    Cookies
+                </a>
+
+            </div>
+
+        </div>
+
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/portal-inicio.js"></script>
+
+</body>
+</html>

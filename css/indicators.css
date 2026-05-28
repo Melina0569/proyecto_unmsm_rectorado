@@ -1,0 +1,233 @@
+/* ============================================
+   INDICATORS MODULE - Sistema de Indicadores
+   ============================================ */
+
+/* Ocultar flecha nativa del select */
+select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: none !important;
+}
+
+/* Firefox específico */
+select::-ms-expand {
+    display: none;
+}
+
+/* Flecha rota cuando el select está abierto */
+select:focus + svg,
+select:active + svg {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+/* Hover suave */
+select:hover,
+input:hover {
+    background-color: #e2e8f0; /* slate-200 */
+}
+
+.dark select:hover,
+.dark input:hover {
+    background-color: #334155; /* slate-700 */
+}
+
+/* Placeholder del select */
+select option[value=""] {
+    color: #94a3b8; /* slate-400 */
+}
+
+/* Contenedor del select para posicionar la flecha personalizada */
+.select-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+/* Select base */
+.select-wrapper select {
+    width: 100%;
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: #374151; /* slate-700 */
+    background-color: #f1f5f9; /* slate-100 */
+    border: 1px solid #cbd5e1; /* slate-300 */
+    border-radius: 0.5rem; /* rounded-lg */
+    cursor: pointer;
+    
+    /* Eliminar flecha nativa */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    
+    /* Eliminar outline azul al hacer focus */
+    outline: none;
+    
+    /* Transición suave */
+    transition: all 0.2s ease;
+}
+
+/* Hover */
+.select-wrapper select:hover {
+    background-color: #e2e8f0; /* slate-200 */
+    border-color: #94a3b8; /* slate-400 */
+}
+
+/* Focus - borde sutil en lugar de grueso */
+.select-wrapper select:focus {
+    border-color: #3b82f6; /* blue-500 */
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); /* blue suave */
+    background-color: #ffffff;
+}
+
+/* Flecha personalizada (una sola, no doble) */
+.select-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #64748b; /* slate-500 */
+    pointer-events: none;
+}
+
+/* Estado deshabilitado */
+.select-wrapper select:disabled {
+    background-color: #f1f5f9;
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
+/* Opción por defecto (placeholder) */
+.select-wrapper select option:first-child {
+    color: #94a3b8; /* slate-400 */
+}
+
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+    .select-wrapper select {
+        color: #e2e8f0; /* slate-200 */
+        background-color: #1e293b; /* slate-800 */
+        border-color: #475569; /* slate-600 */
+    }
+    
+    .select-wrapper select:hover {
+        background-color: #334155; /* slate-700 */
+        border-color: #64748b; /* slate-500 */
+    }
+    
+    .select-wrapper select:focus {
+        border-color: #60a5fa; /* blue-400 */
+        box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+        background-color: #0f172a; /* slate-900 */
+    }
+    
+    .select-wrapper::after {
+        border-top-color: #94a3b8; /* slate-400 */
+    }
+    
+    .select-wrapper select option:first-child {
+        color: #64748b;
+    }
+}
+
+/* Fórmula matemática */
+.formula-box {
+    font-family: 'Courier New', Courier, monospace;
+}
+
+/* Scrollbar personalizado */
+.pdf-viewer-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.pdf-viewer-scrollbar::-webkit-scrollbar-track {
+    background: #cbd5e1;
+}
+
+.pdf-viewer-scrollbar::-webkit-scrollbar-thumb {
+    background: #64748b;
+    border-radius: 4px;
+}
+
+.pdf-viewer-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+.faculty-dropdown-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 transparent;
+}
+
+.faculty-dropdown-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+
+.faculty-dropdown-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.faculty-dropdown-scroll::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 9999px;
+}
+
+.dark .faculty-dropdown-scroll::-webkit-scrollbar-thumb {
+    background: #64748b;
+}
+
+/* Forzar alineación estable del ícono en tarjetas de indicadores */
+.indicator-card__icon .material-icons-round,
+.indicator-card__icon .material-symbols-outlined {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    width: 1em;
+    height: 1em;
+    font-size: 1.875rem;
+}
+
+.indicator-card__icon {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.7),
+        inset 0 -2px 6px rgba(148, 163, 184, 0.25),
+        0 6px 12px rgba(15, 23, 42, 0.10);
+}
+
+.indicator-card__icon::before {
+    content: '';
+    position: absolute;
+    inset: 1px 1px auto 1px;
+    height: 45%;
+    border-radius: 0.65rem;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0));
+    pointer-events: none;
+}
+
+.indicator-card__icon-svg {
+    width: 1.9rem;
+    height: 1.9rem;
+    display: block;
+    filter:
+        drop-shadow(0 1px 0 rgba(255, 255, 255, 0.45))
+        drop-shadow(0 2px 2px rgba(15, 23, 42, 0.18));
+}
+
+.dark .indicator-card__icon {
+    border-color: rgba(100, 116, 139, 0.5);
+    box-shadow:
+        inset 0 1px 0 rgba(148, 163, 184, 0.25),
+        inset 0 -2px 6px rgba(15, 23, 42, 0.5),
+        0 6px 12px rgba(2, 6, 23, 0.4);
+}

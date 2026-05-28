@@ -1,0 +1,952 @@
+/* ============================================
+   CORRECCIONES VISUALES - SIGPRO Dashboard
+   ============================================ */
+
+/* Base y utilidades */
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Icono 3D con sombra */
+.icon-3d {
+    filter: drop-shadow(0 4px 3px rgba(0,0,0,0.25));
+    transform: perspective(500px) rotateX(10deg);
+}
+
+/* Animation Delays */
+.animation-delay-2000 { animation-delay: 2s; }
+.animation-delay-4000 { animation-delay: 4s; }
+
+/* ==========================================
+   STATS CARDS - Layout Horizontal Compacto
+   ========================================== */
+
+.lava-card {
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+    min-height: 80px;
+}
+
+.lava-blob {
+    position: absolute;
+    filter: blur(30px);
+    z-index: -1;
+    opacity: 0.5;
+    border-radius: 50%;
+}
+
+/* Icono en stats cards - AHORA CON EFECTO FLOTANTE 3D */
+.lava-card .icon-wrapper {
+    position: relative;
+    z-index: 10;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(8px);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0 2px 4px -1px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    animation: levitate-stats 3s ease-in-out infinite;
+}
+
+/* Sombra proyectada del icono en stats cards */
+.lava-card .icon-wrapper::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 6px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.2) 0%, transparent 70%);
+    border-radius: 50%;
+    animation: shadowScale-stats 3s ease-in-out infinite;
+}
+
+/* Delays escalonados para cada tarjeta */
+.lava-card:nth-child(1) .icon-wrapper,
+.lava-card:nth-child(1) .icon-wrapper::after { animation-delay: 0s; }
+
+.lava-card:nth-child(2) .icon-wrapper,
+.lava-card:nth-child(2) .icon-wrapper::after { animation-delay: 0.6s; }
+
+.lava-card:nth-child(3) .icon-wrapper,
+.lava-card:nth-child(3) .icon-wrapper::after { animation-delay: 1.2s; }
+
+.lava-card .icon-wrapper span {
+    font-size: 24px !important;
+    color: white;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.15));
+}
+
+/* Animaciones específicas para stats cards */
+@keyframes levitate-stats {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+@keyframes shadowScale-stats {
+    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.25; }
+    50% { transform: translateX(-50%) scale(0.8); opacity: 0.12; }
+}
+
+/* Contenido de texto - LETRAS AGRANDADAS */
+.lava-card .text-content {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.lava-card .text-content .number {
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1;
+    color: white;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.lava-card .text-content .label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+}
+
+/* Hover suave */
+.hover-lift-enhanced {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.hover-lift-enhanced:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================
+   ACTION CARDS - FONDO BLANCO MÁS PROMINENTE
+   ========================================== */
+
+.premium-glass {
+    background: #ffffff;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 1rem;
+    box-shadow: 
+        0 1px 2px rgba(0, 0, 0, 0.05),
+        0 4px 8px rgba(0, 0, 0, 0.08),
+        0 8px 16px rgba(0, 0, 0, 0.1),
+        0 16px 32px rgba(0, 0, 0, 0.12),
+        0 32px 64px rgba(0, 0, 0, 0.08);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+/* HOVER - Sombra más intensa y ligero levantamiento */
+.premium-glass:hover {
+    transform: translateY(-4px);
+    box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.05),
+        0 8px 16px rgba(0, 0, 0, 0.1),
+        0 16px 32px rgba(0, 0, 0, 0.12),
+        0 32px 64px rgba(0, 0, 0, 0.15),
+        0 48px 96px rgba(0, 0, 0, 0.12);
+    border-color: rgba(59, 130, 246, 0.3); /* Borde azul sutil al hacer hover */
+}
+
+/* Estado activo/click */
+.premium-glass:active {
+    transform: translateY(-2px);
+    box-shadow: 
+        0 1px 2px rgba(0, 0, 0, 0.05),
+        0 4px 8px rgba(0, 0, 0, 0.08),
+        0 8px 16px rgba(0, 0, 0, 0.1),
+        0 16px 32px rgba(0, 0, 0, 0.12);
+}
+
+.dark .premium-glass {
+    background: rgba(30, 41, 59, 0.95);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 
+        0 1px 2px rgba(0, 0, 0, 0.2),
+        0 4px 8px rgba(0, 0, 0, 0.3),
+        0 8px 16px rgba(0, 0, 0, 0.4),
+        0 16px 32px rgba(0, 0, 0, 0.3),
+        0 32px 64px rgba(0, 0, 0, 0.2);
+}
+
+.dark .premium-glass:hover {
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.3),
+        0 8px 16px rgba(0, 0, 0, 0.4),
+        0 16px 32px rgba(0, 0, 0, 0.5),
+        0 32px 64px rgba(0, 0, 0, 0.4),
+        0 48px 96px rgba(0, 0, 0, 0.3);
+}
+
+/* Icono 3D con efecto de levitación */
+.action-icon-3d {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0 2px 4px -1px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8),
+        0 0 0 1px rgba(0, 0, 0, 0.05);
+    margin-bottom: 0.5rem;
+    animation: levitate 3s ease-in-out infinite;
+    position: relative;
+}
+
+.dark .action-icon-3d {
+    background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+    box-shadow: 
+        0 4px 6px -1px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Sombra proyectada del icono */
+.action-icon-3d::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 8px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.15) 0%, transparent 70%);
+    border-radius: 50%;
+    animation: shadowScale 3s ease-in-out infinite;
+}
+
+.action-icon-3d span {
+    font-size: 28px;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.1));
+}
+
+/* Colores específicos para cada icono */
+.action-icon-3d.blue span { color: #3b82f6; }
+.action-icon-3d.indigo span { color: #6366f1; }
+.action-icon-3d.cyan span { color: #06b6d4; }
+
+/* Animación de levitación */
+@keyframes levitate {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+@keyframes shadowScale {
+    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.3; }
+    50% { transform: translateX(-50%) scale(0.8); opacity: 0.15; }
+}
+
+/* Delays para animaciones escalonadas */
+.action-card:nth-child(1) .action-icon-3d { animation-delay: 0s; }
+.action-card:nth-child(1) .action-icon-3d::after { animation-delay: 0s; }
+.action-card:nth-child(2) .action-icon-3d { animation-delay: 0.5s; }
+.action-card:nth-child(2) .action-icon-3d::after { animation-delay: 0.5s; }
+.action-card:nth-child(3) .action-icon-3d { animation-delay: 1s; }
+.action-card:nth-child(3) .action-icon-3d::after { animation-delay: 1s; }
+
+/* Título de action card */
+.premium-glass h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+    line-height: 1.3;
+    max-width: 180px;
+}
+
+.dark .premium-glass h3 {
+    color: #f1f5f9;
+}
+
+/* ==========================================
+   BOTONES - Todos Azules Uniformes
+   ========================================== */
+
+.action-button {
+    width: 100%;
+    padding: 0.625rem 1.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: none;
+    background: #3b82f6;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: auto;
+    box-shadow: 0 1px 2px rgba(59, 130, 246, 0.3);
+}
+
+.action-button:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.action-button:active {
+    transform: translateY(0);
+    background: #1d4ed8;
+}
+
+/* Estado deshabilitado */
+.action-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Spinner en botón */
+.action-button .spinner-inline {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==========================================
+   TABLA - FONDO BLANCO MÁS PROMINENTE
+   ========================================== */
+
+.glass-card {
+    background: #ffffff;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 0.75rem;
+    box-shadow: 
+        0 1px 2px rgba(0, 0, 0, 0.05),
+        0 4px 8px rgba(0, 0, 0, 0.08),
+        0 8px 16px rgba(0, 0, 0, 0.1),
+        0 16px 32px rgba(0, 0, 0, 0.12),
+        0 32px 64px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* HOVER en la tabla */
+.glass-card:hover {
+    box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.05),
+        0 8px 16px rgba(0, 0, 0, 0.1),
+        0 16px 32px rgba(0, 0, 0, 0.12),
+        0 32px 64px rgba(0, 0, 0, 0.15),
+        0 48px 96px rgba(0, 0, 0, 0.12);
+    border-color: rgba(59, 130, 246, 0.2);
+}
+
+.dark .glass-card {
+    background: rgba(15, 23, 42, 0.95);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 
+        0 1px 2px rgba(0, 0, 0, 0.2),
+        0 4px 8px rgba(0, 0, 0, 0.3),
+        0 8px 16px rgba(0, 0, 0, 0.4),
+        0 16px 32px rgba(0, 0, 0, 0.3),
+        0 32px 64px rgba(0, 0, 0, 0.2);
+}
+
+.dark .glass-card:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.3),
+        0 8px 16px rgba(0, 0, 0, 0.4),
+        0 16px 32px rgba(0, 0, 0, 0.5),
+        0 32px 64px rgba(0, 0, 0, 0.4),
+        0 48px 96px rgba(0, 0, 0, 0.3);
+}
+
+/* Header de la tabla */
+.glass-card table thead {
+    background: #f8fafc;  /* Fondo gris muy claro para el header */
+    border-bottom: none;
+}
+
+.glass-card table thead th {
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* Primera fila del body - Sin espacio extra */
+.glass-card table tbody tr:first-child td {
+    padding-top: 0.75rem;  /* Reducir padding superior */
+}
+
+/* Filas de la tabla */
+.glass-card table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background-color 0.2s ease;
+}
+
+.glass-card table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.glass-card table tbody td {
+    padding: 1rem;
+    color: #334155;
+    font-size: 0.875rem;
+}
+
+.dark .glass-card table thead {
+    background: rgba(30, 41, 59, 0.8);
+    border-bottom: none;
+}
+
+.dark .glass-card table thead th {
+    color: #94a3b8;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .glass-card table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dark .glass-card table tbody tr:hover {
+    background-color: rgba(30, 41, 59, 0.6);
+}
+
+/* Color verde para el nuevo icono */
+.action-icon-3d.green span { 
+    color: #10b981; 
+}
+
+/* Delay de animación para la tarjeta 4 */
+.action-card:nth-child(4) .action-icon-3d { 
+    animation-delay: 1.5s; 
+}
+
+.action-card:nth-child(4) .action-icon-3d::after { 
+    animation-delay: 1.5s; 
+}
+
+/* Delay de animación para la tarjeta 5 */
+.action-card:nth-child(5) .action-icon-3d {
+    animation-delay: 2s;
+}
+
+.action-card:nth-child(5) .action-icon-3d::after {
+    animation-delay: 2s;
+}
+
+/* ==========================================
+   LINK "VER TODOS" - ESTILO Y FUNCIONALIDAD
+   ========================================== */
+
+.view-all-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: #3b82f6;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+}
+
+.view-all-link:hover {
+    color: #2563eb;
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+.view-all-link:active {
+    color: #1d4ed8;
+}
+
+/* Remover cualquier estilo que bloquee el click */
+.view-all-link.disabled,
+.view-all-link[onclick*="pro"],
+.view-all-link[onclick*="Pro"] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
+}
+
+/* ==========================================
+   TOAST NOTIFICATIONS - Cierre al click
+   ========================================== */
+
+#toast-container {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: white;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    pointer-events: auto;
+    transform: translateX(100%);
+    opacity: 0;
+    animation: slideInRight 0.3s forwards;
+    position: relative;
+    overflow: hidden;
+}
+
+.toast:hover {
+    transform: translateX(-4px);
+}
+
+.toast.hiding {
+    animation: slideOutRight 0.3s forwards;
+}
+
+/* Barra de progreso de auto-cierre */
+.toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.5);
+    animation: progress 3s linear forwards;
+}
+
+.toast:hover::after {
+    animation-play-state: paused;
+}
+
+@keyframes progress {
+    from { width: 100%; }
+    to { width: 0%; }
+}
+
+@keyframes slideInRight {
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* Colores de toast */
+.toast.info { background: #3b82f6; }
+.toast.success { background: #10b981; }
+.toast.warning { background: #f59e0b; }
+.toast.error { background: #ef4444; }
+
+/* Icono de cierre X */
+.toast .close-icon {
+    margin-left: auto;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    font-size: 18px;
+}
+
+.toast:hover .close-icon {
+    opacity: 1;
+}
+
+/* ==========================================
+   UTILIDADES
+   ========================================== */
+
+/* Ocultar elementos antiguos */
+.icon-3d-wrapper,
+.gradient-button {
+    display: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.15);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0,0,0,0.25);
+}
+
+/* ==========================================
+   HEADER / FOOTER - Estilos compartidos con facultades-inicio
+   ========================================== */
+
+/* Header base */
+header {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+    font-family: 'Inter', sans-serif;
+}
+
+/* Específicamente el texto SIGPRO */
+header span.text-xl,
+header .logo-text,
+header .font-bold {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+.dark header {
+    background: rgba(15, 23, 42, 0.8);
+    border-bottom-color: rgba(51, 65, 85, 0.6);
+}
+
+/* Logo icon - gradiente exacto */
+header .bg-gradient-to-br {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    box-shadow: 0 10px 15px -3px rgba(30, 64, 175, 0.3);
+}
+
+/* Logo text tracking */
+header .tracking-tight {
+    letter-spacing: -0.025em;
+}
+
+/* Nav link activo */
+header .border-primary {
+    border-bottom: 2px solid #1e40af;
+    padding-bottom: 0.25rem;
+}
+
+.dark header .border-primary {
+    border-bottom-color: #3b82f6;
+}
+
+header nav a:hover {
+    color: #1e40af;
+}
+
+.dark header nav a:hover {
+    color: #60a5fa;
+}
+
+header nav a.border-primary {
+    color: #1e40af;
+    border-bottom: 2px solid #1e40af;
+    padding-bottom: 0.25rem;
+}
+
+.dark header nav a.border-primary {
+    color: #60a5fa;
+    border-bottom-color: #60a5fa;
+}
+
+/* Theme toggle hover */
+#theme-toggle:hover {
+    background-color: #f1f5f9;
+}
+
+.dark #theme-toggle:hover {
+    background-color: #1e293b;
+}
+
+/* Avatar */
+header .rounded-full.bg-slate-200 {
+    border: 1px solid #cbd5e1;
+}
+
+.dark header .rounded-full.bg-slate-200 {
+    background-color: #334155;
+    border-color: #475569;
+}
+
+
+/* ==========================================
+   FOOTER - Exacto a facultades-inicio
+   ========================================== */
+
+footer {
+    background-color: #1e40af;
+    color: rgba(255, 255, 255, 0.7);
+    border-top: 1px solid #1e3a8a;
+}
+
+.dark footer {
+    background-color: #020617;
+    border-top-color: #1e293b;
+}
+
+/* Footer branding icon color */
+footer .text-accent {
+    color: #60a5fa;
+}
+
+/* Footer links */
+footer a {
+    color: rgba(255, 255, 255, 0.7);
+    transition: color 0.15s ease;
+}
+
+footer a:hover {
+    color: white;
+}
+
+/* Tracking wide en footer */
+footer .tracking-widest {
+    letter-spacing: 0.1em;
+}
+
+/* Profile dropdown animation */
+#profile-dropdown {
+    transform-origin: top right;
+    will-change: transform, opacity;
+}
+
+#profile-dropdown.show-profile {
+    animation: profileDropdownIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+#profile-dropdown.hide-profile {
+    animation: profileDropdownOut 0.18s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    pointer-events: none;
+}
+
+@keyframes profileDropdownIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes profileDropdownOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+    }
+}
+
+/* ==========================================
+   MODAL LOGOUT - ANIMACIONES DINÁMICAS
+   ========================================== */
+
+/* Logout action: feedback fluido */
+#logout-btn.logout-action {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(90deg, rgba(254, 242, 242, 0.55), rgba(254, 226, 226, 0.9));
+    border: 1px solid rgba(239, 68, 68, 0.22);
+}
+
+.dark #logout-btn.logout-action {
+    background: linear-gradient(90deg, rgba(127, 29, 29, 0.15), rgba(153, 27, 27, 0.25));
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+#logout-btn.logout-action::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.35) 45%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.45s ease;
+}
+
+#logout-btn.logout-action:hover {
+    transform: translateX(2px);
+    box-shadow: 0 10px 24px -14px rgba(220, 38, 38, 0.65);
+}
+
+#logout-btn.logout-action:hover::before {
+    transform: translateX(120%);
+}
+
+#logout-btn.logout-action:active {
+    transform: translateX(1px) scale(0.99);
+}
+
+#logout-modal {
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#logout-modal.show-modal {
+    animation: backdropFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+#logout-modal.hide-modal {
+    animation: backdropFadeOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+#logout-modal > div {
+    animation: modalScaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transform-origin: center center;
+}
+
+#logout-modal.hide-modal > div {
+    animation: modalScaleOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes backdropFadeIn {
+    from {
+        background-color: rgba(0, 0, 0, 0);
+        backdrop-filter: blur(0px);
+    }
+    to {
+        background-color: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+    }
+}
+
+@keyframes backdropFadeOut {
+    from {
+        background-color: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+    }
+    to {
+        background-color: rgba(0, 0, 0, 0);
+        backdrop-filter: blur(0px);
+    }
+}
+
+@keyframes modalScaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.85) translateY(-40px) rotateX(10deg);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0) rotateX(0deg);
+    }
+}
+
+@keyframes modalScaleOut {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0) rotateX(0deg);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.85) translateY(20px) rotateX(-10deg);
+    }
+}
+
+/* Animación del icono en el modal */
+#logout-modal .mx-auto.w-14 {
+    animation: iconPulse 0.6s ease-out forwards;
+}
+
+@keyframes iconPulse {
+    0% {
+        transform: scale(0) rotate(-180deg);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.15) rotate(0deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+/* Animación de los botones */
+#logout-modal .flex.gap-3 button {
+    animation: buttonSlideIn 0.5s ease-out forwards;
+    opacity: 0;
+}
+
+#logout-modal .flex.gap-3 button:first-child {
+    animation-delay: 0.15s;
+}
+
+#logout-modal .flex.gap-3 button:last-child {
+    animation-delay: 0.3s;
+}
+
+@keyframes buttonSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Hover efectos en botones del modal */
+#logout-modal button:hover {
+    transform: translateY(-2px);
+}
+
+#logout-modal button:active {
+    transform: translateY(0);
+}
+

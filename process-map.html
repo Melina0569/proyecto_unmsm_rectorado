@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Mapa de Procesos - SIGPRO UNMSM</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1e3a8a",
+                        secondary: "#0d9488",
+                        accent: "#f59e0b",
+                        "background-light": "#f8fafc",
+                        "background-dark": "#0f172a",
+                        "navy-title": "#111827",
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                        sans: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.75rem",
+                        'xl': '1rem',
+                        '2xl': '1.5rem',
+                        '3xl': '2.5rem',
+                    },
+                    boxShadow: {
+                        'pop-in-orange': '0 20px 50px -12px rgba(249, 115, 22, 0.4), 0 0 20px 2px rgba(249, 115, 22, 0.15)',
+                        'pop-in-blue': '0 20px 50px -12px rgba(37, 99, 235, 0.4), 0 0 20px 2px rgba(37, 99, 235, 0.15)',
+                        'pop-in-green': '0 20px 50px -12px rgba(16, 185, 129, 0.4), 0 0 20px 2px rgba(16, 185, 129, 0.15)',
+                        'card-float': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    }
+                },
+            },
+        };
+    </script>
+    
+    <!-- Estilos -->
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/animations.css">
+    <link rel="stylesheet" href="css/views.css">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/process-map.css">
+</head>
+<body class="bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-slate-100 transition-colors duration-300 antialiased">
+    
+    <!-- Navegación -->
+    <nav class="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-2">
+                    <span class="material-icons-round text-primary text-3xl">account_tree</span>
+                    <span class="font-bold text-xl tracking-tight text-primary dark:text-white">SIGPRO</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a class="text-sm font-medium text-primary dark:text-secondary" href="index.html">Inicio</a>
+                    <a class="text-sm font-medium hover:text-primary dark:hover:text-secondary" href="portal-inicio.html">Portal</a>
+                    <a class="text-sm font-medium hover:text-primary dark:hover:text-secondary" href="flows.html">Flujogramas</a>
+                    <a class="text-sm font-medium hover:text-primary dark:hover:text-secondary" href="indicators.html">Indicadores</a>
+                    <button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800" id="theme-toggle">
+                        <span class="material-icons-round text-xl block dark:hidden">dark_mode</span>
+                        <span class="material-icons-round text-xl hidden dark:block">light_mode</span>
+                    </button>
+                    <a class="bg-primary hover:bg-blue-800 text-white px-5 py-2 rounded-full text-sm font-semibold transition-all shadow-md hover:shadow-lg" href="portal-inicio.html">
+                        Acceder
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header DINÁMICO -->
+    <header class="bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-background-dark pt-20 pb-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-6xl md:text-7xl font-black text-navy-title dark:text-white mb-6 tracking-tighter">
+                Mapa de Procesos
+            </h1>
+            <div class="h-1.5 w-24 bg-primary mx-auto mb-6 rounded-full"></div>
+            <!-- NOMBRE DE FACULTAD DINÁMICO -->
+            <p id="faculty-name" class="text-xl md:text-2xl text-slate-500 dark:text-slate-400 font-medium max-w-2xl mx-auto">
+                Cargando facultad...
+            </p>
+        </div>
+    </header>
+
+    <!-- Contenido Principal -->
+    <main class="pb-32 bg-slate-50 dark:bg-background-dark">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            <!-- Breadcrumb con botones de navegación -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-16">
+                <div class="flex items-center gap-5">
+                    <a href="index.html" class="w-14 h-14 rounded-2xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm hover:shadow-md">
+                        <span class="material-symbols-outlined text-slate-600 dark:text-slate-400">arrow_back</span>
+                    </a>
+                    <div>
+                        <h2 class="text-4xl font-black dark:text-white tracking-tight">Cadena de Valor</h2>
+                        <p class="text-slate-500 font-bold uppercase tracking-[0.2em] text-xs mt-1">Arquitectura de Procesos Institucionales</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENEDOR DINÁMICO DE PROCESOS -->
+            <div id="processes-container" class="space-y-16 perspective-view">
+                <!-- Se renderiza dinámicamente con JS -->
+                <div class="text-center py-20">
+                    <span class="material-symbols-outlined text-6xl text-slate-300 animate-spin">refresh</span>
+                    <p class="text-slate-500 mt-4">Cargando procesos...</p>
+                </div>
+            </div>
+
+            <!-- PANEL DE INDICADORES (debajo del mapa de procesos) -->
+            <div id="indicators-section" class="hidden mt-16">
+                <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <!-- Header del panel -->
+                    <div class="flex justify-between items-start p-8 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                        <div>
+                            <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-1">
+                                Indicadores - <span id="current-process-name" class="text-primary">Proceso</span>
+                            </h3>
+                            <p class="text-slate-500 dark:text-slate-400 text-sm">
+                                Monitoreo de métricas clave de desempeño institucional.
+                            </p>
+                        </div>
+                        <button onclick="ProcessMap.closeIndicatorsPanel()" class="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-all">
+                            <span class="material-symbols-outlined text-slate-600 dark:text-slate-300">close</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Buscador -->
+                    <div class="p-6 border-b border-slate-200 dark:border-slate-700">
+                        <div class="relative max-w-md">
+                            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                            <input 
+                                type="text" 
+                                id="search-indicator"
+                                placeholder="Buscar indicador..." 
+                                class="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                onkeyup="ProcessMap.filterIndicators(this.value)"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Lista de indicadores -->
+                    <div class="p-6" id="indicators-list">
+                        <!-- Los indicadores se cargan dinámicamente aquí -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL DE FLUJOGRAMAS (debajo del mapa de procesos) -->
+            <div id="flowcharts-section" class="hidden mt-16">
+                <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <!-- Header del panel -->
+                    <div class="flex justify-between items-start p-8 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                        <div>
+                            <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-1">
+                                Flujogramas - <span id="current-flowchart-process-name" class="text-primary">Proceso</span>
+                            </h3>
+                            <p class="text-slate-500 dark:text-slate-400 text-sm">
+                                Directorio de representaciones gráficas de procesos institucionales.
+                            </p>
+                        </div>
+                        <button onclick="ProcessMap.closeFlowchartsPanel()" class="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-all">
+                            <span class="material-symbols-outlined text-slate-600 dark:text-slate-300">close</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Buscador -->
+                    <div class="p-6 border-b border-slate-200 dark:border-slate-700">
+                        <div class="relative max-w-md">
+                            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                            <input 
+                                type="text" 
+                                id="search-flowchart"
+                                placeholder="Buscar flujograma..." 
+                                class="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                onkeyup="ProcessMap.filterFlowcharts(this.value)"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Lista de flujogramas -->
+                    <div class="p-6" id="flowcharts-list">
+                        <!-- Los flujogramas se cargan dinámicamente aquí -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL DE FICHA TÉCNICA (debajo del mapa de procesos) -->
+                        <!-- PANEL DE SOPORTE (debajo del mapa de procesos) -->
+                        <div id="soporte-section" class="hidden mt-16">
+                            <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                <!-- Header del panel -->
+                                <div class="flex justify-between items-start p-8 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                                    <div>
+                                        <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-1">
+                                            Soporte - <span id="current-soporte-process-name" class="text-primary">Proceso</span>
+                                        </h3>
+                                        <p class="text-slate-500 dark:text-slate-400 text-sm">
+                                            Directorio de documentos y recursos de soporte institucional.
+                                        </p>
+                                    </div>
+                                    <button onclick="ProcessMap.closeSoportePanel()" class="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center transition-all">
+                                        <span class="material-symbols-outlined text-slate-600 dark:text-slate-300">close</span>
+                                    </button>
+                                </div>
+                                <!-- Buscador -->
+                                <div class="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                                    <div class="relative max-w-md">
+                                        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                                        <input 
+                                            type="text" 
+                                            id="search-soporte"
+                                            placeholder="Buscar recurso de soporte..." 
+                                            class="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                            onkeyup="ProcessMap.filterSoporte(this.value)"
+                                        >
+                                    </div>
+                                </div>
+                                <!-- Lista de recursos de soporte -->
+                                <div class="p-6 flex flex-col items-center justify-center min-h-[320px] bg-slate-50 dark:bg-slate-900" id="soporte-list">
+                                    <!-- Los recursos de soporte se cargan dinámicamente aquí -->
+                                </div>
+                            </div>
+                        </div>
+            <div id="ficha-tecnica-section" class="hidden mt-16">
+                <div class="bg-white dark:bg-slate-800 rounded-[2rem] shadow-lg border-[3px] border-[#cbd5e1] dark:border-[#475569] overflow-hidden relative">
+                    <!-- Línea decorativa superior -->
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#f97316] via-[#3b82f6] to-[#10b981]"></div>
+                    
+                    <!-- Header -->
+                    <div class="flex justify-between items-start p-8 border-b-[3px] border-[#cbd5e1] dark:border-[#475569] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-orange-50 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 border-2 border-orange-200 dark:border-orange-700/50">
+                                <span class="material-symbols-outlined text-3xl text-[#ea580c]">description</span>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-black text-slate-900 dark:text-slate-100 mb-1">
+                                    Ficha Técnica - <span id="current-ficha-process-name" class="text-[#1e40af] dark:text-[#60a5fa]">Proceso</span>
+                                </h3>
+                                <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                                    Documento técnico oficial del proceso institucional.
+                                </p>
+                            </div>
+                        </div>
+                        <button onclick="ProcessMap.closeFichaTecnicaPanel()" class="w-11 h-11 rounded-full flex items-center justify-center transition-all bg-white dark:bg-[#334155] border-2 border-[#94a3b8] dark:border-[#475569] text-[#64748b] dark:text-[#cbd5e1] hover:bg-[#ef4444] hover:border-[#ef4444] hover:text-white hover:rotate-90 hover:scale-110 shadow-md">
+                            <span class="material-symbols-outlined text-xl">close</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Contenido -->
+                    <div class="p-8 bg-[#f8fafc] dark:bg-[#0f172a]">
+                        <!-- Info del archivo -->
+                        <div class="flex items-center gap-4 mb-6 p-5 bg-white dark:bg-[#1e293b] rounded-xl border-2 border-[#e2e8f0] dark:border-[#334155] shadow-sm">
+                            <div class="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-200 dark:border-amber-700/50">
+                                <span class="material-symbols-outlined text-4xl text-[#d97706]">picture_as_pdf</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p id="ficha-tecnica-filename-display" class="text-lg font-bold text-slate-900 dark:text-white truncate mb-1">
+                                    Ficha_Tecnica_Proceso.pdf
+                                </p>
+                                <p class="text-sm text-slate-500 dark:text-slate-400">
+                                    PDF • Documento técnico oficial
+                                </p>
+                            </div>
+                            <button onclick="ProcessMap.downloadFichaTecnicaFile()" id="btn-download-ficha" class="px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-lg bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 border-2 border-slate-900 dark:border-slate-200 disabled:opacity-60 disabled:cursor-not-allowed">
+                                <span class="material-symbols-outlined text-base">download</span>
+                                Descargar PDF
+                            </button>
+                        </div>
+                        
+                        <!-- Vista del PDF -->
+                        <div class="relative bg-white dark:bg-[#0f172a] rounded-xl border-2 border-dashed border-[#cbd5e1] dark:border-[#334155] overflow-hidden" style="height: 600px;">
+                            <iframe id="ficha-tecnica-iframe-display" src="" class="w-full h-full" style="border: none;"></iframe>
+                            
+                            <!-- Placeholder -->
+                            <div id="ficha-tecnica-placeholder-display" class="absolute inset-0 flex flex-col items-center justify-center bg-[#f8fafc] dark:bg-[#1e293b]">
+                                <div class="w-24 h-24 rounded-2xl flex items-center justify-center mb-6 shadow-lg" style="background: #fef3c7; border: 2px solid #fde68a;">
+                                    <span class="material-symbols-outlined text-5xl text-[#d97706]">picture_as_pdf</span>
+                                </div>
+                                <h4 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Vista previa del documento</h4>
+                                <p class="text-slate-500 dark:text-slate-400 text-center max-w-md mb-2">
+                                    El PDF se mostrará aquí una vez cargado.
+                                </p>
+                                <p class="text-sm text-slate-400 dark:text-slate-500 text-center">
+                                    Si no puede visualizarse, use el botón de descarga.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-300 py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12">
+                <div class="col-span-1 md:col-span-1">
+                    <div class="flex items-center gap-2 mb-6">
+                        <span class="material-icons-round text-secondary text-3xl">account_tree</span>
+                        <span class="font-bold text-xl tracking-tight text-white">SIGPRO</span>
+                    </div>
+                    <p class="text-sm leading-relaxed mb-6">
+                        Oficina de Racionalización de la Universidad Nacional Mayor de San Marcos.
+                    </p>
+                    
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-6 uppercase text-xs tracking-widest">Oficina de Racionalización</h4>
+                    <ul class="space-y-4 text-sm">
+                        <li class="flex gap-3">
+                            <span class="material-icons-round text-secondary text-lg">location_on</span>
+                            Ciudad Universitaria, Lima
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="material-icons-round text-secondary text-lg">call</span>
+                            (01) 619-7000 Anexo 450
+                        </li>
+                        <li class="flex gap-3">
+                            <span class="material-icons-round text-secondary text-lg">mail</span>
+                            racionalizacion.ogpl@unmsm.edu.pe
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-6 uppercase text-xs tracking-widest">Enlaces Rápidos</h4>
+                    <ul class="space-y-4 text-sm">
+                        <li><a class="hover:text-white transition-colors" href="portal-inicio.html">Portal de Racionalización</a></li>
+                        <li><a class="hover:text-white transition-colors" href="indicators.html">Indicadores de Gestión</a></li>
+                        <li><a class="hover:text-white transition-colors" href="flows.html">Repositorio de Flujogramas</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-6 uppercase text-xs tracking-widest">Soporte</h4>
+                    <ul class="space-y-4 text-sm">
+                        <li><a class="hover:text-white transition-colors" href="#">Manual de Usuario</a></li>
+                        <li><a class="hover:text-white transition-colors" href="#">Preguntas Frecuentes</a></li>
+                        <li><a class="hover:text-white transition-colors" href="#">Recursos</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="mt-16 pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-medium">
+                <p>© 2026 UNMSM - Sistema de Gestión por Procesos. Todos los derechos reservados.</p>
+                <div class="flex gap-6">
+                    <a class="hover:text-white transition-colors" href="#">Términos de Uso</a>
+                    <a class="hover:text-white transition-colors" href="#">Privacidad</a>
+                    <a class="hover:text-white transition-colors" href="#">Cookies</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/utils/helpers.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" 
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="js/components/api.js"></script>
+    <script src="js/process-map.js"></script>
+</html>

@@ -1,0 +1,439 @@
+/* ==========================================
+   HOJA DE REPORTE - Estilos Específicos
+   ========================================== */
+
+/* Dark Mode Global */
+html.dark {
+    color-scheme: dark;
+}
+
+body, .dark body {
+    background-color: #0f172a;
+    color: #e2e8f0;
+}
+
+/* Animaciones */
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOutRight {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+/* ==========================================
+   MEJORAS VISUALES - MODO CLARO (SOMBRAS POTENCIADAS)
+   ========================================== */
+
+/* Fondo del body en claro con sutil gradiente */
+body {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+}
+
+/* Tarjeta principal - SOMBRA POTENCIADA Y ELEVADA */
+.max-w-5xl > div {
+    background-color: #ffffff !important;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.15), 
+        0 12px 24px -8px rgba(0, 0, 0, 0.1),
+        0 4px 8px -2px rgba(0, 0, 0, 0.05) !important;
+    border-width: 1px !important;
+    border-color: rgba(226, 232, 240, 0.8) !important;
+    position: relative;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Efecto de elevación adicional en hover para la tarjeta principal */
+.max-w-5xl > div:hover {
+    box-shadow: 
+        0 35px 60px -15px rgba(0, 0, 0, 0.2), 
+        0 15px 30px -10px rgba(0, 0, 0, 0.12),
+        0 6px 12px -4px rgba(0, 0, 0, 0.08) !important;
+    transform: translateY(-2px);
+}
+
+/* Header con sombra sutil inferior */
+.max-w-5xl > div > div:first-child {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+    border-bottom-width: 1px !important;
+    border-color: rgba(203, 213, 225, 0.6) !important;
+    box-shadow:
+        0 10px 22px -16px rgba(15, 23, 42, 0.18),
+        0 4px 6px -4px rgba(0, 0, 0, 0.08) !important;
+    position: relative;
+    z-index: 1;
+}
+
+.max-w-5xl > div > div:first-child::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(20, 184, 166, 0.55), rgba(16, 185, 129, 0.65), rgba(20, 184, 166, 0.55), transparent);
+    pointer-events: none;
+}
+
+/* Footer con sombra superior sutil */
+.max-w-5xl > div > div:last-child {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+    border-top-width: 1px !important;
+    border-color: rgba(203, 213, 225, 0.6) !important;
+    box-shadow: 0 -4px 6px -4px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Inputs con sombra sutil y efecto de elevación en focus */
+input, textarea, select {
+    background-color: #ffffff !important;
+    border-width: 1px !important;
+    border-color: rgba(203, 213, 225, 0.8) !important;
+    box-shadow: 
+        0 2px 4px -1px rgba(0, 0, 0, 0.05),
+        0 1px 2px -1px rgba(0, 0, 0, 0.03),
+        inset 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Focus con sombra azul más pronunciada */
+input:focus, textarea:focus, select:focus {
+    background-color: #ffffff !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 
+        0 0 0 3px rgba(59, 130, 246, 0.15),
+        0 8px 16px -4px rgba(59, 130, 246, 0.2),
+        0 4px 8px -2px rgba(59, 130, 246, 0.1) !important;
+    transform: translateY(-1px);
+}
+
+/* Secciones destacadas */
+form .bg-slate-100 {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important;
+    box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.03),
+        0 1px 2px rgba(255, 255, 255, 0.8) !important;
+    border: 1px solid rgba(203, 213, 225, 0.5) !important;
+}
+
+/* Toast Notifications */
+#toast-container {
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: white;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%);
+    opacity: 0;
+    animation: slideInRight 0.3s forwards;
+    pointer-events: auto;
+    min-width: 300px;
+}
+
+.toast.hiding {
+    animation: slideOutRight 0.3s forwards;
+}
+
+.toast.success { background: #10b981; }
+.toast.error { background: #ef4444; }
+.toast.info { background: #3b82f6; }
+.toast.warning { background: #f59e0b; }
+
+/* Botón con sombra potenciada y efecto de elevación */
+#btn-finalizar {
+    box-shadow: 
+        0 10px 25px -5px rgba(16, 185, 129, 0.4),
+        0 8px 10px -6px rgba(16, 185, 129, 0.2),
+        0 4px 6px -2px rgba(16, 185, 129, 0.1) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#btn-finalizar:hover {
+    box-shadow: 
+        0 20px 35px -10px rgba(16, 185, 129, 0.5),
+        0 12px 20px -8px rgba(16, 185, 129, 0.3),
+        0 6px 10px -4px rgba(16, 185, 129, 0.2) !important;
+    transform: translateY(-3px) scale(1.02);
+}
+
+#btn-finalizar:active {
+    transform: translateY(-1px) scale(0.98);
+    box-shadow: 
+        0 5px 15px -5px rgba(16, 185, 129, 0.3),
+        0 3px 8px -4px rgba(16, 185, 129, 0.2) !important;
+}
+
+/* ==========================================
+   MODO OSCURO - AJUSTES ESPECÍFICOS
+   ========================================== */
+
+/* Fondo oscuro más pronunciado */
+.dark body {
+    background: linear-gradient(135deg, #0a0e27 0%, #0f172a 100%) !important;
+}
+
+/* Tarjeta principal en oscuro - fondo y borde */
+.dark .max-w-5xl > div {
+    background-color: #1a1f35 !important;
+    border-color: rgba(51, 65, 85, 0.6) !important;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.5), 
+        0 12px 24px -8px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+.dark .max-w-5xl > div:hover {
+    box-shadow: 
+        0 35px 60px -15px rgba(0, 0, 0, 0.6), 
+        0 15px 30px -10px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Header en oscuro */
+.dark .max-w-5xl > div > div:first-child {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+    border-color: rgba(51, 65, 85, 0.6) !important;
+    box-shadow:
+        0 14px 28px -18px rgba(16, 185, 129, 0.35),
+        0 8px 18px -12px rgba(20, 184, 166, 0.28),
+        0 4px 6px -4px rgba(0, 0, 0, 0.35) !important;
+}
+
+.dark .max-w-5xl > div > div:first-child::after {
+    background: linear-gradient(90deg, transparent, rgba(20, 184, 166, 0.7), rgba(16, 185, 129, 0.82), rgba(20, 184, 166, 0.7), transparent);
+    box-shadow: 0 0 18px rgba(16, 185, 129, 0.22);
+}
+
+/* Footer en oscuro */
+.dark .max-w-5xl > div > div:last-child {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+    border-color: rgba(51, 65, 85, 0.6) !important;
+    box-shadow: 0 -4px 6px -4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Títulos del header en oscuro */
+.dark .max-w-5xl > div > div:first-child h1 {
+    color: #f8fafc !important;
+}
+
+.dark .max-w-5xl > div > div:first-child p {
+    color: #94a3b8 !important;
+}
+
+/* Secciones bg-slate-100 en oscuro */
+.dark form .bg-slate-100 {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+    border-color: rgba(51, 65, 85, 0.6) !important;
+    box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.3),
+        0 1px 2px rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Títulos de sección en oscuro */
+.dark form .bg-slate-100 h3 {
+    color: #f1f5f9 !important;
+}
+
+/* Inputs en oscuro */
+.dark input, .dark textarea, .dark select {
+    background-color: #0f172a !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(71, 85, 105, 0.8) !important;
+    box-shadow:
+        0 2px 4px -1px rgba(0, 0, 0, 0.2),
+        inset 0 1px 2px rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark input:focus, .dark textarea:focus, .dark select:focus {
+    border-color: #60a5fa !important;
+    box-shadow:
+        0 0 0 3px rgba(96, 165, 250, 0.15),
+        0 8px 16px -4px rgba(96, 165, 250, 0.2),
+        inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
+}
+
+/* File list items */
+.file-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    animation: slideUp 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.dark .file-item {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.file-item .remove-file {
+    margin-left: auto;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    transition: all 0.2s;
+}
+
+.file-item .remove-file:hover {
+    background: #fee2e2;
+}
+
+.dark .file-item .remove-file:hover {
+    background: #7f1d1d;
+}
+
+/* Upload area */
+.upload-area {
+    transition: all 0.3s ease;
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.9) 0%, rgba(241, 245, 249, 0.6) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.upload-area:hover {
+    background-color: rgba(16, 185, 129, 0.04);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 8px 20px -12px rgba(16, 185, 129, 0.45);
+}
+
+.upload-area.has-file {
+    border-color: #10b981;
+    background-color: rgba(16, 185, 129, 0.05);
+}
+
+.dark .upload-area {
+    border-color: #00ff88 !important;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%) !important;
+    box-shadow: inset 0 0 20px rgba(0, 255, 136, 0.1), inset 0 1px 2px rgba(0, 255, 136, 0.05) !important;
+}
+
+.dark .upload-area:hover {
+    background-color: rgba(0, 255, 136, 0.15) !important;
+    border-color: #00ffaa !important;
+    box-shadow: 
+        inset 0 0 30px rgba(0, 255, 136, 0.2),
+        0 0 20px rgba(0, 255, 136, 0.3) !important;
+}
+
+/* Dark mode input adjustments */
+.dark input::placeholder, .dark textarea::placeholder {
+    color: #64748b;
+}
+
+/* Date input styling */
+input[type="date"] {
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+/* Vista previa de contenido (diseño similar a indicadores) */
+.preview-item {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 0.875rem 1rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08),
+                0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}
+
+.dark .preview-item {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border-color: rgba(51, 65, 85, 0.6);
+}
+
+.preview-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 800;
+    color: #64748b;
+    margin-bottom: 0.35rem;
+}
+
+.dark .preview-label {
+    color: #94a3b8;
+}
+
+.preview-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1e293b;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.dark .preview-value {
+    color: #e2e8f0;
+}
+
+/* Botón de expedientes */
+#btn-expedientes {
+    box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4),
+                0 8px 10px -6px rgba(16, 185, 129, 0.2),
+                0 4px 6px -2px rgba(16, 185, 129, 0.1) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#btn-expedientes:hover {
+    box-shadow: 0 20px 35px -10px rgba(16, 185, 129, 0.5),
+                0 12px 20px -8px rgba(16, 185, 129, 0.3),
+                0 6px 10px -4px rgba(16, 185, 129, 0.2) !important;
+    transform: translateY(-2px) scale(1.02);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    body {
+        padding: 1rem;
+    }
+    
+    .upload-area {
+        padding: 2rem 1rem;
+    }
+}
+
+/* Smooth transitions for all interactive elements */
+button, input, textarea, select {
+    transition: all 0.2s ease;
+}
+
+/* Read-only input styling */
+input[readonly] {
+    background-color: #f1f5f9;
+    cursor: not-allowed;
+}
+
+.dark input[readonly] {
+    background-color: #1e293b;
+    color: #94a3b8;
+}
+
+/* Date picker icon in dark mode */
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}

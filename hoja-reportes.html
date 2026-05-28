@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Hoja de Reporte | SIGPRO UNMSM</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <!-- Configuración Tailwind -->
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1a365d",
+                        accent: "#2563eb",
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                    }
+                },
+            },
+        };
+    </script>
+    
+    <!-- CSS específico -->
+    <link rel="stylesheet" href="css/facultades-nuevo/hoja-reportes.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 min-h-screen p-6 md:p-12">
+    
+    <!-- Contenedor principal -->
+    <div class="max-w-5xl mx-auto">
+        
+        <!-- Tarjeta del formulario -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            
+            <!-- Header de la ficha -->
+            <div class="bg-slate-100 dark:bg-slate-800 p-6 border-b border-slate-300 dark:border-slate-700">
+                <h1 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg">
+                        <span class="material-symbols-outlined text-white text-xl">summarize</span>
+                    </div>
+                    Hoja de Reporte
+                </h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                    Documento de seguimiento y reporte de actividades institucionales.
+                </p>
+            </div>
+            
+            <!-- FORMULARIO -->
+            <form id="reporte-form" class="p-8">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-6">
+                    
+                    <!-- SECCIÓN 1: INFORMACIÓN DEL REPORTE -->
+                    <div class="md:col-span-12">
+                        <div class="bg-slate-100 dark:bg-slate-800 p-4 -mx-8 mb-6 border-y border-slate-300 dark:border-slate-700">
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined text-emerald-600">info</span>
+                                Información del Reporte
+                            </h3>
+                        </div>
+                    </div>
+                    
+                    <!-- Código del Reporte (generado automáticamente) -->
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Código del Reporte
+                        </label>
+                        <input type="text" name="codigoReporte" id="codigo-reporte" readonly
+                            class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm text-slate-600 dark:text-slate-400 cursor-not-allowed"
+                            placeholder="Se generará automáticamente"/>
+                    </div>
+                    
+                    <!-- Semestre de Reporte -->
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Semestre de Reporte <span class="text-red-500">*</span>
+                        </label>
+                        <select name="semestreReporte" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all">
+                            <option value="2026-I">2026-I</option>
+                            <option value="2026-II">2026-II</option>
+                            <option value="2027-I">2027-I</option>
+                            <option value="2027-II">2027-II</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Fecha de Elaboración -->
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Fecha de Elaboración <span class="text-red-500">*</span>
+                        </label>
+                        <input type="date" name="fechaElaboracion" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"/>
+                    </div>
+                    
+                    <!-- SECCIÓN 2: DATOS DEL RESPONSABLE -->
+                    <div class="md:col-span-12 mt-4">
+                        <div class="bg-slate-100 dark:bg-slate-800 p-4 -mx-8 mb-6 border-y border-slate-300 dark:border-slate-700">
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined text-emerald-600">person</span>
+                                Datos del Responsable
+                            </h3>
+                        </div>
+                    </div>
+                    
+                    <!-- Nombre y Apellido del Responsable -->
+                    <div class="md:col-span-8">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Nombre y Apellido del Responsable <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="nombreResponsable" id="nombre-responsable" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                            placeholder="Ej. Juan Pérez García"/>
+                    </div>
+                    
+                    <!-- Cargo -->
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Cargo <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="cargoResponsable" id="cargo-responsable" required
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                            placeholder="Ej. Jefe de Oficina"/>
+                    </div>
+
+                    <!-- Unidad Orgánica Responsable -->
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Unidad orgánica Responsable
+                        </label>
+                        <input type="text" name="unidadOrganicaResponsable" id="unidad-organica-responsable"
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                            placeholder="Ej. Oficina de Planificación"/>
+                    </div>
+
+                    <!-- SECCIÓN 3: CONTENIDO DEL REPORTE -->
+                    <div class="md:col-span-12 mt-4">
+                        <div class="bg-slate-100 dark:bg-slate-800 p-4 -mx-8 mb-6 border-y border-slate-300 dark:border-slate-700">
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined text-emerald-600">edit_note</span>
+                                Contenido del Reporte
+                            </h3>
+                        </div>
+                    </div>
+
+                    <!-- Actividades Realizadas -->
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Actividades Realizadas
+                        </label>
+                        <textarea name="actividadesRealizadas" rows="4"
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none"
+                            placeholder="Describa las actividades realizadas en el periodo..."></textarea>
+                    </div>
+
+                    <!-- Resultados Obtenidos -->
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Resultados Obtenidos
+                        </label>
+                        <textarea name="resultadosObtenidos" rows="4"
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none"
+                            placeholder="Detalle los resultados, logros o avances obtenidos..."></textarea>
+                    </div>
+
+                    <!-- Observaciones -->
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Observaciones
+                        </label>
+                        <textarea name="observaciones" rows="3"
+                            class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none"
+                            placeholder="Observaciones adicionales (opcional)..."></textarea>
+                    </div>
+                    <!-- SECCIÓN 4: DOCUMENTOS ADJUNTOS -->
+                    <div class="md:col-span-12 mt-4">
+                        <div class="bg-slate-100 dark:bg-slate-800 p-4 -mx-8 mb-6 border-y border-slate-300 dark:border-slate-700">
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined text-emerald-600">attach_file</span>
+                                Documentos Adjuntos
+                            </h3>
+                        </div>
+                    </div>
+
+                    <!-- Excel de soporte -->
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+                            Documento Excel de Sustento (opcional)
+                        </label>
+                        <div class="rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">Archivo Excel de sustento del reporte</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Formatos permitidos: .xls, .xlsx. El sistema generará el PDF formal como documento principal.</p>
+                            </div>
+                            <button type="button"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                                onclick="document.getElementById('excel-file-input').click()">
+                                <span class="material-symbols-outlined text-base">upload_file</span>
+                                Seleccionar Excel
+                            </button>
+                            <input type="file" id="excel-file-input" name="excelReporte" class="hidden" accept=".xls,.xlsx">
+                        </div>
+                        <div id="excel-file-list" class="mt-3 hidden"></div>
+                    </div>
+                    
+                </div>
+            </form>
+            
+            <!-- Footer del formulario -->
+            <div class="p-8 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-4">
+                <button type="button" id="btn-finalizar" 
+                    class="bg-gradient-to-r from-emerald-600 to-teal-800 hover:from-emerald-700 hover:to-teal-900 text-white px-12 py-4 rounded-xl font-bold tracking-wide flex items-center gap-3 shadow-lg shadow-emerald-600/30 transition-all transform hover:scale-105 active:scale-95">
+                    <span class="material-symbols-outlined text-xl">check_circle</span>
+                    FINALIZAR Y GENERAR REPORTE
+                </button>
+                <a href="facultades-documentos.html" id="btn-expedientes"
+                    class="hidden bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white px-8 py-3 rounded-xl font-semibold tracking-wide flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-all transform hover:scale-105 animate-bounce">
+                    <span class="material-symbols-outlined text-lg">folder_open</span>
+                    Ver en Documentos
+                    <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                </a>
+                <p class="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
+                    Todos los campos con * son obligatorios
+                </p>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- JavaScript -->
+    <script src="js/components/api.js"></script>
+    <script src="js/facultades-nuevo/hoja-reportes.js"></script>
+</body>
+</html>

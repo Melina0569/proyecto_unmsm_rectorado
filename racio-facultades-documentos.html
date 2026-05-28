@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>SIGPRO - Racio Facultades Documentos</title>
+
+	<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+	<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+
+	<script>
+		tailwind.config = {
+			darkMode: "class",
+			theme: {
+				extend: {
+					colors: {
+						primary: "#1152d4",
+						"background-light": "#f6f6f8",
+						"background-dark": "#101622"
+					},
+					fontFamily: {
+						display: ["Inter", "sans-serif"]
+					}
+				}
+			}
+		};
+	</script>
+
+	<link rel="stylesheet" href="css/racio-inicio.css" />
+	<link rel="stylesheet" href="css/racio-facultades-documentos.css" />
+</head>
+<body class="bg-background-light text-slate-900 font-display min-h-screen flex flex-col" id="racio-body">
+	<header class="admin-header bg-white shadow-sm sticky top-0 z-50">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+			<div class="flex items-center gap-2">
+				<div class="bg-blue-600 text-white p-1 rounded flex items-center justify-center">
+					<span class="material-symbols-outlined">school</span>
+				</div>
+				<span class="font-bold text-xl text-gray-800 tracking-tight">SIGPRO</span>
+			</div>
+			<nav class="hidden md:flex space-x-8 text-sm font-medium text-gray-600">
+				<a class="hover:text-blue-600 transition-colors" href="racio-inicio.html">Inicio</a>
+				<a class="text-blue-600 border-b-2 border-blue-600 pb-1" href="racio-facultades-documentos.html">Facultades</a>
+				<a class="hover:text-blue-600 transition-colors" href="racio-expedientes.html">Expedientes</a>
+				<a class="hover:text-blue-600 transition-colors" href="racio-repositorio.html">Repositorio</a>
+			</nav>
+			<div class="flex items-center gap-3">
+				<button id="theme-toggle" aria-label="Activar modo oscuro" class="theme-toggle-btn w-10 h-10 rounded-full border border-slate-200 bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 transition-all duration-300 flex items-center justify-center" type="button">
+					<span id="theme-icon" class="material-symbols-outlined text-xl">dark_mode</span>
+				</button>
+
+				<div class="relative">
+					<button id="profile-toggle" type="button" aria-haspopup="menu" aria-expanded="false" class="profile-trigger flex items-center gap-2 rounded-full border border-slate-200 bg-white pl-2 pr-3 py-1.5 hover:border-blue-300 hover:shadow-md transition-all duration-300">
+						<div id="profile-avatar" class="w-8 h-8 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">RA</div>
+						<div class="hidden md:block text-left leading-tight">
+							<div id="profile-name" class="text-xs font-semibold text-slate-800">Administrador</div>
+							<div id="profile-role" class="text-[10px] text-slate-500">Racionalización</div>
+						</div>
+						<span class="material-symbols-outlined text-slate-500 text-base">expand_more</span>
+					</button>
+
+					<div id="profile-menu" role="menu" class="profile-menu absolute right-0 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+						<div class="px-3 py-2 border-b border-slate-100">
+							<div id="profile-menu-name" class="text-sm font-semibold text-slate-800">Administrador</div>
+							<div id="profile-menu-email" class="text-xs text-slate-500 truncate">admin@unmsm.edu.pe</div>
+						</div>
+						<button id="logout-button" type="button" role="menuitem" class="w-full mt-2 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+							<span class="material-symbols-outlined text-base">logout</span>
+							Cerrar sesión
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</header>
+
+	<main class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
+		<div class="mb-8">
+			<h1 class="text-3xl font-black tracking-tight text-gray-900">Dashboard de Facultades</h1>
+			<p class="text-gray-500 mt-1">Seguimiento de documentos por facultad, estado y fecha.</p>
+		</div>
+
+		<section class="panel-card rounded-2xl p-5 sm:p-6 mb-6">
+			<div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+				<div class="flex flex-col gap-2">
+					<label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Facultad</label>
+					<div class="custom-dropdown relative" data-dropdown="faculty">
+						<button id="filter-faculty-trigger" type="button" class="dropdown-trigger w-full flex items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-left outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+							<span id="filter-faculty-label" class="truncate">Todas las facultades</span>
+							<span class="material-symbols-outlined dropdown-caret text-slate-400 text-base">expand_more</span>
+						</button>
+						<div id="filter-faculty-menu" class="dropdown-menu" aria-hidden="true"></div>
+					</div>
+				</div>
+
+				<div class="flex flex-col gap-2 md:col-span-2">
+					<label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Código de Expediente</label>
+					<div class="relative">
+						<input id="filter-code" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-10 pr-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" placeholder="Buscar por código o descripción" />
+						<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+					</div>
+				</div>
+
+				<div class="flex flex-col gap-2">
+					<label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Ordenar por</label>
+					<div class="custom-dropdown relative" data-dropdown="sort">
+						<button id="sort-by-trigger" type="button" class="dropdown-trigger w-full flex items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-left outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+							<span id="sort-by-label" class="truncate">Más antiguos</span>
+							<span class="material-symbols-outlined dropdown-caret text-slate-400 text-base">sort</span>
+						</button>
+						<div id="sort-by-menu" class="dropdown-menu" aria-hidden="true"></div>
+					</div>
+				</div>
+			</div>
+
+			<div class="mt-5 flex flex-wrap gap-2 pt-4 border-t border-slate-200">
+				<button class="status-tab active" data-status="all" type="button">TODOS</button>
+				<button class="status-tab" data-status="pendiente" type="button">PENDIENTE</button>
+				<button class="status-tab" data-status="en_proceso" type="button">EN PROCESO</button>
+				<button class="status-tab" data-status="completado" type="button">COMPLETADO</button>
+			</div>
+		</section>
+
+		<section class="panel-card rounded-2xl overflow-hidden">
+			<div class="overflow-x-auto">
+				<table class="w-full text-left border-collapse">
+					<thead>
+						<tr class="bg-slate-50 border-b border-slate-200">
+							<th class="px-5 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Código</th>
+							<th class="px-5 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Facultad</th>
+							<th class="px-5 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Progreso</th>
+							<th class="px-5 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+							<th class="px-5 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+							<th class="px-5 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Acción</th>
+						</tr>
+					</thead>
+					<tbody id="docs-tbody" class="divide-y divide-slate-100"></tbody>
+				</table>
+			</div>
+
+			<div class="px-5 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+				<span id="pagination-info" class="text-xs text-slate-500 font-medium">Mostrando 0-0 de 0 expedientes</span>
+				<div class="flex gap-1">
+					<button id="page-prev" class="page-btn" type="button"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
+					<span id="page-current" class="px-3 py-1 rounded bg-primary text-white text-xs font-bold">1</span>
+					<button id="page-next" class="page-btn" type="button"><span class="material-symbols-outlined text-sm">chevron_right</span></button>
+				</div>
+			</div>
+		</section>
+	</main>
+
+	<footer class="admin-footer bg-white border-t border-gray-200 mt-12 py-8">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+			<p class="text-sm text-gray-500 font-medium">
+				© 2026 Oficina General de Planificación - UNMSM | Sistema de Racionalización v2.0
+			</p>
+		</div>
+	</footer>
+
+	<div id="logout-modal" class="logout-modal" aria-hidden="true">
+		<div id="logout-modal-backdrop" class="logout-modal-backdrop"></div>
+		<div class="logout-modal-panel" role="dialog" aria-modal="true" aria-labelledby="logout-modal-title" aria-describedby="logout-modal-description">
+			<div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+				<span class="material-symbols-outlined">logout</span>
+			</div>
+			<h3 id="logout-modal-title" class="text-lg font-bold text-slate-800 text-center">¿Estás seguro de cerrar sesión?</h3>
+			<p id="logout-modal-description" class="text-sm text-slate-500 text-center mt-2">Se cerrará la sesión del administrador y volverás al portal de acceso.</p>
+			<div class="mt-6 flex items-center justify-center gap-3">
+				<button id="logout-cancel" type="button" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">No, cancelar</button>
+				<button id="logout-confirm" type="button" class="px-4 py-2 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors">Sí, cerrar sesión</button>
+			</div>
+		</div>
+	</div>
+
+	<script src="js/components/api.js"></script>
+	<script src="js/racio-facultades-documentos.js"></script>
+</body>
+</html>
