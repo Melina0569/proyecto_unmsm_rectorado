@@ -535,9 +535,81 @@ async function loadDashboardData() {
 	const localDocuments = loadLocalDocuments();
 	dashboardDocuments = mergeDocuments(apiDocuments, localDocuments);
 
-	updateCounters(dashboardDocuments);
+	if (dashboardDocuments.length > 0) {
+		updateCounters(dashboardDocuments);
+	}
 	renderNotifications(dashboardDocuments);
 	updateLastRefreshLabel();
+}
+
+// Cargar y renderizar estadísticas administrativas (contador de documentos)
+async function loadAndRenderAdminStats() {
+	if (typeof API === 'undefined' || !API.admin || !API.admin.stats) return;
+
+	// Preferir método centralizado si existe
+	const loader = API.admin.stats.getAdminStats || API.admin.stats.get;
+	if (typeof loader !== 'function') return;
+
+	try {
+		const res = await loader();
+		const result = res?.success ? res : (res && Array.isArray(res) ? { success: true, data: res } : res);
+
+		if (!result?.success) {
+			const errEl = document.getElementById('admin-stats-error');
+			if (result?.status === 401 || result?.status === 403) {
+				// Sesión inválida: limpiar y redirigir al login
+				localStorage.removeItem('unmsm_token');
+				localStorage.removeItem('unmsm_user');
+				window.location.replace('portal-inicio-racio.html');
+				return;
+			}
+			console.warn('No se pudieron cargar estadísticas administrativas', result);
+			if (errEl) {
+				errEl.textContent = result?.error || result?.message || 'No se pudieron cargar las estadísticas del sistema.';
+				errEl.classList.remove('hidden');
+			}
+			return;
+		}
+
+		const stats = result.data || {};
+		// Hide error if present
+		const errEl = document.getElementById('admin-stats-error');
+		if (errEl) errEl.classList.add('hidden');
+
+		const byStatus = stats.byStatus || {};
+		const byType = stats.byType || {};
+
+		const pend = document.getElementById('count-pendiente');
+		const proc = document.getElementById('count-en-proceso');
+		const comp = document.getElementById('count-completado');
+
+		if (pend) pend.textContent = String((byStatus.pending ?? stats.documentsPending ?? stats.documents_pending ?? stats.pending ?? stats.pendingDocuments ?? pend.textContent) || 0);
+		if (proc) proc.textContent = String((byStatus.inProgress ?? stats.documentsInProcess ?? stats.documents_in_process ?? stats.inProcess ?? stats.processing ?? proc.textContent) || 0);
+		if (comp) comp.textContent = String((byStatus.completed ?? stats.documentsCompleted ?? stats.documents_completed ?? stats.completed ?? stats.approved ?? comp.textContent) || 0);
+
+		const totalNode = document.getElementById('total-documents');
+		const facultiesNode = document.getElementById('active-faculties');
+		const pendingUsersNode = document.getElementById('pending-users');
+		const avgNode = document.getElementById('avg-approval-time');
+
+		if (totalNode) totalNode.textContent = String(stats.totalDocuments ?? stats.total_documents ?? stats.total ?? 0);
+		if (facultiesNode) facultiesNode.textContent = String(stats.activeFaculties ?? stats.active_faculties ?? stats.facultiesActive ?? 0);
+		if (pendingUsersNode) pendingUsersNode.textContent = String(stats.pendingUsers ?? stats.pending_users ?? stats.usersPending ?? 0);
+		if (avgNode) avgNode.textContent = String(stats.avgApprovalTime ?? stats.avg_approval_time ?? stats.averageApprovalTime ?? 0);
+
+		const indicatorsNode = document.getElementById('type-indicators');
+		const flowsNode = document.getElementById('type-flows');
+		const charsNode = document.getElementById('type-characterizations');
+		const reportsNode = document.getElementById('type-reports');
+
+		if (indicatorsNode) indicatorsNode.textContent = String(byType.indicators ?? stats.indicators ?? 0);
+		if (flowsNode) flowsNode.textContent = String(byType.flows ?? stats.flows ?? 0);
+		if (charsNode) charsNode.textContent = String(byType.characterizations ?? stats.characterizations ?? 0);
+		if (reportsNode) reportsNode.textContent = String(byType.reports ?? stats.reports ?? 0);
+
+	} catch (error) {
+		console.error('Error cargando admin stats:', error);
+	}
 }
 
 function setupRefreshButton() {
@@ -636,5 +708,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 	setupRefreshButton();
 	setupFacultyFilter();
 	setupFacultyNavigation();
+	await loadAndRenderAdminStats();
 	await loadDashboardData();
 });

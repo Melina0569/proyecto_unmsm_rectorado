@@ -97,6 +97,131 @@
 			</div>
 		</div>
 
+		<!-- Admin stats error notification -->
+		<div id="admin-stats-error" class="hidden bg-red-50 border border-red-100 text-red-700 px-4 py-3 rounded-lg" role="alert"></div>
+
+		<section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+			<div class="mini-lava mini-total rounded-2xl p-5 volumetric-3d flex items-center justify-between h-28">
+				<div class="blob-1" aria-hidden="true"></div>
+				<div class="blob-2" aria-hidden="true"></div>
+				<div class="blob-3" aria-hidden="true"></div>
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-[0.15em] text-white/80">Total de documentos</p>
+					<div id="total-documents" class="mt-1 text-3xl font-extrabold text-white">0</div>
+				</div>
+				<div class="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 levitate-icon">
+					<span class="material-symbols-outlined text-white text-3xl">description</span>
+				</div>
+			</div>
+			<div class="mini-lava mini-faculties rounded-2xl p-5 volumetric-3d flex items-center justify-between h-28">
+				<div class="blob-1" aria-hidden="true"></div>
+				<div class="blob-2" aria-hidden="true"></div>
+				<div class="blob-3" aria-hidden="true"></div>
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-[0.15em] text-white/80">Facultades activas</p>
+					<div id="active-faculties" class="mt-1 text-3xl font-extrabold text-white">0</div>
+				</div>
+				<div class="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 levitate-icon">
+					<span class="material-symbols-outlined text-white text-3xl">school</span>
+				</div>
+			</div>
+			<div class="mini-lava mini-pending rounded-2xl p-5 volumetric-3d flex items-center justify-between h-28">
+				<div class="blob-1" aria-hidden="true"></div>
+				<div class="blob-2" aria-hidden="true"></div>
+				<div class="blob-3" aria-hidden="true"></div>
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-[0.15em] text-white/80">Usuarios pendientes</p>
+					<div id="pending-users" class="mt-1 text-3xl font-extrabold text-white">0</div>
+				</div>
+				<div class="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 levitate-icon">
+					<span class="material-symbols-outlined text-white text-3xl">person_add</span>
+				</div>
+			</div>
+			<div class="mini-lava mini-time rounded-2xl p-5 volumetric-3d flex items-center justify-between h-28">
+				<div class="blob-1" aria-hidden="true"></div>
+				<div class="blob-2" aria-hidden="true"></div>
+				<div class="blob-3" aria-hidden="true"></div>
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-[0.15em] text-white/80">Tiempo promedio</p>
+					<div class="mt-1 flex items-end gap-2">
+						<div id="avg-approval-time" class="text-3xl font-extrabold text-white">0</div>
+						<span class="pb-1 text-sm font-medium text-white/80">días</span>
+					</div>
+				</div>
+				<div class="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 levitate-icon">
+					<span class="material-symbols-outlined text-white text-3xl">schedule</span>
+				</div>
+			</div>
+		</section>
+
+		<div class="cards-top-shadow" aria-hidden="true"></div>
+		<section class="rounded-3xl bg-white border border-slate-100 shadow-soft p-6 cards-frame-3d">
+			<div class="flex items-center justify-between gap-4 mb-4">
+				<h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+					<span class="material-symbols-outlined text-blue-600">stacked_bar_chart</span>
+					Distribución por tipo
+				</h2>
+			</div>
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+				<div class="type-mini type-indicators rounded-2xl p-4 hover-lift">
+					<div class="blob-1" aria-hidden="true"></div>
+					<div class="blob-2" aria-hidden="true"></div>
+					<div class="blob-3" aria-hidden="true"></div>
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-[0.15em] text-white/90">Indicadores</p>
+						<div class="mt-2">
+							<div id="type-indicators" class="text-3xl font-black text-white">0</div>
+						</div>
+					</div>
+					<div class="ml-4 w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center border border-white/30 levitate-icon">
+						<span class="material-symbols-outlined text-white text-xl">insights</span>
+					</div>
+				</div>
+				<div class="type-mini type-flows rounded-2xl p-4 hover-lift">
+					<div class="blob-1" aria-hidden="true"></div>
+					<div class="blob-2" aria-hidden="true"></div>
+					<div class="blob-3" aria-hidden="true"></div>
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-[0.15em] text-white/90">Flujos</p>
+						<div class="mt-2">
+							<div id="type-flows" class="text-3xl font-black text-white">0</div>
+						</div>
+					</div>
+					<div class="ml-4 w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center border border-white/30 levitate-icon">
+						<span class="material-symbols-outlined text-white text-xl">sync_alt</span>
+					</div>
+				</div>
+				<div class="type-mini type-chars rounded-2xl p-4 hover-lift">
+					<div class="blob-1" aria-hidden="true"></div>
+					<div class="blob-2" aria-hidden="true"></div>
+					<div class="blob-3" aria-hidden="true"></div>
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-[0.15em] text-white/90">Caracterizaciones</p>
+						<div class="mt-2">
+							<div id="type-characterizations" class="text-3xl font-black text-white">0</div>
+						</div>
+					</div>
+					<div class="ml-4 w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center border border-white/30 levitate-icon">
+						<span class="material-symbols-outlined text-white text-xl">category</span>
+					</div>
+				</div>
+				<div class="type-mini type-reports rounded-2xl p-4 hover-lift">
+					<div class="blob-1" aria-hidden="true"></div>
+					<div class="blob-2" aria-hidden="true"></div>
+					<div class="blob-3" aria-hidden="true"></div>
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-[0.15em] text-white/90">Reportes</p>
+						<div class="mt-2">
+							<div id="type-reports" class="text-3xl font-black text-white">0</div>
+						</div>
+					</div>
+					<div class="ml-4 w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center border border-white/30 levitate-icon">
+						<span class="material-symbols-outlined text-white text-xl">analytics</span>
+					</div>
+				</div>
+			</div>
+		</section>
+
 		<section class="grid grid-cols-1 md:grid-cols-3 gap-10 pt-4 pb-8">
 			<div class="lava-container lava-pendientes rounded-3xl p-8 text-white volumetric-3d flex justify-between items-center h-52 cursor-pointer group" data-status="pendiente">
 				<div class="lava-blob blob-1"></div>
@@ -371,5 +496,26 @@
 
 	<script src="js/components/api.js"></script>
 	<script src="js/racio-inicio.js"></script>
+	<script>
+	  // Re-insert .cards-top-shadow after other scripts run (robust fallback)
+	  (function ensureTopShadow(){
+	    function insertShadow(){
+	      try{
+	        var frame = document.querySelector('.cards-frame-3d');
+	        if(!frame) return;
+	        if(!document.querySelector('.cards-top-shadow')){
+	          var div = document.createElement('div');
+	          div.className = 'cards-top-shadow';
+	          div.setAttribute('aria-hidden','true');
+	          frame.parentNode.insertBefore(div, frame);
+	        }
+	      }catch(e){/* ignore */}
+	    }
+	    // run after load and again shortly after to beat late DOM mutations
+	    if(document.readyState === 'loading'){
+	      document.addEventListener('DOMContentLoaded', function(){ insertShadow(); setTimeout(insertShadow, 120); });
+	    } else { insertShadow(); setTimeout(insertShadow, 120); }
+	  })();
+	</script>
 </body>
 </html>

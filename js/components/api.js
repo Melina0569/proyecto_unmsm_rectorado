@@ -607,6 +607,7 @@ const RemoteAPI = {
     getHeaders() {
         const token = localStorage.getItem('unmsm_token');
         return {
+            'Accept': 'application/json',
             'Content-Type': 'application/json',
             'Authorization': token ? `Bearer ${token}` : ''
         };
@@ -663,6 +664,8 @@ const RemoteAPI = {
 
                 const persistSession = (normalizedUser, accessToken, refreshToken) => {
                     localStorage.setItem('unmsm_token', accessToken);
+                    localStorage.setItem('accessToken', accessToken);
+                    localStorage.setItem('token', accessToken);
                     if (refreshToken) {
                         localStorage.setItem('unmsm_refresh_token', refreshToken);
                     } else {
@@ -1147,6 +1150,29 @@ const RemoteAPI = {
                 }
             },
 
+            async getAdminFaculties() {
+                const token = localStorage.getItem('token') || localStorage.getItem('unmsm_token');
+
+                try {
+                    const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/faculties`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Authorization': token ? `Bearer ${token}` : ''
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Error obteniendo facultades admin');
+                    }
+
+                    return await response.json();
+                } catch (error) {
+                    console.error(error);
+                    return [];
+                }
+            },
+
             async create(facultyData) {
                 try {
                     const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/faculties`, {
@@ -1172,7 +1198,23 @@ const RemoteAPI = {
                 } catch (error) {
                     return { success: false, error: error.message };
                 }
-            }
+            },
+
+            // Convenience wrapper that returns structured result for admin stats
+            async getAdminStats() {
+                try {
+                    const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/stats`, {
+                        headers: RemoteAPI.getHeaders()
+                    });
+
+                    let data = null;
+                    try { data = await response.json(); } catch (e) { data = null; }
+
+                    return { success: response.ok, data, status: response.status };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            },
         },
 
         // ========== ADMIN - REPOSITORIO ==========
