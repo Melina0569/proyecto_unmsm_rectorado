@@ -534,7 +534,7 @@
 	transform-style: preserve-3d;
 	border-radius: 1rem;
 	/* softened outer drop shadow for a subtler 3D effect */
-	box-shadow: 0 20px 60px -24px rgba(2,6,23,0.18), 0 10px 30px -18px rgba(2,6,23,0.12);
+	box-shadow: 0 20px 60px -24px rgba(2,6,23,0.18), 0 10px 30px -18px rgba(2,6,23,0.12), inset 0 10px 30px -18px rgba(2,6,23,0.10) !important;
 	overflow: visible;
 }
 .cards-frame-3d::before {
@@ -829,6 +829,10 @@
 .theme-dark #facultad-search {
 	background: rgba(15, 23, 42, 0.88) !important;
 	border-color: rgba(148, 163, 184, 0.34) !important;
+.cards-frame-3d {
+    /* gentle outer lift plus subtle inner top shadow for the overhang effect */
+    box-shadow: 0 14px 34px -18px rgba(2,6,23,0.12), inset 0 10px 30px -18px rgba(2,6,23,0.08);
+}
 	color: #e2e8f0 !important;
 	box-shadow: 0 14px 22px -16px rgba(2, 6, 23, 0.72);
 }
