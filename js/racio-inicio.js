@@ -371,7 +371,9 @@ async function loadApiDocuments() {
 	}
 
 	try {
-		const response = await API.documentos.getAll({});
+		const response = await (API.admin && API.admin.documents && typeof API.admin.documents.getAdminDocuments === 'function'
+			? API.admin.documents.getAdminDocuments('', '', 1, 20)
+			: API.documentos.getAll({}));
 		if (!response?.success) {
 			return [];
 		}
@@ -527,6 +529,132 @@ function renderNotifications(documents) {
 	}).join("");
 }
 
+function extractFacultyRows(payload) {
+	if (Array.isArray(payload)) {
+		return payload;
+	}
+
+	if (Array.isArray(payload?.data)) {
+		return payload.data;
+	}
+
+	if (Array.isArray(payload?.items)) {
+		return payload.items;
+	}
+
+	return [];
+}
+
+function formatAdminFacultyDate(value) {
+	if (!value) return "-";
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return "-";
+
+	return new Intl.DateTimeFormat("es-PE", {
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit"
+	}).format(date);
+}
+
+function renderAdminFacultiesTable(rows) {
+	const tableBody = document.getElementById("admin-faculties-body");
+	const emptyState = document.getElementById("admin-faculties-empty");
+	const countNode = document.getElementById("admin-faculties-count");
+
+	if (!tableBody) {
+		return;
+	}
+
+	if (!rows.length) {
+		tableBody.innerHTML = `
+			<tr>
+				<td colspan="9" class="text-center py-6 text-slate-500">No hay datos de facultades para mostrar.</td>
+			</tr>
+		`;
+		if (countNode) countNode.textContent = "0 facultades";
+		if (emptyState) emptyState.classList.remove("hidden");
+		return;
+	}
+
+	if (countNode) {
+		countNode.textContent = `${rows.length} facultad${rows.length === 1 ? "" : "es"}`;
+	}
+	if (emptyState) emptyState.classList.add("hidden");
+
+	tableBody.innerHTML = rows.map((faculty) => {
+		const stats = faculty?.stats || {};
+		const active = Boolean(faculty?.isActive);
+		const statusClass = active
+			? "admin-faculty-status admin-faculty-status--active"
+			: "admin-faculty-status admin-faculty-status--inactive";
+		const statusLabel = active ? "Activa" : "Inactiva";
+
+		return `
+			<tr>
+				<td>
+					<div class="font-semibold text-slate-800">${faculty?.name || "-"}</div>
+				</td>
+				<td class="font-semibold text-slate-700">${faculty?.code || "-"}</td>
+				<td class="text-slate-600">${faculty?.shortName || "-"}</td>
+				<td><span class="${statusClass}">${statusLabel}</span></td>
+				<td class="text-slate-600">${formatAdminFacultyDate(faculty?.createdAt)}</td>
+				<td class="text-center font-semibold text-slate-700">${Number(stats?.indicatorsCount || 0)}</td>
+				<td class="text-center font-semibold text-slate-700">${Number(stats?.flowsCount || 0)}</td>
+				<td class="text-center font-semibold text-slate-700">${Number(stats?.processesCount || 0)}</td>
+				<td class="text-center font-semibold text-slate-700">${Number(stats?.activeUsers || 0)}</td>
+			</tr>
+		`;
+	}).join("");
+}
+
+async function loadAdminFacultiesTable() {
+	const errorNode = document.getElementById("admin-faculties-error");
+	const tableBody = document.getElementById("admin-faculties-body");
+
+	if (!tableBody) {
+		return;
+	}
+
+	if (errorNode) {
+		errorNode.classList.add("hidden");
+		errorNode.textContent = "";
+	}
+
+	if (typeof API === "undefined" || !API.admin || !API.admin.faculties) {
+		renderAdminFacultiesTable([]);
+		return;
+	}
+
+	try {
+		let result = null;
+		if (typeof API.admin.faculties.getAll === "function") {
+			result = await API.admin.faculties.getAll();
+		}
+
+		if (!result?.success && typeof API.admin.faculties.getAdminFaculties === "function") {
+			const fallbackRows = await API.admin.faculties.getAdminFaculties();
+			const rows = extractFacultyRows(fallbackRows);
+			renderAdminFacultiesTable(rows);
+			return;
+		}
+
+		if (!result?.success) {
+			throw new Error(result?.error || "No se pudieron cargar las facultades administrativas.");
+		}
+
+		const rows = extractFacultyRows(result.data);
+		renderAdminFacultiesTable(rows);
+	} catch (error) {
+		console.error("Error cargando facultades administrativas:", error);
+		renderAdminFacultiesTable([]);
+		if (errorNode) {
+			errorNode.textContent = error?.message || "No se pudieron cargar las facultades administrativas.";
+			errorNode.classList.remove("hidden");
+		}
+	}
+}
+
 async function loadDashboardData() {
 	const [apiDocuments] = await Promise.all([
 		loadApiDocuments()
@@ -620,7 +748,11 @@ function setupRefreshButton() {
 
 	button.addEventListener("click", async () => {
 		button.disabled = true;
-		await loadDashboardData();
+		await Promise.all([
+			loadDashboardData(),
+			loadAdminFacultiesTable(),
+			loadAndRenderAdminStats()
+		]);
 		button.disabled = false;
 	});
 }
@@ -681,16 +813,37 @@ function setupFacultyFilter() {
 	applyFilter();
 }
 
-function setupFacultyNavigation() {
+async function setupFacultyNavigation() {
 	const cards = Array.from(document.querySelectorAll(".facultad-card"));
 	if (!cards.length) return;
+
+	// Try to fetch faculties from API to map names -> ids
+	const mapByName = new Map();
+	try {
+		if (typeof API !== 'undefined' && API.admin && typeof API.admin.faculties?.getAll === 'function') {
+			const res = await API.admin.faculties.getAll();
+			const rows = (res && res.success)
+				? (Array.isArray(res.data) ? res.data : (Array.isArray(res.data?.items) ? res.data.items : []))
+				: [];
+			rows.forEach((f) => {
+				const name = (f?.name || f?.shortName || f?.facultad || '').trim();
+				if (name) mapByName.set(name.toLowerCase(), f?.id || '');
+			});
+		}
+	} catch (e) {
+		console.warn('No se pudieron cargar facultades para navegación:', e);
+	}
 
 	cards.forEach((card) => {
 		const labelNode = card.querySelector("span.text-xs.font-bold");
 		const facultyName = (labelNode?.textContent || "").trim();
 		if (!facultyName) return;
 
-		const target = `racio-facultades-documentos.html?facultad=${encodeURIComponent(facultyName)}`;
+		const id = mapByName.get(facultyName.toLowerCase());
+		const target = id
+			? `racio-facultades-documentos.html?facultyId=${encodeURIComponent(id)}`
+			: `racio-facultades-documentos.html?facultad=${encodeURIComponent(facultyName)}`;
+
 		card.setAttribute("href", target);
 		card.setAttribute("title", `Ver expedientes de ${facultyName}`);
 	});
@@ -708,6 +861,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 	setupRefreshButton();
 	setupFacultyFilter();
 	setupFacultyNavigation();
+	await loadAdminFacultiesTable();
 	await loadAndRenderAdminStats();
 	await loadDashboardData();
 });

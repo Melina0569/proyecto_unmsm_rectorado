@@ -469,6 +469,50 @@
 				<p class="text-xs text-slate-500 mt-1">Prueba con otro nombre de facultad.</p>
 			</div>
 		</section>
+
+		<section class="admin-faculties-panel rounded-3xl p-6 md:p-8">
+			<div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
+				<div>
+					<h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+						<span class="material-symbols-outlined text-blue-700">admin_panel_settings</span>
+						Facultades Administrativas
+					</h2>
+					<p class="text-xs text-gray-500 mt-1">Estado, fecha de creación y métricas por facultad</p>
+				</div>
+				<span id="admin-faculties-count" class="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">0 facultades</span>
+			</div>
+
+			<div id="admin-faculties-error" class="hidden mb-4 rounded-xl border border-red-100 bg-red-50 text-red-700 text-sm px-4 py-3"></div>
+
+			<div class="admin-faculties-table-wrap overflow-x-auto rounded-2xl border border-slate-200 bg-white/90">
+				<table class="admin-faculties-table min-w-full text-sm">
+					<thead>
+						<tr>
+							<th>Facultad</th>
+							<th>Código</th>
+							<th>Nombre corto</th>
+							<th>Estado</th>
+							<th>Creación</th>
+							<th class="text-center">Indicadores</th>
+							<th class="text-center">Flujogramas</th>
+							<th class="text-center">Procesos</th>
+							<th class="text-center">Usuarios</th>
+						</tr>
+					</thead>
+					<tbody id="admin-faculties-body">
+						<tr>
+							<td colspan="9" class="text-center py-6 text-slate-500">Cargando facultades...</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<div id="admin-faculties-empty" class="hidden mt-4 rounded-2xl border border-dashed border-slate-300 bg-white/70 px-6 py-8 text-center">
+				<span class="material-symbols-outlined text-3xl text-slate-400">domain_disabled</span>
+				<p class="text-sm font-semibold text-slate-700 mt-2">No se encontraron facultades</p>
+				<p class="text-xs text-slate-500 mt-1">Verifica el endpoint administrativo o la sesión actual.</p>
+			</div>
+		</section>
 	</main>
 
 	<footer class="admin-footer bg-white border-t border-gray-200 mt-12 py-8">

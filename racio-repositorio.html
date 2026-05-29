@@ -107,9 +107,16 @@
 		<section class="repo-filters grid grid-cols-1 lg:grid-cols-12 gap-4">
 			<div class="lg:col-span-4">
 				<label class="repo-label" for="repo-faculty-filter">Facultad</label>
-				<select id="repo-faculty-filter" class="repo-input">
-					<option value="all">Todas las facultades</option>
-				</select>
+				<div class="repo-select" id="repo-faculty-select">
+					<button id="repo-faculty-trigger" class="repo-input repo-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="repo-faculty-menu">
+						<span id="repo-faculty-selected">Todas las facultades</span>
+						<span class="material-symbols-outlined repo-select-chevron">expand_more</span>
+					</button>
+					<div id="repo-faculty-menu" class="repo-select-menu hidden" role="listbox" aria-label="Filtro por facultad"></div>
+					<select id="repo-faculty-filter" class="sr-only" tabindex="-1" aria-hidden="true">
+						<option value="all">Todas las facultades</option>
+					</select>
+				</div>
 			</div>
 			<div class="lg:col-span-8">
 				<label class="repo-label" for="repo-search">Búsqueda rápida</label>

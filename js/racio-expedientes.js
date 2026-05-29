@@ -1345,7 +1345,9 @@ function extractArrayPayload(payload) {
 async function loadApiDocuments() {
     if (typeof API === "undefined" || !API.documentos?.getAll) return [];
     try {
-        const result = await API.documentos.getAll({});
+        const result = await (API.admin && API.admin.documents && typeof API.admin.documents.getAdminDocuments === 'function'
+            ? API.admin.documents.getAdminDocuments('', '', 1, 20)
+            : API.documentos.getAll({}));
         if (!result?.success) return [];
         return extractArrayPayload(result.data).map((doc, index) => normalizeDocument(doc, index));
     } catch {
@@ -2663,12 +2665,7 @@ async function renderSelectedDocument() {
 
 async function initializeDocuments() {
     const apiDocs = await loadApiDocuments();
-    const localDocs = loadLocalDocuments();
-    const detailDocs = loadLocalDetailDocuments();
-    const mergedLocal = mergeDocuments(localDocs, detailDocs);
-    const mergedDocs = mergeDocuments(apiDocs, mergedLocal);
-
-    state.allDocuments = mergedDocs.length ? mergedDocs : SAMPLE_DOCUMENTS.map((doc, index) => normalizeDocument(doc, index));
+    state.allDocuments = apiDocs;
 
     const params = getQueryParams();
     const selectedCode = params.get("codigo") || params.get("code") || "";

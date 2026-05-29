@@ -1230,6 +1230,13 @@ const RemoteAPI = {
                 } catch (error) {
                     return { success: false, error: error.message };
                 }
+            },
+
+            async getByFaculty(facultyId) {
+                if (!facultyId) {
+                    return { success: false, error: 'facultyId es requerido' };
+                }
+                return this.get({ facultyId });
             }
         },
 
@@ -1248,6 +1255,21 @@ const RemoteAPI = {
                     return { success: false, error: error.message };
                 }
             },
+
+			// Helper compatible con facultyId + status opcional
+			async getAdminDocuments(facultyId, status = '', page = 1, limit = 20) {
+                const filters = { page, limit };
+
+                if (facultyId) {
+                    filters.facultyId = facultyId;
+                }
+
+                if (status) {
+                    filters.status = status;
+                }
+
+                return this.getAll(filters);
+			},
 
             async getReview(id) {
                 try {

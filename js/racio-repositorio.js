@@ -12,8 +12,10 @@ const realtimeState = {
 const state = {
 	documents: [],
 	filtered: [],
+	faculties: [],
 	selectedType: "all",
 	selectedFaculty: "all",
+	selectedFacultyId: "",
 	searchTerm: "",
 	selectedCode: ""
 };
@@ -233,32 +235,50 @@ function setupProfileMenu(logoutControls) {
 	}
 }
 
-function loadRepositoryDocuments() {
-	const previousCode = state.selectedCode;
+function normalizeRepositoryType(value, fallbackCode = "") {
+	const raw = normalizeText(value);
+	if (raw.includes("indic")) return "indicador";
+	if (raw.includes("flujo") || raw.includes("flow")) return "flujograma";
+	if (raw.includes("caract")) return "caracterizacion";
+	if (raw.includes("invent")) return "inventario";
+	if (raw.includes("report")) return "reporte";
+	return inferType(fallbackCode);
+}
+
+function safeArray(value) {
+	return Array.isArray(value) ? value : [];
+}
+
+function readLocalRepositorySource() {
 	const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
 	const detailRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
 	let docs = [];
 	let detailMap = {};
+
 	try {
 		docs = raw ? JSON.parse(raw) : [];
 		if (!Array.isArray(docs)) docs = [];
 	} catch {
 		docs = [];
 	}
+
 	try {
 		detailMap = detailRaw ? JSON.parse(detailRaw) : {};
 	} catch {
 		detailMap = {};
 	}
 
-	const approved = docs
+	return { docs, detailMap };
+}
+
+function mapLocalApprovedDocuments(docs, detailMap) {
+	return safeArray(docs)
 		.filter((doc) => {
 			const status = normalizeText(doc.estado || doc.status);
 			return status.includes("aprob") || status.includes("complet");
 		})
 		.map((doc) => {
 			const code = doc.codigo || doc.code || doc.id || "DOC-SIN-CODIGO";
-			const type = doc.tipo || inferType(code);
 			const detail = detailMap?.[code] || null;
 			return {
 				id: doc.id || code,
@@ -266,13 +286,151 @@ function loadRepositoryDocuments() {
 				descripcion: doc.descripcion || doc.nombre || `Documento ${code}`,
 				facultad: doc.nombreFacultad || doc.facultad || doc.generadoPor || "Facultad no registrada",
 				unidad: doc.unidad || doc.area || "Oficina responsable",
-				tipo: type,
+				tipo: normalizeRepositoryType(doc.tipo, code),
 				estado: statusLabel(doc.estado || doc.status || "aprobado"),
 				fecha: parseDate(doc.fechaAprobacion || doc.fechaActualizacion || doc.fecha || doc.updatedAt),
 				detail
 			};
 		})
 		.sort((a, b) => b.fecha - a.fecha);
+}
+
+function normalizeRemoteRepositoryDoc(doc, forcedType, index) {
+	const code = doc?.code || doc?.codigo || doc?.documentCode || doc?.id || `DOC-${index + 1}`;
+	const facultyName =
+		doc?.faculty?.shortName
+		|| doc?.faculty?.name
+		|| doc?.nombreFacultad
+		|| doc?.facultad
+		|| doc?.facultadNombre
+		|| doc?.createdBy?.faculty?.shortName
+		|| doc?.createdBy?.faculty?.name
+		|| "Facultad no registrada";
+
+	const unidad =
+		doc?.unit
+		|| doc?.unidad
+		|| doc?.area
+		|| doc?.responsibleUnit
+		|| doc?.createdBy?.fullName
+		|| "Oficina responsable";
+
+	const fecha = parseDate(
+		doc?.approvedAt
+		|| doc?.publishedAt
+		|| doc?.updatedAt
+		|| doc?.createdAt
+		|| doc?.fechaAprobacion
+		|| doc?.fechaActualizacion
+		|| doc?.fecha
+	);
+
+	return {
+		id: doc?.id || code,
+		codigo: code,
+		descripcion: doc?.title || doc?.descripcion || doc?.name || `Documento ${code}`,
+		facultad: facultyName,
+		unidad,
+		tipo: normalizeRepositoryType(forcedType || doc?.type || doc?.tipo, code),
+		estado: statusLabel(doc?.status || doc?.estado || "Aprobado"),
+		fecha,
+		detail: doc || null
+	};
+}
+
+function flattenRemoteRepositoryPayload(payload) {
+	if (Array.isArray(payload)) {
+		return payload.map((doc, index) => normalizeRemoteRepositoryDoc(doc, doc?.type || doc?.tipo, index));
+	}
+
+	const source = payload && typeof payload === "object" ? payload : {};
+	const buckets = [
+		{ key: "indicators", type: "indicador" },
+		{ key: "flows", type: "flujograma" },
+		{ key: "characterizations", type: "caracterizacion" },
+		{ key: "reports", type: "reporte" }
+	];
+
+	const rows = [];
+	buckets.forEach(({ key, type }) => {
+		safeArray(source[key]).forEach((doc, index) => {
+			rows.push(normalizeRemoteRepositoryDoc(doc, type, index));
+		});
+	});
+
+	if (!rows.length && Array.isArray(source.items)) {
+		return source.items.map((doc, index) => normalizeRemoteRepositoryDoc(doc, doc?.type || doc?.tipo, index));
+	}
+
+	return rows;
+}
+
+function mergeRemoteWithLocal(remoteDocs, localDocs) {
+	const localByCode = new Map();
+	localDocs.forEach((doc) => {
+		localByCode.set(doc.codigo, doc);
+	});
+
+	return remoteDocs
+		.map((remoteDoc) => {
+			const localDoc = localByCode.get(remoteDoc.codigo);
+			return {
+				...localDoc,
+				...remoteDoc,
+				detail: remoteDoc.detail || localDoc?.detail || null
+			};
+		})
+		.sort((a, b) => b.fecha - a.fecha);
+}
+
+async function loadRemoteRepositoryDocuments(facultyIdOverride = "") {
+	if (
+		typeof API === "undefined"
+		|| !API.admin
+		|| !API.admin.repository
+		|| typeof API.admin.repository.get !== "function"
+	) {
+		return { success: false, docs: [] };
+	}
+
+	try {
+		const params = new URLSearchParams(window.location.search);
+		const facultyId = facultyIdOverride || params.get("facultyId") || params.get("facultadId") || "";
+
+		let response;
+		if (facultyId && typeof API.admin.repository.getByFaculty === "function") {
+			response = await API.admin.repository.getByFaculty(facultyId);
+		} else if (facultyId) {
+			response = await API.admin.repository.get({ facultyId });
+		} else {
+			response = await API.admin.repository.get();
+		}
+
+		if (!response?.success) {
+			return { success: false, docs: [] };
+		}
+
+		const docs = flattenRemoteRepositoryPayload(response.data);
+		return { success: true, docs };
+	} catch (error) {
+		console.error("No se pudo cargar el repositorio administrativo:", error);
+		return { success: false, docs: [] };
+	}
+}
+
+async function loadRepositoryDocuments(options = {}) {
+	const { includeRemote = true, facultyId = "" } = options;
+	const previousCode = state.selectedCode;
+	let approved = [];
+	if (includeRemote) {
+		const remoteResult = await loadRemoteRepositoryDocuments(facultyId);
+		if (remoteResult.success) {
+			approved = remoteResult.docs;
+		}
+	} else {
+		const { docs, detailMap } = readLocalRepositorySource();
+		approved = mapLocalApprovedDocuments(docs, detailMap);
+	}
 
 	state.documents = approved;
 	state.filtered = approved;
@@ -281,15 +439,219 @@ function loadRepositoryDocuments() {
 		: approved[0]?.codigo || "";
 }
 
+async function loadFacultiesForFilter() {
+	let faculties = [];
+
+	try {
+		if (
+			typeof API !== "undefined"
+			&& API.admin
+			&& API.admin.faculties
+			&& typeof API.admin.faculties.getAll === "function"
+		) {
+			const response = await API.admin.faculties.getAll();
+			if (response?.success) {
+				const source = Array.isArray(response.data)
+					? response.data
+					: Array.isArray(response.data?.items)
+						? response.data.items
+						: [];
+				faculties = source
+					.map((item) => ({
+						id: item?.id || "",
+						name: item?.shortName || item?.name || item?.facultad || ""
+					}))
+					.filter((item) => item.name);
+			}
+		}
+	} catch (error) {
+		console.warn("No se pudieron cargar facultades administrativas:", error);
+	}
+
+	if (!faculties.length) {
+		try {
+			if (
+				typeof API !== "undefined"
+				&& API.public
+				&& API.public.faculties
+				&& typeof API.public.faculties.getAll === "function"
+			) {
+				const response = await API.public.faculties.getAll();
+				if (response?.success) {
+					const source = Array.isArray(response.data)
+						? response.data
+						: Array.isArray(response.data?.items)
+							? response.data.items
+							: [];
+					faculties = source
+							.map((item) => ({
+								id: item?.id || "",
+								name: item?.shortName || item?.name || item?.facultad || ""
+							}))
+							.filter((item) => item.name);
+				}
+			}
+		} catch (error) {
+			console.warn("No se pudieron cargar facultades públicas:", error);
+		}
+	}
+
+	if (!faculties.length) {
+		faculties = state.documents
+			.map((doc) => ({ id: "", name: doc.facultad }))
+			.filter((item) => item.name);
+	}
+
+	const uniqueByName = new Map();
+	faculties.forEach((faculty) => {
+		const key = normalizeText(faculty.name);
+		if (!key) return;
+		if (!uniqueByName.has(key)) {
+			uniqueByName.set(key, faculty);
+			return;
+		}
+		const existing = uniqueByName.get(key);
+		if (!existing?.id && faculty.id) {
+			uniqueByName.set(key, faculty);
+		}
+	});
+
+	state.faculties = Array.from(uniqueByName.values()).sort((a, b) => a.name.localeCompare(b.name, "es"));
+}
+
 function populateFacultyFilter() {
 	const select = document.getElementById("repo-faculty-filter");
 	if (!select) return;
-	const faculties = Array.from(new Set(state.documents.map((doc) => doc.facultad))).sort((a, b) => a.localeCompare(b, "es"));
 	const options = ["<option value=\"all\">Todas las facultades</option>"];
-	faculties.forEach((faculty) => {
-		options.push(`<option value="${faculty.replace(/"/g, "&quot;")}">${faculty}</option>`);
+	state.faculties.forEach((faculty) => {
+		const safeName = faculty.name.replace(/"/g, "&quot;");
+		const safeId = String(faculty.id || "").replace(/"/g, "&quot;");
+		options.push(`<option value="${safeName}" data-faculty-id="${safeId}">${safeName}</option>`);
 	});
 	select.innerHTML = options.join("");
+	select.value = state.selectedFaculty;
+	if (!select.value) {
+		state.selectedFaculty = "all";
+		select.value = "all";
+	}
+	const selectedOption = select.options[select.selectedIndex] || null;
+	state.selectedFacultyId = selectedOption?.dataset?.facultyId || "";
+	renderFacultyDropdownMenu();
+	updateFacultyDropdownLabel();
+}
+
+function updateFacultyDropdownLabel() {
+	const label = document.getElementById("repo-faculty-selected");
+	if (!label) return;
+	const current = state.selectedFaculty === "all" ? "Todas las facultades" : state.selectedFaculty;
+	label.textContent = current;
+}
+
+function closeFacultyDropdown() {
+	const selectWrap = document.getElementById("repo-faculty-select");
+	const trigger = document.getElementById("repo-faculty-trigger");
+	const menu = document.getElementById("repo-faculty-menu");
+	if (!selectWrap || !trigger || !menu) return;
+	menu.classList.add("hidden");
+	selectWrap.classList.remove("open");
+	trigger.setAttribute("aria-expanded", "false");
+}
+
+function openFacultyDropdown() {
+	const selectWrap = document.getElementById("repo-faculty-select");
+	const trigger = document.getElementById("repo-faculty-trigger");
+	const menu = document.getElementById("repo-faculty-menu");
+	if (!selectWrap || !trigger || !menu) return;
+	menu.classList.remove("hidden");
+	selectWrap.classList.add("open");
+	trigger.setAttribute("aria-expanded", "true");
+}
+
+function renderFacultyDropdownMenu() {
+	const menu = document.getElementById("repo-faculty-menu");
+	const select = document.getElementById("repo-faculty-filter");
+	if (!menu || !select) return;
+
+	const items = [
+		{ name: "Todas las facultades", value: "all", id: "" },
+		...state.faculties.map((faculty) => ({
+			name: faculty.name,
+			value: faculty.name,
+			id: faculty.id || ""
+		}))
+	];
+
+	menu.innerHTML = items.map((item) => {
+		const active = item.value === state.selectedFaculty;
+		const safeName = item.name.replace(/"/g, "&quot;");
+		const safeId = String(item.id || "").replace(/"/g, "&quot;");
+		return `
+			<button
+				type="button"
+				class="repo-select-option ${active ? "is-active" : ""}"
+				role="option"
+				aria-selected="${active ? "true" : "false"}"
+				data-value="${safeName}"
+				data-faculty-id="${safeId}"
+			>
+				${safeName}
+			</button>
+		`;
+	}).join("");
+
+	menu.querySelectorAll(".repo-select-option").forEach((option) => {
+		option.addEventListener("click", () => {
+			const value = option.dataset.value || "all";
+			const facultyId = option.dataset.facultyId || "";
+			state.selectedFaculty = value;
+			state.selectedFacultyId = facultyId;
+			select.value = value;
+			updateFacultyDropdownLabel();
+			closeFacultyDropdown();
+			select.dispatchEvent(new Event("change", { bubbles: true }));
+		});
+	});
+}
+
+function setupFacultyDropdown() {
+	const selectWrap = document.getElementById("repo-faculty-select");
+	const trigger = document.getElementById("repo-faculty-trigger");
+	const menu = document.getElementById("repo-faculty-menu");
+	if (!selectWrap || !trigger || !menu) return;
+
+	trigger.addEventListener("click", () => {
+		const isOpen = selectWrap.classList.contains("open");
+		if (isOpen) {
+			closeFacultyDropdown();
+			return;
+		}
+		openFacultyDropdown();
+	});
+
+	trigger.addEventListener("keydown", (event) => {
+		if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
+			event.preventDefault();
+			openFacultyDropdown();
+		}
+		if (event.key === "Escape") {
+			event.preventDefault();
+			closeFacultyDropdown();
+		}
+	});
+
+	menu.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") {
+			event.preventDefault();
+			closeFacultyDropdown();
+			trigger.focus();
+		}
+	});
+
+	document.addEventListener("click", (event) => {
+		if (!selectWrap.contains(event.target)) {
+			closeFacultyDropdown();
+		}
+	});
 }
 
 function getPageByType(type) {
@@ -469,7 +831,7 @@ function getRealtimeSignature() {
 	return [docs.length, detail.length, history.length, docs.slice(-48), detail.slice(-48), history.slice(-48)].join("|");
 }
 
-function refreshRacioViewFromStorage(force = false) {
+async function refreshRacioViewFromStorage(force = false) {
 	const signature = getRealtimeSignature();
 	if (!force && realtimeState.lastSignature === signature) return;
 	realtimeState.lastSignature = signature;
@@ -478,7 +840,7 @@ function refreshRacioViewFromStorage(force = false) {
 	const detailVisible = Boolean(detailView && !detailView.classList.contains("hidden"));
 	const currentCode = state.selectedCode;
 
-	loadRepositoryDocuments();
+	await loadRepositoryDocuments({ includeRemote: false });
 	if (currentCode && state.documents.some((doc) => doc.codigo === currentCode)) {
 		state.selectedCode = currentCode;
 	}
@@ -495,7 +857,7 @@ function setupRealTimeSync() {
 	window.addEventListener("storage", (event) => {
 		const key = event.key || "";
 		if (!key) {
-			refreshRacioViewFromStorage(true);
+			void refreshRacioViewFromStorage(true);
 			return;
 		}
 		if (
@@ -503,12 +865,12 @@ function setupRealTimeSync() {
 			|| key === STORAGE_KEYS.DOCUMENTOS_DETALLE
 			|| key.startsWith(`${STORAGE_KEYS.HISTORIAL_DATOS}_`)
 		) {
-			refreshRacioViewFromStorage(true);
+			void refreshRacioViewFromStorage(true);
 		}
 	});
 
 	window.setInterval(() => {
-		refreshRacioViewFromStorage(false);
+		void refreshRacioViewFromStorage(false);
 	}, REALTIME_REFRESH_MS);
 }
 
@@ -693,11 +1055,16 @@ function wireFilters() {
 
 	const facultyFilter = document.getElementById("repo-faculty-filter");
 	if (facultyFilter) {
-		facultyFilter.addEventListener("change", () => {
+		facultyFilter.addEventListener("change", async () => {
 			state.selectedFaculty = facultyFilter.value;
+			const selectedOption = facultyFilter.options[facultyFilter.selectedIndex] || null;
+			state.selectedFacultyId = selectedOption?.dataset?.facultyId || "";
+			updateFacultyDropdownLabel();
+			await loadRepositoryDocuments({ includeRemote: true, facultyId: state.selectedFacultyId });
 			applyFilters();
 			renderCards();
 			showCardsView();
+			renderFacultyDropdownMenu();
 		});
 	}
 
@@ -725,13 +1092,16 @@ function wireFilters() {
 	}
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
 	if (!guardAdminSession()) return;
 	renderProfileInfo();
 	setupThemeToggle();
 	const logoutControls = setupLogoutModal();
 	setupProfileMenu(logoutControls);
-	loadRepositoryDocuments();
+	setupFacultyDropdown();
+	await loadRepositoryDocuments({ includeRemote: true });
+	await loadFacultiesForFilter();
+	realtimeState.lastSignature = getRealtimeSignature();
 	populateFacultyFilter();
 	applyFilters();
 	renderCards();

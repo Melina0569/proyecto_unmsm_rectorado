@@ -946,6 +946,135 @@
 	border-color: rgba(148, 163, 184, 0.28) !important;
 }
 
+.admin-faculties-panel {
+	position: relative;
+	overflow: hidden;
+	background:
+		radial-gradient(circle at 12% 8%, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0) 42%),
+		radial-gradient(circle at 94% 16%, rgba(16, 185, 129, 0.14) 0%, rgba(16, 185, 129, 0) 40%),
+		linear-gradient(180deg, #ffffff 0%, #f5f8fd 100%);
+	border: 1px solid rgba(148, 163, 184, 0.3);
+	box-shadow:
+		0 24px 48px -30px rgba(15, 23, 42, 0.4),
+		0 10px 18px -14px rgba(15, 23, 42, 0.25);
+}
+
+.admin-faculties-panel::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-image: linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+	background-size: 28px 28px;
+	opacity: 0.3;
+	pointer-events: none;
+}
+
+.admin-faculties-panel > * {
+	position: relative;
+	z-index: 1;
+}
+
+.admin-faculties-table {
+	border-collapse: collapse;
+}
+
+.admin-faculties-table thead th {
+	padding: 0.85rem 0.9rem;
+	text-align: left;
+	font-size: 0.7rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-weight: 700;
+	color: #475569;
+	background: rgba(241, 245, 249, 0.92);
+	border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+	white-space: nowrap;
+}
+
+.admin-faculties-table tbody td {
+	padding: 0.85rem 0.9rem;
+	border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+	vertical-align: middle;
+	background: rgba(255, 255, 255, 0.92);
+}
+
+.admin-faculties-table tbody tr:hover td {
+	background: rgba(239, 246, 255, 0.86);
+}
+
+.admin-faculty-status {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.2rem 0.55rem;
+	border-radius: 999px;
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	border: 1px solid transparent;
+}
+
+.admin-faculty-status--active {
+	background: rgba(16, 185, 129, 0.12);
+	color: #047857;
+	border-color: rgba(16, 185, 129, 0.25);
+}
+
+.admin-faculty-status--inactive {
+	background: rgba(248, 113, 113, 0.12);
+	color: #b91c1c;
+	border-color: rgba(248, 113, 113, 0.28);
+}
+
+.theme-dark .admin-faculties-panel {
+	background:
+		radial-gradient(circle at 12% 8%, rgba(59, 130, 246, 0.26) 0%, rgba(59, 130, 246, 0) 44%),
+		radial-gradient(circle at 94% 16%, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0) 42%),
+		linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(2, 6, 23, 0.96) 100%);
+	border-color: rgba(148, 163, 184, 0.34);
+	box-shadow:
+		0 30px 52px -28px rgba(2, 6, 23, 0.88),
+		0 14px 24px -16px rgba(15, 23, 42, 0.72);
+}
+
+.theme-dark .admin-faculties-panel::before {
+	background-image: linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+	opacity: 0.24;
+}
+
+.theme-dark .admin-faculties-table-wrap {
+	border-color: rgba(148, 163, 184, 0.3) !important;
+	background: rgba(15, 23, 42, 0.8) !important;
+}
+
+.theme-dark .admin-faculties-table thead th {
+	background: rgba(30, 41, 59, 0.9);
+	color: #cbd5e1;
+	border-bottom-color: rgba(148, 163, 184, 0.26);
+}
+
+.theme-dark .admin-faculties-table tbody td {
+	background: rgba(30, 41, 59, 0.78);
+	border-bottom-color: rgba(148, 163, 184, 0.2);
+	color: #cbd5e1;
+}
+
+.theme-dark .admin-faculties-table tbody tr:hover td {
+	background: rgba(37, 99, 235, 0.18);
+}
+
+.theme-dark .admin-faculty-status--active {
+	background: rgba(16, 185, 129, 0.2);
+	border-color: rgba(16, 185, 129, 0.36);
+	color: #86efac;
+}
+
+.theme-dark .admin-faculty-status--inactive {
+	background: rgba(248, 113, 113, 0.22);
+	border-color: rgba(248, 113, 113, 0.34);
+	color: #fca5a5;
+}
+
 @media (max-width: 640px) {
 	.volumetric-3d {
 		transform: none;

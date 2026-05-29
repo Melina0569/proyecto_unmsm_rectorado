@@ -4,29 +4,6 @@ const STORAGE_KEYS = {
 
 const PAGE_SIZE = 8;
 
-const FACULTADES_CATALOGO = [
-	{ id: 1, name: "Medicina", code: "FM", icon: "medical_services", color: "red", indicators: 12, flows: 8, processes: 5 },
-	{ id: 2, name: "Derecho y Ciencia Política", code: "FDCP", icon: "gavel", color: "indigo", indicators: 12, flows: 8, processes: 5 },
-	{ id: 3, name: "Letras y Ciencias Humanas", code: "FLCH", icon: "history_edu", color: "amber", indicators: 10, flows: 12, processes: 7 },
-	{ id: 4, name: "Farmacia y Bioquímica", code: "FFB", icon: "vaccines", color: "cyan", indicators: 13, flows: 8, processes: 5 },
-	{ id: 5, name: "Odontología", code: "FO", icon: "health_and_safety", color: "teal", indicators: 11, flows: 7, processes: 4 },
-	{ id: 6, name: "Educación", code: "FE", icon: "school", color: "emerald", indicators: 17, flows: 12, processes: 8 },
-	{ id: 7, name: "Química e Ingeniería Química", code: "FQIQ", icon: "science", color: "lime", indicators: 11, flows: 8, processes: 5 },
-	{ id: 8, name: "Medicina Veterinaria", code: "FMV", icon: "pets", color: "orange", indicators: 14, flows: 9, processes: 6 },
-	{ id: 9, name: "Ciencias Administrativas", code: "FCA", icon: "work", color: "purple", indicators: 12, flows: 8, processes: 5 },
-	{ id: 10, name: "Ciencias Biológicas", code: "FCB", icon: "biotech", color: "green", indicators: 15, flows: 6, processes: 4 },
-	{ id: 11, name: "Ciencias Contables", code: "FCC", icon: "money_bag", color: "pink", indicators: 15, flows: 6, processes: 4 },
-	{ id: 12, name: "Ciencias Económicas", code: "FCE", icon: "trending_up", color: "yellow", indicators: 14, flows: 10, processes: 6 },
-	{ id: 13, name: "Ciencias Físicas", code: "FCF", icon: "antigravity", color: "violet", indicators: 10, flows: 7, processes: 4 },
-	{ id: 14, name: "Ciencias Matemáticas", code: "FCM", icon: "calculate", color: "blue", indicators: 12, flows: 8, processes: 5 },
-	{ id: 15, name: "Ciencias Sociales", code: "FCCSS", icon: "groups", color: "rose", indicators: 13, flows: 9, processes: 6 },
-	{ id: 16, name: "Ingeniería Geológica, Minera, Metalúrgica y Geográfica", code: "FIGMMG", icon: "terrain", color: "stone", indicators: 9, flows: 10, processes: 6 },
-	{ id: 17, name: "Ingeniería Industrial", code: "FII", icon: "precision_manufacturing", color: "slate", indicators: 15, flows: 9, processes: 6 },
-	{ id: 18, name: "Psicología", code: "FP", icon: "psychology", color: "fuchsia", indicators: 16, flows: 8, processes: 5 },
-	{ id: 19, name: "Ingeniería Eléctrica y Electrónica", code: "FIEE", icon: "electrical_services", color: "amber", indicators: 16, flows: 11, processes: 7 },
-	{ id: 20, name: "Ingeniería de Sistemas e Informática", code: "FISI", icon: "computer", color: "sky", indicators: 18, flows: 14, processes: 8 }
-];
-
 const SORT_OPTIONS = [
 	{ value: "oldest", label: "Más antiguos" },
 	{ value: "newest", label: "Más recientes" },
@@ -37,6 +14,7 @@ const SORT_OPTIONS = [
 const state = {
 	allDocuments: [],
 	filteredDocuments: [],
+	faculties: [],
 	page: 1,
 	status: "all",
 	faculty: "all",
@@ -262,11 +240,13 @@ function normalizeDocument(doc, index) {
 	const status = normalizeEstado(doc.estado || doc.status || doc.estadoTexto);
 	const date = parseDate(doc.fecha || doc.fechaCreacion || doc.createdAt || doc.updatedAt);
 	const code = doc.codigo || doc.code || `EXP-${date.getFullYear()}-${String(index + 1).padStart(4, "0")}`;
+	const facultyId = doc.facultyId || doc.facultadId || doc.facultad_id || doc.faculty?.id || "";
 	const faculty = doc.nombreFacultad || doc.facultad || doc.facultadNombre || "Facultad no especificada";
 	const unit = doc.unidad || doc.area || doc.generadoPor || "Unidad administrativa";
 
 	return {
 		id: doc.id || code,
+		facultyId,
 		code,
 		faculty,
 		unit,
@@ -294,14 +274,64 @@ function extractArrayPayload(payload) {
 	return [];
 }
 
-async function loadApiDocuments() {
-	if (typeof API === "undefined" || !API.documentos || typeof API.documentos.getAll !== "function") return [];
+function extractFacultyRows(payload) {
+	if (Array.isArray(payload)) return payload;
+	if (Array.isArray(payload?.data)) return payload.data;
+	if (Array.isArray(payload?.items)) return payload.items;
+	return [];
+}
+
+async function loadApiFaculties() {
+	if (typeof API === "undefined" || !API.admin?.faculties?.getAll) return [];
 
 	try {
-		const result = await API.documentos.getAll({});
-		if (!result?.success) return [];
-		const list = extractArrayPayload(result.data);
-		return list.map((doc, i) => normalizeDocument(doc, i));
+		const response = await API.admin.faculties.getAll();
+		if (!response?.success) return [];
+		const rows = extractFacultyRows(response.data);
+		return rows
+			.map((item) => ({
+				id: item?.id || "",
+				code: item?.code || "",
+				name: item?.name || item?.shortName || item?.facultad || "",
+				shortName: item?.shortName || item?.name || ""
+			}))
+			.filter((item) => item.id && item.name);
+	} catch {
+		return [];
+	}
+}
+
+async function loadApiDocuments(facultyId = "", faculties = state.faculties) {
+	if (typeof API === "undefined" || !API.admin?.documents?.getAdminDocuments) return [];
+
+	try {
+		if (facultyId) {
+			const result = await API.admin.documents.getAdminDocuments(facultyId, "", 1, 50);
+			if (!result?.success) return [];
+			const list = extractArrayPayload(result.data);
+			return list.map((doc, i) => normalizeDocument(doc, i));
+		}
+
+		const ids = Array.isArray(faculties)
+			? faculties.map((item) => item.id).filter(Boolean)
+			: [];
+
+		if (!ids.length) return [];
+
+		const responses = await Promise.all(ids.map((id) => API.admin.documents.getAdminDocuments(id, "", 1, 50)));
+		const merged = [];
+		responses.forEach((result) => {
+			if (!result?.success) return;
+			extractArrayPayload(result.data).forEach((doc) => merged.push(doc));
+		});
+
+		const uniqueByCode = new Map();
+		merged.forEach((doc, index) => {
+			const normalized = normalizeDocument(doc, index);
+			uniqueByCode.set(normalized.code, normalized);
+		});
+
+		return Array.from(uniqueByCode.values());
 	} catch {
 		return [];
 	}
@@ -328,8 +358,8 @@ function statusLabel(status) {
 
 function getFacultyDisplayLabel(value) {
 	if (!value || value === "all") return "Todas las facultades";
-	const match = FACULTADES_CATALOGO.find((item) => item.name === value || item.code === value);
-	return match?.name || value;
+	const match = state.faculties.find((item) => item.id === value || item.code === value || item.name === value || item.shortName === value);
+	return match?.shortName || match?.name || value;
 }
 
 function getSortDisplayLabel(value) {
@@ -392,13 +422,13 @@ function renderFacultyDropdownOptions(documents) {
 	const config = getDropdownConfig("faculty");
 	if (!config.menu) return;
 
-	const fromCatalog = FACULTADES_CATALOGO.map((faculty) => faculty.name);
-	const fromDocuments = documents.map((doc) => doc.faculty).filter(Boolean);
-	const faculties = Array.from(new Set([...fromCatalog, ...fromDocuments])).sort((a, b) => a.localeCompare(b));
+	const faculties = state.faculties
+		.slice()
+		.sort((a, b) => (a.shortName || a.name).localeCompare(b.shortName || b.name));
 
 	config.menu.innerHTML = [
 		`<button type="button" class="dropdown-option active" data-value="all" aria-selected="true">Todas las facultades</button>`,
-		...faculties.map((name) => `<button type="button" class="dropdown-option" data-value="${name}" aria-selected="false">${name}</button>`)
+		...faculties.map((faculty) => `<button type="button" class="dropdown-option" data-value="${faculty.id}" aria-selected="false">${faculty.shortName || faculty.name}</button>`)
 	].join("");
 }
 
@@ -470,7 +500,12 @@ function applyFilters() {
 	const query = normalizeText(state.query);
 
 	state.filteredDocuments = state.allDocuments
-		.filter((doc) => state.faculty === "all" || normalizeText(doc.faculty) === normalizeText(state.faculty))
+		.filter((doc) => {
+			if (state.faculty === "all") return true;
+			if (doc.facultyId && doc.facultyId === state.faculty) return true;
+			const selectedFacultyName = getFacultyDisplayLabel(state.faculty);
+			return normalizeText(doc.faculty) === normalizeText(selectedFacultyName);
+		})
 		.filter((doc) => state.status === "all" || doc.status === state.status)
 		.filter((doc) => {
 			if (!query) return true;
@@ -569,23 +604,24 @@ function bindPagination() {
 	}
 }
 
-function populateFacultyFilter(documents) {
-	renderFacultyDropdownOptions(documents);
+function populateFacultyFilter() {
+	renderFacultyDropdownOptions();
 }
 
 function resolveFacultyFromQuery() {
 	const params = new URLSearchParams(window.location.search);
-	const facultyParam = params.get("facultad");
+	const facultyParam = params.get("facultyId") || params.get("facultadId") || params.get("facultad");
 	if (!facultyParam) return "all";
 
 	const normalizedQuery = normalizeText(facultyParam);
-	const byName = FACULTADES_CATALOGO.find((item) => normalizeText(item.name) === normalizedQuery);
-	if (byName) return byName.name;
+	const match = state.faculties.find((item) => (
+		normalizeText(item.id) === normalizedQuery
+		|| normalizeText(item.code) === normalizedQuery
+		|| normalizeText(item.name) === normalizedQuery
+		|| normalizeText(item.shortName) === normalizedQuery
+	));
 
-	const byCode = FACULTADES_CATALOGO.find((item) => normalizeText(item.code) === normalizedQuery);
-	if (byCode) return byCode.name;
-
-	return facultyParam;
+	return match?.id || "all";
 }
 
 function bindFilters() {
@@ -619,16 +655,16 @@ function buildFallbackDocuments() {
 }
 
 async function initializeDocuments() {
-	const apiDocs = await loadApiDocuments();
-	const localDocs = loadLocalDocuments();
-	const merged = mergeDocuments(apiDocs, localDocs);
-
-	state.allDocuments = merged.length ? merged : buildFallbackDocuments();
-	populateFacultyFilter(state.allDocuments);
+	state.faculties = await loadApiFaculties();
+	populateFacultyFilter();
 	renderSortDropdownOptions();
 
 	const preselectedFaculty = resolveFacultyFromQuery();
 	state.faculty = preselectedFaculty;
+
+	const apiDocs = await loadApiDocuments(state.faculty === "all" ? "" : state.faculty, state.faculties);
+	state.allDocuments = apiDocs;
+
 	syncDropdownSelection("faculty", state.faculty);
 	syncDropdownSelection("sort", state.sortBy);
 
