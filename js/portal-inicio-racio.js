@@ -258,5 +258,33 @@ function showNotification(message, type = 'info') {
     });
 
 })();
+// ============================================
+// REDIRECCIÓN AL RETROCEDER CON BOTÓN DEL NAVEGADOR
+// ============================================
 
+(function() {
+    'use strict';
+
+    // Solo aplicar en páginas específicas (login y solicitud de acceso)
+    const currentPage = window.location.pathname.split('/').pop();
+    const pagesToRedirect = ['portal-inicio-racio.html', 'portal-inicio-facultades.html'];
+
+    if (!pagesToRedirect.includes(currentPage)) return;
+
+    // Guardar la página de destino según la página actual
+    const redirectTarget = 'portal-inicio.html';
+
+    // Reemplazar entrada actual en historial y agregar entrada dummy
+    history.replaceState({ page: 'redirect' }, '', redirectTarget);
+    history.pushState({ page: 'current' }, '', window.location.href);
+
+    // Interceptar el evento popstate (botón Atrás del navegador)
+    window.addEventListener('popstate', function(event) {
+        // Si el estado indica que debe redirigir, ir a portal-inicio.html
+        if (event.state && event.state.page === 'redirect') {
+            window.location.replace(redirectTarget);
+        }
+    });
+
+})();
 

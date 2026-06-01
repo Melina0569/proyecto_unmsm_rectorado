@@ -644,6 +644,7 @@ const RemoteAPI = {
                     const nombreCompletoBackend = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
                     const nombre = data?.nombreCompleto || data?.nombre || data?.nombres || nombreCompletoBackend || nombreDesdeEmail;
                     const cargo = data?.cargo || data?.puesto || data?.rol || data?.role || user.role || null;
+                    const facultyId = data?.facultyId ?? data?.facultadId ?? data?.faculty?.id ?? data?.facultad?.id ?? user.facultyId ?? user.facultadId ?? user.faculty?.id ?? null;
                     const facultadRaw = data?.facultadNombre || data?.nombreFacultad || data?.facultad || user.facultyName || user.faculty;
                     const facultad = typeof facultadRaw === 'object'
                         ? (facultadRaw?.nombre || facultadRaw?.descripcion || facultadRaw?.name || null)
@@ -655,6 +656,8 @@ const RemoteAPI = {
                         nombreCompleto: data?.nombreCompleto || nombre,
                         cargo,
                         rol: data?.rol || data?.role || user.role || cargo || 'Usuario',
+                        facultyId,
+                        facultadId: facultyId,
                         facultad,
                         nombreFacultad: facultad,
                         refreshToken: data?.refreshToken || data?.refresh_token || null,

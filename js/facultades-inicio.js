@@ -87,8 +87,13 @@ async function loadDashboardData() {
             console.log('No hay usuario autenticado');
         }
         
-        const facultadId = user?.facultadId || null;
-        
+        const facultadId = user?.facultadId || user?.facultyId || user?.faculty?.id || user?.facultad?.id || null;
+
+        if (!facultadId) {
+            console.warn('No se encontró facultadId en la sesión; se omite la consulta remota para evitar un 403.');
+            throw new Error('No se pudo determinar la facultad de la sesión. Vuelve a iniciar sesión.');
+        }
+
         // Load documents from API
         const resultado = await API.documentos.getAll({ facultadId });
         
