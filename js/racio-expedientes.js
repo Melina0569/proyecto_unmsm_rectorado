@@ -2527,12 +2527,44 @@ async function renderSelectedDocument() {
     // 🔥 RENDERIZAR PREVIEW (prioridad: última respuesta de facultades-documentos si existe)
     if (elements.previewContent) {
         const codigo = doc.codigo;
-        let historial = [];
-        try {
-            historial = JSON.parse(localStorage.getItem('sigpro_correcciones_solicitudes')) || [];
-        } catch {}
-        const mensajes = historial.filter((item) => String(item?.codigo || "") === String(codigo || ""))
-            .sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+        // Intentar cargar revisión desde API admin (si está disponible)
+        let reviewPayload = null;
+        let reviewError = null;
+        if (typeof API !== 'undefined' && API.admin?.documents?.getReview) {
+            try {
+                const resp = await API.admin.documents.getReview(doc.id || doc.codigo);
+                if (resp && resp.success && resp.data) reviewPayload = resp.data;
+                else if (resp && !resp.success) {
+                    reviewError = resp.error || resp.message || JSON.stringify(resp);
+                    console.warn('API review returned error:', reviewError, resp);
+                }
+            } catch (err) {
+                reviewError = String(err || "Error desconocido");
+                console.warn('API review no disponible:', err);
+            }
+        }
+
+        // Construir lista de mensajes/rectificaciones: preferir datos del review, fallback a localStorage
+        let mensajes = [];
+        if (reviewPayload) {
+            mensajes = Array.isArray(reviewPayload.correcciones)
+                ? reviewPayload.correcciones.slice()
+                : Array.isArray(reviewPayload.rectificaciones)
+                    ? reviewPayload.rectificaciones.slice()
+                    : Array.isArray(reviewPayload.observaciones)
+                        ? reviewPayload.observaciones.slice()
+                        : [];
+            // Normalizar fechas si vienen como objetos
+            mensajes = mensajes.map(m => ({ ...m }));
+            mensajes.sort((a, b) => new Date(b.fecha || b.createdAt || 0) - new Date(a.fecha || a.createdAt || 0));
+        } else {
+            let historial = [];
+            try {
+                historial = JSON.parse(localStorage.getItem('sigpro_correcciones_solicitudes')) || [];
+            } catch {}
+            mensajes = historial.filter((item) => String(item?.codigo || "") === String(codigo || ""))
+                .sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+        }
         if (mensajes.length > 0) {
             // Mostrar la última respuesta enviada
             const evento = mensajes[0];
@@ -2565,6 +2597,26 @@ async function renderSelectedDocument() {
                 </div>
             `;
         } else {
+            // Si hubo un error consultando la revisión, mostrar aviso al usuario en lugar del preview
+            if (reviewError) {
+                elements.previewContent.innerHTML = `
+                    <div class="rounded-lg border border-rose-200 bg-rose-50 dark:bg-rose-900/20 p-4 text-sm text-rose-800">
+                        <p class="font-bold">Error al cargar la revisión del servidor</p>
+                        <p class="mt-1">${escapeHtml(String(reviewError).substring(0, 200))}</p>
+                        <p class="mt-2 text-xs text-slate-500">Verifique la pestaña Network y los logs del servidor para más detalles.</p>
+                    </div>
+                `;
+                // Evitar continuar con el preview normal cuando hubo error
+                if (elements.previewFrame) {
+                    elements.previewFrame.classList.remove("preview-frame");
+                    void elements.previewFrame.offsetWidth;
+                    elements.previewFrame.classList.add("preview-frame");
+                    updatePreviewScale(state.previewScale);
+                }
+                updateApproveButtonState(doc);
+                renderHistoryPanel(doc.codigo);
+                return;
+            }
             // Si no hay mensajes, mostrar el adjunto principal como antes
             let selectedAttachment = doc.tipo === "indicador"
                 ? buildTechnicalAttachment(doc)

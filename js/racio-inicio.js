@@ -3,6 +3,7 @@ const STORAGE_KEYS = {
 };
 
 let dashboardDocuments = [];
+let dashboardAccessRequests = [];
 
 function formatSpanishDate(date) {
 	const dayName = new Intl.DateTimeFormat("es-PE", { weekday: "long" }).format(date);
@@ -315,6 +316,28 @@ function buildExpedienteDetailUrl(doc) {
 	return `racio-expedientes.html?${params.toString()}`;
 }
 
+function normalizeAccessRequest(item, index) {
+	if (!item || typeof item !== "object") {
+		return null;
+	}
+
+	const firstName = item.firstName || item.first_name || item.nombre || item.name || "";
+	const lastName = item.lastName || item.last_name || item.apellido || item.surname || "";
+	const fullName = String(`${firstName} ${lastName}`).trim() || item.email || `Solicitud ${index + 1}`;
+	const requestedAt = item.requestedAt || item.requested_at || item.createdAt || item.created_at || item.fecha || new Date().toISOString();
+
+	return {
+		id: item.id || item.requestId || item.code || `${index + 1}`,
+		email: item.email || item.correo || "",
+		fullName,
+		faculty: item.faculty?.name || item.faculty?.nombre || item.faculty || item.facultad || "Sin facultad",
+		position: item.position || item.cargo || "",
+		message: item.message || item.mensaje || "",
+		status: String(item.status || "PENDING").toUpperCase(),
+		requestedAt: new Date(requestedAt)
+	};
+}
+
 function mergeDocuments(primary, secondary) {
 	const byCode = new Map();
 
@@ -354,12 +377,26 @@ function extractArrayPayload(payload) {
 		return payload;
 	}
 
-	if (Array.isArray(payload?.data)) {
-		return payload.data;
+	if (!payload || typeof payload !== "object") {
+		return [];
 	}
 
-	if (Array.isArray(payload?.items)) {
-		return payload.items;
+	const candidateKeys = ["data", "items", "documents", "records", "results", "rows", "list", "docs", "content"];
+	for (const key of candidateKeys) {
+		const value = payload[key];
+		if (Array.isArray(value)) {
+			return value;
+		}
+	}
+
+	for (const key of candidateKeys) {
+		const nested = payload[key];
+		if (nested && typeof nested === "object") {
+			const nestedArray = extractArrayPayload(nested);
+			if (nestedArray.length) {
+				return nestedArray;
+			}
+		}
 	}
 
 	return [];
@@ -371,17 +408,70 @@ async function loadApiDocuments() {
 	}
 
 	try {
-		const response = await (API.admin && API.admin.documents && typeof API.admin.documents.getAdminDocuments === 'function'
-			? API.admin.documents.getAdminDocuments('', '', 1, 20)
-			: API.documentos.getAll({}));
+		const hasAdminDocuments = API.admin && API.admin.documents && typeof API.admin.documents.getAdminDocuments === 'function';
+		const requests = [];
+
+		if (hasAdminDocuments) {
+			const statusFilters = ["", "pending", "pendiente", "inProgress", "in_proceso", "completado", "aprobado"];
+			requests.push(...statusFilters.map((status) => API.admin.documents.getAdminDocuments('', status, 1, 20)));
+		} else {
+			requests.push(API.documentos.getAll({}));
+		}
+
+		const responses = await Promise.all(requests);
+		const mergedRows = [];
+		responses.forEach((response) => {
+			if (!response?.success) return;
+			const rows = extractArrayPayload(response.data);
+			if (rows.length) {
+				mergedRows.push(...rows);
+			}
+		});
+
+		if (!mergedRows.length) {
+			console.warn('La API devolvió documentos sin un arreglo reconocible o sin resultados útiles');
+			return [];
+		}
+
+		const uniqueByCode = new Map();
+		mergedRows.forEach((doc, index) => {
+			const normalized = normalizeDocument(doc, index);
+			const key = String(normalized.codigo || normalized.id || `doc-${index}`);
+			if (!uniqueByCode.has(key)) {
+				uniqueByCode.set(key, normalized);
+			}
+		});
+
+		return Array.from(uniqueByCode.values());
+	} catch (error) {
+		console.error("Error cargando documentos desde API:", error);
+		return [];
+	}
+}
+
+async function loadAccessRequests() {
+	if (typeof API === "undefined" || !API.admin?.accessRequests?.getAll) {
+		return [];
+	}
+
+	try {
+		const response = await API.admin.accessRequests.getAll("PENDING");
 		if (!response?.success) {
+			console.warn("No se pudieron cargar solicitudes de acceso:", response);
 			return [];
 		}
 
 		const rows = extractArrayPayload(response.data);
-		return rows.map((doc, index) => normalizeDocument(doc, index));
+		if (!rows.length) {
+			return [];
+		}
+
+		return rows
+			.map((item, index) => normalizeAccessRequest(item, index))
+			.filter(Boolean)
+			.sort((a, b) => (b.requestedAt?.getTime?.() || 0) - (a.requestedAt?.getTime?.() || 0));
 	} catch (error) {
-		console.error("Error cargando documentos desde API:", error);
+		console.error("Error cargando solicitudes de acceso:", error);
 		return [];
 	}
 }
@@ -416,6 +506,51 @@ function toRelativeTime(date) {
 	if (days === 1) return "Ayer";
 
 	return `${days} dias`;
+}
+
+function renderAccessRequests(requests) {
+	dashboardAccessRequests = Array.isArray(requests) ? requests : [];
+	const list = document.getElementById("access-requests-list");
+	const status = document.getElementById("access-requests-status");
+	if (!list) return;
+
+	if (!dashboardAccessRequests.length) {
+		if (status) status.textContent = "Sin solicitudes pendientes";
+		list.innerHTML = `
+			<div class="rounded-xl border border-gray-100 bg-gray-50/60 p-4 text-sm text-gray-500 md:col-span-3">
+				No hay solicitudes de acceso pendientes en este momento.
+			</div>
+		`;
+		return;
+	}
+
+	if (status) status.textContent = `Mostrando ${dashboardAccessRequests.length} solicitud(es) pendiente(s)`;
+	list.innerHTML = dashboardAccessRequests.slice(0, 3).map((request) => {
+		const relativeTime = toRelativeTime(request.requestedAt || new Date());
+		const initials = initialsFromName(request.fullName);
+		return `
+			<article class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm hover-lift transition-all">
+				<div class="flex items-start gap-3">
+					<div class="w-11 h-11 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+						${escapeHtml(initials)}
+					</div>
+					<div class="min-w-0 flex-1">
+						<div class="flex justify-between items-start gap-2">
+							<div>
+								<h4 class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(request.fullName)}</h4>
+								<p class="text-xs text-gray-500 truncate">${escapeHtml(request.email || "Sin correo")}</p>
+							</div>
+							<span class="text-[10px] text-gray-400 font-medium whitespace-nowrap">${escapeHtml(relativeTime)}</span>
+						</div>
+						<p class="text-xs text-gray-600 mt-2 line-clamp-2"><strong>Facultad:</strong> ${escapeHtml(request.faculty)}</p>
+						${request.position ? `<p class="text-xs text-gray-600 mt-1 line-clamp-2"><strong>Cargo:</strong> ${escapeHtml(request.position)}</p>` : ""}
+						${request.message ? `<p class="text-xs text-gray-500 mt-2 line-clamp-2">${escapeHtml(request.message)}</p>` : ""}
+						<div class="mt-3 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 uppercase">PENDING</div>
+					</div>
+				</div>
+			</article>
+		`;
+	}).join("");
 }
 
 function getNotificationStyle(status) {
@@ -472,8 +607,15 @@ function renderNotifications(documents) {
 		codigo: c.codigo || '',
 	}));
 
+	// Dar prioridad a pendientes y en proceso para que las notificaciones reflejen actividad real
+	const prioritizedDocuments = [...documents]
+		.sort((a, b) => {
+			const rank = (doc) => (doc.estado === "pendiente" ? 0 : doc.estado === "en_proceso" ? 1 : 2);
+			return rank(a) - rank(b) || ((b.fechaObj || b.fecha)?.getTime?.() || 0) - ((a.fechaObj || a.fecha)?.getTime?.() || 0);
+		});
+
 	// Unir documentos y correcciones
-	const all = [...documents, ...correcciones].sort((a, b) => {
+	const all = [...prioritizedDocuments, ...correcciones].sort((a, b) => {
 		const da = a.fechaObj || a.fecha;
 		const db = b.fechaObj || b.fecha;
 		return (db?.getTime?.() || 0) - (da?.getTime?.() || 0);
@@ -661,12 +803,40 @@ async function loadDashboardData() {
 	]);
 
 	const localDocuments = loadLocalDocuments();
-	dashboardDocuments = mergeDocuments(apiDocuments, localDocuments);
+	// Cargar documentos detallados guardados por las facultades (sigpro_documentos_detalle)
+	let localDetailDocs = [];
+	try {
+		const rawDetail = localStorage.getItem('sigpro_documentos_detalle');
+		if (rawDetail) {
+			const detailMap = JSON.parse(rawDetail) || {};
+			localDetailDocs = Object.entries(detailMap).map(([codigo, detail]) => {
+				const item = detail || {};
+				const ficha = item.fichaData || {};
+				return {
+					codigo: item.codigo || ficha.codigo || codigo,
+					descripcion: item.titulo || ficha.descripcion || item.descripcion || `Documento ${codigo}`,
+					facultad: ficha.facultad || item.nombreFacultad || item.facultad || '',
+					estado: normalizeEstado(item.estado || ficha.estado || 'pendiente'),
+					fecha: parseDocumentDate(item) || parseDocumentDate(ficha) || new Date(),
+					fechaObj: parseDocumentDate(item) || parseDocumentDate(ficha) || new Date(),
+					descripcionRaw: item,
+				};
+			});
+		}
+	} catch (e) {
+		console.warn('No se pudo parsear sigpro_documentos_detalle:', e);
+		localDetailDocs = [];
+	}
+
+	// Merge: api <- local list <- local detail (detail should override summaries)
+	dashboardDocuments = mergeDocuments(apiDocuments, mergeDocuments(localDocuments, localDetailDocs));
+	dashboardAccessRequests = await loadAccessRequests();
 
 	if (dashboardDocuments.length > 0) {
 		updateCounters(dashboardDocuments);
 	}
 	renderNotifications(dashboardDocuments);
+	renderAccessRequests(dashboardAccessRequests);
 	updateLastRefreshLabel();
 }
 
@@ -748,12 +918,18 @@ function setupRefreshButton() {
 
 	button.addEventListener("click", async () => {
 		button.disabled = true;
-		await Promise.all([
-			loadDashboardData(),
-			loadAdminFacultiesTable(),
-			loadAndRenderAdminStats()
-		]);
-		button.disabled = false;
+		const originalLabel = button.innerHTML;
+		button.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span>Actualizando';
+		try {
+			await Promise.all([
+				loadDashboardData(),
+				loadAdminFacultiesTable(),
+				loadAndRenderAdminStats()
+			]);
+		} finally {
+			button.disabled = false;
+			button.innerHTML = originalLabel;
+		}
 	});
 }
 

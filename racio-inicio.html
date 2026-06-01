@@ -278,7 +278,13 @@
 					<span class="material-symbols-outlined text-blue-600">notifications</span>
 					Notificaciones de Documentos
 				</h2>
-				<a class="text-sm text-blue-600 font-medium hover:underline" href="#">Ver historial</a>
+				<div class="flex items-center gap-2">
+					<button id="refresh-button" type="button" class="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50 transition-colors" title="Actualizar notificaciones y estadísticas">
+						<span class="material-symbols-outlined text-[18px]">refresh</span>
+						Actualizar
+					</button>
+					<a class="text-sm text-blue-600 font-medium hover:underline" href="#">Ver historial</a>
+				</div>
 			</div>
 			<p id="notifications-status" class="notifications-status text-xs font-medium text-gray-500 mb-5">Mostrando las 3 notificaciones más recientes</p>
 			<div id="notifications-list" class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -296,6 +302,21 @@
 						<p class="text-xs text-gray-500 mt-1 mb-2 line-clamp-2">Cuando las facultades envien documentos o cambien de estado, apareceran aqui.</p>
 						<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 uppercase">En espera</span>
 					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="access-requests-showcase rounded-2xl p-6 mt-6 border border-blue-100 bg-white/80 shadow-sm">
+			<div class="flex justify-between items-center mb-3">
+				<h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+					<span class="material-symbols-outlined text-blue-600">how_to_reg</span>
+					Solicitudes de acceso pendientes
+				</h2>
+				<span id="access-requests-status" class="text-xs font-medium text-gray-500">Cargando solicitudes...</span>
+			</div>
+			<div id="access-requests-list" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+				<div class="rounded-xl border border-gray-100 bg-gray-50/60 p-4 text-sm text-gray-500 md:col-span-3">
+					Cargando solicitudes de acceso...
 				</div>
 			</div>
 		</section>
