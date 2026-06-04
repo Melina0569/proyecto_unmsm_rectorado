@@ -22,7 +22,6 @@ const REPORT_CONFIG = {
         cargoResponsable: '#cargo-responsable',
         unidadOrganicaResponsable: '#unidad-organica-responsable'
     },
-    // Tipo de documento para la API
     DOCUMENT_TYPE: 'reporte',
     API_ENDPOINT: '/documentos',
     SHOW_DOCUMENTOS_BUTTON_DELAY_MS: 1400
@@ -107,7 +106,7 @@ const FACULTY_CODE_MAP = {
     'Psicología': 'FP',
     'Facultad de Ingeniería Electrónica y Eléctrica': 'FIEE',
     'Facultad de ingeniería electrónica y eléctrica': 'FIEE',
-    'Ingeniería electrónica y eléctrica': 'FIEE',  
+    'Ingeniería electrónica y eléctrica': 'FIEE',
     'Electrónica y eléctrica': 'FIEE',
     'Electrónica': 'FIEE',
     'Eléctrica': 'FIEE',
@@ -115,7 +114,6 @@ const FACULTY_CODE_MAP = {
     'Facultad de ingeniería de sistemas e informática': 'FISI',
     'Sistemas': 'FISI',
     'Informática': 'FISI',
-
 };
 
 // Archivos seleccionados
@@ -191,12 +189,10 @@ function cleanFileName(value) {
 
 function formatReportDate(value) {
     if (!value) return '-';
-
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) {
         return String(value).trim() || '-';
     }
-
     return parsed.toLocaleDateString('es-PE', {
         day: '2-digit',
         month: '2-digit',
@@ -383,9 +379,6 @@ function extractSequenceFromCode(code, facultyCode, year) {
 
 async function getNextReportSequence(facultyCode, year) {
     const usedSequences = new Set();
-    // Se calcula con el estado local actual para permitir reutilizar correlativos
-    // liberados al eliminar expedientes en la bandeja/repositorio.
-
     const docsRaw = localStorage.getItem(REPORT_STORAGE_KEYS.DOCUMENTOS_LISTA);
     const docs = docsRaw ? JSON.parse(docsRaw) : [];
     docs.forEach((doc) => {
@@ -403,7 +396,6 @@ async function getNextReportSequence(facultyCode, year) {
     return nextSequence;
 }
 
-// Generar código de reporte automático
 async function generateReportCode() {
     const year = new Date().getFullYear();
     const facultyCode = resolveFacultyCode();
@@ -425,16 +417,13 @@ async function refreshGeneratedCode() {
 
 async function loadUserData() {
     try {
-        // Verificar si API está disponible
         if (typeof API === 'undefined' || !API.auth) {
             setDemoUser();
             showToast('API no disponible. Se usara modo local en este equipo.', 'warning', 3500);
             return;
         }
 
-        // Obtener usuario autenticado
         const user = API.auth.getUser();
-        
         if (!user) {
             setDemoUser();
             showToast('No hay sesion activa. Se usara modo local temporal.', 'warning', 3500);
@@ -442,27 +431,34 @@ async function loadUserData() {
         }
 
         currentUser = user;
-        
-        // Extraer facultad del usuario
-        if (user.facultad) {
-            // Formato: "Facultad de Ingeniería de Sistemas" → buscar ID
-            userFaculty = await findFacultyId(user.facultad);
+
+        // Extraer facultad del usuario (múltiples fuentes)
+        const facultyName = user.facultad || user.nombreFacultad || user.facultyName || user.faculty;
+        if (facultyName) {
+            userFaculty = await findFacultyId(facultyName);
+        }
+
+        // Si aún no hay facultad, inferir del correo
+        if (!userFaculty && user.correo) {
+            const domain = user.correo.split('@')[0];
+            if (domain.includes('fisi')) {
+                userFaculty = { id: 20, name: 'Ingeniería de Sistemas e Informática', code: 'FISI' };
+            }
         }
 
         // Prellenar campos del usuario
         const nombreInput = document.querySelector(REPORT_CONFIG.selectors.nombreResponsable);
         const cargoInput = document.querySelector(REPORT_CONFIG.selectors.cargoResponsable);
         const unidadInput = document.querySelector(REPORT_CONFIG.selectors.unidadOrganicaResponsable);
-        
+
         if (nombreInput && user.correo) {
-            // Extraer nombre del correo (juan.perez@unmsm.edu.pe → Juan Perez)
             const nameFromEmail = user.correo.split('@')[0]
                 .split('.')
                 .map(w => w.charAt(0).toUpperCase() + w.slice(1))
                 .join(' ');
             nombreInput.value = nameFromEmail;
         }
-        
+
         if (cargoInput && user.rol) {
             cargoInput.value = user.rol;
         }
@@ -487,16 +483,16 @@ function setDemoUser() {
         facultad: 'Facultad de Ingeniería de Sistemas',
         unidad: 'Oficina de Planificación'
     };
-    userFaculty = { id: 20, name: 'Ingeniería de Sistemas e Informática' };
+    userFaculty = { id: 20, name: 'Ingeniería de Sistemas e Informática', code: 'FISI' };
 }
 
 async function findFacultyId(facultyName) {
     try {
         if (!API.faculties || !API.faculties.getAll) return null;
-        
+
         const result = await API.faculties.getAll();
         if (result.success && result.data) {
-            const faculty = result.data.find(f => 
+            const faculty = result.data.find(f =>
                 facultyName.includes(f.name) || f.name.includes(facultyName.replace('Facultad de ', ''))
             );
             return faculty || null;
@@ -515,13 +511,12 @@ function initFileUpload() {
     const fileInput = document.querySelector(REPORT_CONFIG.selectors.fileInput);
     const fileList = document.querySelector(REPORT_CONFIG.selectors.fileList);
     const excelInput = document.querySelector(REPORT_CONFIG.selectors.excelInput);
-    
+
     if (fileInput && fileList) {
         fileInput.addEventListener('change', (e) => {
             const files = Array.from(e.target.files);
-            
+
             files.forEach(file => {
-                // Validar tamaño (25MB)
                 if (file.size > 25 * 1024 * 1024) {
                     showToast(`El archivo ${file.name} excede 25MB`, 'error');
                     return;
@@ -531,10 +526,10 @@ function initFileUpload() {
                     showToast(`Use el apartado Excel para ${file.name}`, 'warning', 2500);
                     return;
                 }
-                
+
                 selectedFiles.push(file);
             });
-            
+
             renderFileList();
             fileInput.value = '';
         });
@@ -567,17 +562,17 @@ function initFileUpload() {
 function renderFileList() {
     const fileList = document.querySelector(REPORT_CONFIG.selectors.fileList);
     if (!fileList) return;
-    
+
     if (selectedFiles.length === 0) {
         fileList.classList.add('hidden');
         return;
     }
-    
+
     fileList.classList.remove('hidden');
     fileList.innerHTML = selectedFiles.map((file, index) => {
         const size = formatFileSize(file.size);
         const icon = getFileIcon(file.name);
-        
+
         return `
             <div class="file-item">
                 <span class="material-symbols-outlined text-emerald-500">${icon}</span>
@@ -746,42 +741,54 @@ window.removeExcelFile = function() {
 
 function goToDocumentos(codigo) {
     const destino = `facultades-documentos.html?docCode=${encodeURIComponent(codigo)}`;
-
-    if (window.top && window.top !== window) {
-        window.top.location.href = destino;
-        return;
-    }
+    
+    // Si estamos dentro de un iframe, notificar al padre para navegación suave
     if (window.parent && window.parent !== window) {
-        window.parent.location.href = destino;
+        window.parent.postMessage({
+            type: 'navigate-to',
+            url: destino,
+            docCode: codigo
+        }, '*');
         return;
     }
+    
+    // Si estamos en ventana principal, navegar directamente
     window.location.href = destino;
 }
 
 // ==========================================
-// MANEJO DEL FORMULARIO - INTEGRADO CON API
+// MANEJO DEL FORMULARIO - INTEGRADO CON API REAL + LOCALSTORAGE
 // ==========================================
 
 function initFormHandler() {
     const btnFinalizar = document.querySelector(REPORT_CONFIG.selectors.btnFinalizar);
     const btnExpedientes = document.querySelector(REPORT_CONFIG.selectors.btnExpedientes);
     const form = document.querySelector(REPORT_CONFIG.selectors.form);
-    
+
     if (!btnFinalizar || !form) return;
-    
+
     btnFinalizar.addEventListener('click', async (e) => {
         e.preventDefault();
-        
+
+        const token = localStorage.getItem('unmsm_token') 
+            || localStorage.getItem('accessToken') 
+            || localStorage.getItem('token');
+
+        if (!token) {
+            showToast('No hay sesión activa. Inicie sesión primero.', 'error');
+            setTimeout(() => {
+                window.location.href = 'portal-inicio-facultades.html';
+            }, 2000);
+            return;
+        }
+
         // Validar formulario
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
 
         const emptyRequiredFields = getRequiredEmptyFields(form, data);
-
         if (emptyRequiredFields.length > 0) {
             showToast('Complete todos los campos obligatorios (*)', 'warning');
-            
-            // Resaltar campos vacíos
             emptyRequiredFields.forEach((input) => {
                 input.classList.add('ring-2', 'ring-red-500', 'border-red-500');
                 input.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -789,20 +796,119 @@ function initFormHandler() {
                     input.classList.remove('ring-2', 'ring-red-500', 'border-red-500');
                 }, 3000);
             });
-            
             return;
         }
-        
+
+        // Verificar autenticación
+        if (typeof API === 'undefined' || !API.auth.isAuthenticated()) {
+            showToast('Debe iniciar sesión primero.', 'error');
+            return;
+        }
+
         // Mostrar carga
         const originalText = btnFinalizar.innerHTML;
         btnFinalizar.disabled = true;
         btnFinalizar.innerHTML = `
             <span class="material-symbols-outlined animate-spin">refresh</span>
-            GUARDANDO...
+            ENVIANDO...
         `;
-        
+
+        let apiSuccess = false;
+        let apiResult = null;
+
         try {
-            // Preparar datos para la API
+            // ==========================================
+            // PASO 1: Enviar a API real
+            // ==========================================
+            const reportPayload = {
+                semester: data.semestreReporte || '',
+                responsibleName: data.nombreResponsable?.trim() || '',
+                position: data.cargoResponsable?.trim() || '',
+                organicUnit: data.unidadOrganicaResponsable?.trim() || '',
+                elaborationDate: data.fechaElaboracion || new Date().toISOString().split('T')[0],
+                activities: data.actividadesRealizadas || '',
+                results: data.resultadosObtenidos || '',
+                observations: data.observaciones || '',
+                code: data.codigoReporte || await generateReportCode(),
+                facultyId: userFaculty?.id || null,
+                userEmail: currentUser?.correo || currentUser?.email || '',
+                documentType: 'reporte',
+                status: 'PENDING'
+            };
+
+            console.log('Enviando a API:', reportPayload);
+
+            apiResult = await API.portal.reports.create(reportPayload);
+
+            if (!apiResult.success) {
+    if (apiResult.status === 401) {
+        showToast('Sesión expirada. Redirigiendo...', 'error');
+        setTimeout(() => {
+            window.location.href = 'portal-inicio-facultades.html';
+        }, 2000);
+        return;
+    }
+    console.warn('API falló, usando fallback local:', apiResult.error);
+    showToast('API no disponible. Guardando localmente...', 'warning', 3000);
+}
+        if (!apiResult.success) {
+            // Errores de autenticación
+            if (apiResult.status === 401) {
+                showToast('Sesión expirada. Redirigiendo al login...', 'error');
+                setTimeout(() => {
+                    window.location.href = 'portal-inicio-facultades.html';
+                }, 2000);
+                return;
+            }
+            
+            // Error 403 - Forbidden: El servidor rechazó la petición
+            if (apiResult.status === 403) {
+                console.error('🔴 Error 403 Forbidden:', apiResult.data);
+                showToast(
+                    `Error 403: Acceso denegado. ${apiResult.data?.message || 'Verifica permisos o token.'}`, 
+                    'error', 
+                    5000
+                );
+                // NO guardar localmente en 403, informar al usuario claramente
+                btnFinalizar.disabled = false;
+                btnFinalizar.innerHTML = originalText;
+                return;  // ← Detener aquí, no continuar con fallback
+            }
+            
+            // Error 404 - Endpoint no encontrado
+            if (apiResult.status === 404) {
+                showToast('Error 404: El endpoint /portal/reports no existe en el servidor', 'error', 5000);
+                btnFinalizar.disabled = false;
+                btnFinalizar.innerHTML = originalText;
+                return;
+            }
+            
+            // Error de red (servidor no responde)
+            if (apiResult.isNetworkError) {
+                showToast('Error de red: No se pudo conectar con ' + CONFIG.REMOTE_BASE, 'error', 5000);
+                btnFinalizar.disabled = false;
+                btnFinalizar.innerHTML = originalText;
+                return;
+            }
+            
+            // Otros errores del servidor
+            showToast(
+                `Error ${apiResult.status || ''}: ${apiResult.error || 'Desconocido'}`, 
+                'error', 
+                5000
+            );
+            btnFinalizar.disabled = false;
+            btnFinalizar.innerHTML = originalText;
+            return;
+        }
+
+        
+        apiSuccess = true;
+        console.log('✅ Reporte creado en API:', apiResult.data);
+
+            // ==========================================
+            // PASO 2: Guardar localmente (PDF, adjuntos, documentos)
+            // ==========================================
             const reportData = {
                 codigo: data.codigoReporte || await generateReportCode(),
                 nombre: `Reporte ${data.semestreReporte} - ${data.nombreResponsable}`,
@@ -822,146 +928,117 @@ function initFormHandler() {
                 fechaCreacion: new Date().toISOString(),
                 excelPrincipal: selectedExcelFile ? selectedExcelFile.name : '',
                 archivosSoporte: selectedFiles.map(f => f.name),
-                archivos: selectedFiles.map(f => f.name)
+                archivos: selectedFiles.map(f => f.name),
+                apiId: apiResult?.data?.id || null,
+                apiSync: apiSuccess
             };
             reportData.documentoPrincipal = `${cleanFileName(reportData.codigo)}.pdf`;
 
-            console.log('Enviando a API:', reportData);
+            const now = new Date();
+            const codigo = reportData.codigo;
+            const fechaAdjunto = now.toISOString().split('T')[0];
 
-            // Intentar guardar en API; si falla, usar fallback local.
-            let result = null;
-            let savedOrigin = 'local-fallback';
+            // Guardar en lista de documentos
+            const docsRaw = localStorage.getItem(REPORT_STORAGE_KEYS.DOCUMENTOS_LISTA);
+            const docs = docsRaw ? JSON.parse(docsRaw) : [];
+            const docPendiente = {
+                id: apiResult?.data?.id || codigo,
+                fecha: fechaAdjunto,
+                hora: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
+                codigo: codigo,
+                descripcion: reportData.nombre,
+                generadoPor: 'Facultad',
+                estado: 'pendiente',
+                progreso: 5,
+                facultadId: reportData.facultadId || 1,
+                tipo: 'reporte',
+                origen: apiSuccess ? 'api' : 'local-fallback'
+            };
 
-            if (canUseApiUpload()) {
-                // Crear FormData para envio con archivos
-                const apiFormData = new FormData();
-                apiFormData.append('data', JSON.stringify(reportData));
-
-                if (selectedExcelFile) {
-                    apiFormData.append('excelPrincipal', selectedExcelFile);
-                }
-
-                selectedFiles.forEach((file, index) => {
-                    apiFormData.append(`archivo${index}`, file);
-                });
-
-                result = await API.documentos.upload(apiFormData);
-
-                if (result && result.success) {
-                    savedOrigin = getApiMode() === 'remote' ? 'remote' : 'local-api';
-                }
-            }
-
-            if (!result || !result.success) {
-                const fallbackId = saveToLocalStorage(reportData);
-                result = {
-                    success: true,
-                    data: { id: fallbackId }
-                };
-                showToast('Sin conexion a API. Se guardo localmente en este equipo.', 'warning', 4000);
-            }
-
-            if (result.success) {
-                const now = new Date();
-                const codigo = reportData.codigo;
-                const docPendiente = {
-                    id: result.data?.id || codigo,
-                    fecha: now.toISOString().split('T')[0],
-                    hora: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
-                    codigo,
-                    descripcion: reportData.nombre,
-                    generadoPor: 'Facultad',
-                    estado: 'pendiente',
-                    progreso: 5,
-                    facultadId: reportData.facultadId || 1,
-                    tipo: 'reporte',
-                    origen: savedOrigin
-                };
-
-                const docsRaw = localStorage.getItem(REPORT_STORAGE_KEYS.DOCUMENTOS_LISTA);
-                const docs = docsRaw ? JSON.parse(docsRaw) : [];
-                const idx = docs.findIndex(item => item.codigo === codigo);
-                if (idx >= 0) {
-                    docs[idx] = { ...docs[idx], ...docPendiente };
-                } else {
-                    docs.unshift(docPendiente);
-                }
-                localStorage.setItem(REPORT_STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(docs));
-
-                const detalleRaw = localStorage.getItem(REPORT_STORAGE_KEYS.DOCUMENTOS_DETALLE);
-                const detalle = safeParseJson(detalleRaw, {}) || {};
-                const fechaAdjunto = now.toISOString().split('T')[0];
-                const adjuntos = await buildAdjuntosPersistidos(reportData, selectedFiles, selectedExcelFile, fechaAdjunto);
-
-                const detalleReporte = {
-                    tipo: 'reporte',
-                    codigo,
-                    titulo: reportData.nombre,
-                    operacion: 'GESTION DE REPORTES',
-                    fechaRegistro: now.toISOString(),
-                    reporteData: reportData,
-                    adjuntos,
-                    resumenCampos: [
-                        { label: 'Semestre', value: data.semestreReporte || '-' },
-                        { label: 'Fecha de elaboracion', value: data.fechaElaboracion || '-' },
-                        { label: 'Responsable', value: data.nombreResponsable || '-' },
-                        { label: 'Cargo', value: data.cargoResponsable || '-' },
-                            { label: 'Unidad orgánica Responsable', value: data.unidadOrganicaResponsable || '-' },
-                        { label: 'Actividades realizadas', value: data.actividadesRealizadas || '-' },
-                        { label: 'Resultados obtenidos', value: data.resultadosObtenidos || '-' },
-                        { label: 'Observaciones', value: data.observaciones || '-' },
-                            { label: 'Documento principal', value: reportData.documentoPrincipal || '-' },
-                            { label: 'Excel de sustento', value: selectedExcelFile?.name || '-' }
-                    ]
-                };
-
-                detalle[codigo] = detalleReporte;
-
-                try {
-                    localStorage.setItem(REPORT_STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
-                } catch (error) {
-                    if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
-                        const detalleSinContenido = {
-                            ...detalleReporte,
-                            adjuntos: (detalleReporte.adjuntos || []).map((adjunto) => {
-                                const { contenido, ...rest } = adjunto;
-                                return rest;
-                            })
-                        };
-
-                        detalle[codigo] = detalleSinContenido;
-                        cacheAdjuntosTemporales(codigo, detalleReporte.adjuntos || []);
-                        localStorage.setItem(REPORT_STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
-                        showToast('Adjuntos grandes: se activo vista temporal para previsualizar en Documentos.', 'warning', 5000);
-                    } else {
-                        throw error;
-                    }
-                }
-
-                showToast('Hoja de reporte generada exitosamente', 'success');
-
-                if (btnExpedientes) {
-                    setTimeout(() => {
-                        btnFinalizar.style.display = 'none';
-                        btnExpedientes.classList.remove('hidden');
-                        btnExpedientes.href = `facultades-documentos.html?docCode=${encodeURIComponent(codigo)}`;
-                        btnExpedientes.onclick = (ev) => {
-                            ev.preventDefault();
-                            goToDocumentos(codigo);
-                        };
-                    }, REPORT_CONFIG.SHOW_DOCUMENTOS_BUTTON_DELAY_MS);
-                } else {
-                    goToDocumentos(codigo);
-                }
+            const idx = docs.findIndex(item => item.codigo === codigo);
+            if (idx >= 0) {
+                docs[idx] = { ...docs[idx], ...docPendiente };
             } else {
-                throw new Error(result.error || 'Error al guardar');
+                docs.unshift(docPendiente);
             }
-            
+            localStorage.setItem(REPORT_STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(docs));
+
+            // Guardar detalle con adjuntos
+            const detalleRaw = localStorage.getItem(REPORT_STORAGE_KEYS.DOCUMENTOS_DETALLE);
+            const detalle = safeParseJson(detalleRaw, {}) || {};
+
+            const adjuntos = await buildAdjuntosPersistidos(reportData, selectedFiles, selectedExcelFile, fechaAdjunto);
+
+            const detalleReporte = {
+                tipo: 'reporte',
+                codigo: codigo,
+                titulo: reportData.nombre,
+                operacion: 'GESTION DE REPORTES',
+                fechaRegistro: now.toISOString(),
+                reporteData: reportData,
+                adjuntos: adjuntos,
+                resumenCampos: [
+                    { label: 'Semestre', value: data.semestreReporte || '-' },
+                    { label: 'Fecha de elaboracion', value: data.fechaElaboracion || '-' },
+                    { label: 'Responsable', value: data.nombreResponsable || '-' },
+                    { label: 'Cargo', value: data.cargoResponsable || '-' },
+                    { label: 'Unidad orgánica Responsable', value: data.unidadOrganicaResponsable || '-' },
+                    { label: 'Actividades realizadas', value: data.actividadesRealizadas || '-' },
+                    { label: 'Resultados obtenidos', value: data.resultadosObtenidos || '-' },
+                    { label: 'Observaciones', value: data.observaciones || '-' },
+                    { label: 'Documento principal', value: reportData.documentoPrincipal || '-' },
+                    { label: 'Excel de sustento', value: selectedExcelFile?.name || '-' }
+                ]
+            };
+
+            detalle[codigo] = detalleReporte;
+
+            try {
+                localStorage.setItem(REPORT_STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
+            } catch (error) {
+                if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+                    const detalleSinContenido = {
+                        ...detalleReporte,
+                        adjuntos: (detalleReporte.adjuntos || []).map((adjunto) => {
+                            const { contenido, ...rest } = adjunto;
+                            return rest;
+                        })
+                    };
+
+                    detalle[codigo] = detalleSinContenido;
+                    cacheAdjuntosTemporales(codigo, detalleReporte.adjuntos || []);
+                    localStorage.setItem(REPORT_STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
+                    showToast('Adjuntos grandes: se activo vista temporal para previsualizar en Documentos.', 'warning', 5000);
+                } else {
+                    throw error;
+                }
+            }
+
+            // Mostrar mensaje de éxito
+            if (apiSuccess) {
+                showToast('¡Reporte enviado y guardado correctamente!', 'success');
+            } else {
+                showToast('Reporte guardado localmente (API no disponible)', 'warning', 4000);
+            }
+
+            // Mostrar botón "Ver en Documentos"
+            if (btnExpedientes) {
+                setTimeout(() => {
+                    btnFinalizar.style.display = 'none';
+                    btnExpedientes.classList.remove('hidden');
+                    btnExpedientes.href = `facultades-documentos.html?docCode=${encodeURIComponent(codigo)}`;
+                    btnExpedientes.onclick = (ev) => {
+                        ev.preventDefault();
+                        goToDocumentos(codigo);
+                    };
+                }, REPORT_CONFIG.SHOW_DOCUMENTOS_BUTTON_DELAY_MS);
+            } else {
+                goToDocumentos(codigo);
+            }
+
         } catch (error) {
             console.error('Error:', error);
-            showToast('Error al guardar: ' + error.message, 'error');
-            
-            // Restaurar botón
+            showToast('Error al enviar: ' + error.message, 'error');
             btnFinalizar.disabled = false;
             btnFinalizar.innerHTML = originalText;
         }
@@ -973,7 +1050,6 @@ function initFormHandler() {
 // ==========================================
 
 function initDefaultValues() {
-    // Fecha por defecto: hoy
     const fechaInput = document.querySelector('input[name="fechaElaboracion"]');
     if (fechaInput && !fechaInput.value) {
         const today = new Date().toISOString().split('T')[0];
@@ -989,7 +1065,6 @@ function initTheme() {
     const currentTheme = localStorage.getItem('theme') || 'light';
     applyTheme(currentTheme);
 
-    // Sincronizar tema cuando el contenedor padre notifica cambios via postMessage.
     window.addEventListener('message', (event) => {
         const payload = event.data || {};
         if (payload.type !== 'theme-change') return;
@@ -1011,13 +1086,11 @@ function applyTheme(theme) {
 
 function initKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        // Ctrl/Cmd + S para guardar
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
             document.querySelector(REPORT_CONFIG.selectors.btnFinalizar)?.click();
         }
-        
-        // Escape para volver
+
         if (e.key === 'Escape') {
             if (confirm('¿Desea salir? Los cambios no guardados se perderán.')) {
                 window.location.href = 'facultades-nuevo.html';
@@ -1032,26 +1105,20 @@ function initKeyboardShortcuts() {
 
 async function init() {
     console.log('🚀 Hoja de Reporte - Inicializando...');
-    
+
     initTheme();
     initDefaultValues();
     initFileUpload();
     initKeyboardShortcuts();
-    
-    // Cargar datos de usuario (async)
-    await loadUserData();
 
-    // Generar codigo una vez cargado el contexto de usuario/facultad
+    await loadUserData();
     await refreshGeneratedCode();
-    
-    // Inicializar formulario después de cargar usuario
     initFormHandler();
-    
+
     showToast('Formulario listo', 'info', 2000);
     console.log('✅ Hoja de Reporte inicializada');
 }
 
-// Ejecutar cuando el DOM esté listo
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {

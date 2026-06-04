@@ -494,25 +494,25 @@ const LocalAPI = {
 
     // ========== DASHBOARD ==========
     dashboard: {
-        async getPublicMetrics() {
-            await simulateDelay(400);
-            const faculties = JSON.parse(localStorage.getItem(LocalAPI.db.faculties) || '[]');
-            
-            return {
-                success: true,
-                data: {
-                    totalesGlobales: { 
-                        totalDocumentos: faculties.reduce((s, f) => s + f.flows, 0), 
-                        totalAprobados: Math.floor(faculties.reduce((s, f) => s + f.flows, 0) * 0.8)
-                    },
-                    conteosPorFacultad: faculties.map(f => ({
-                        facultad: f.name,
-                        totalDocumentos: f.flows
-                    }))
+            async getPublicMetrics() {
+                try {
+                    // Intentar endpoint público /public/stats (sin auth)
+                    const response = await fetch(`${CONFIG.REMOTE_BASE}/public/stats`, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    return { success: true, data };
+                } catch (error) {
+                    console.warn('Dashboard público no disponible:', error.message);
+                    return { success: false, error: error.message };
                 }
-            };
-        }
-    },
+            }
+        },
 
     // ========== DOCUMENTOS (Simulado) ==========
     documentos: {
@@ -605,13 +605,25 @@ const LocalAPI = {
 // ============================================
 const RemoteAPI = {
     getHeaders() {
-        const token = localStorage.getItem('unmsm_token');
-        return {
+        // Buscar token en TODAS las claves posibles (¡token está antes!)
+        const token = localStorage.getItem('token')  // ← TU TOKEN ESTÁ AQUÍ
+            || localStorage.getItem('unmsm_token')
+            || localStorage.getItem('accessToken')
+            || localStorage.getItem('unmsm_access_token')
+            || sessionStorage.getItem('accessToken')
+            || sessionStorage.getItem('unmsm_token');
+        
+        const headers = {
             'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
+            'Content-Type': 'application/json'
         };
-    },
+        
+        if (token && token.length > 20) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        return headers;
+        },
 
     async fetchWithTimeout(url, options = {}) {
         const controller = new AbortController();
@@ -638,34 +650,44 @@ const RemoteAPI = {
         async login(email, password) {
             try {
                 const normalizeAuthResponse = (data, fallbackEmail) => {
-                    const nombreDesdeEmail = String(fallbackEmail || '').split('@')[0].replace(/\./g, ' ');
+                    // El backend devuelve: { accessToken, refreshToken, expiresIn, user: {...} }
                     const user = data?.user || {};
-                    const emailFinal = data?.email || data?.correo || user.email || fallbackEmail;
-                    const nombreCompletoBackend = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-                    const nombre = data?.nombreCompleto || data?.nombre || data?.nombres || nombreCompletoBackend || nombreDesdeEmail;
-                    const cargo = data?.cargo || data?.puesto || data?.rol || data?.role || user.role || null;
-                    const facultyId = data?.facultyId ?? data?.facultadId ?? data?.faculty?.id ?? data?.facultad?.id ?? user.facultyId ?? user.facultadId ?? user.faculty?.id ?? null;
-                    const facultadRaw = data?.facultadNombre || data?.nombreFacultad || data?.facultad || user.facultyName || user.faculty;
-                    const facultad = typeof facultadRaw === 'object'
-                        ? (facultadRaw?.nombre || facultadRaw?.descripcion || facultadRaw?.name || null)
-                        : (facultadRaw || null);
+                    const emailFinal = user.email || fallbackEmail;
+                    
+                    // Construir nombre desde firstName + lastName
+                    const nombreCompletoBackend = [user.firstName, user.lastName]
+                        .filter(Boolean)
+                        .join(' ')
+                        .trim();
+                    
+                    // Fallback: usar parte del email si no hay nombre
+                    const nombreDesdeEmail = String(fallbackEmail || '')
+                        .split('@')[0]
+                        .replace(/\./g, ' ');
+                    
+                    const nombre = nombreCompletoBackend || nombreDesdeEmail;
+                    const rol = user.role || 'Usuario';
+                    const facultyId = user.facultyId || null;
+                    const facultad = user.facultyName || 'UNMSM';
 
                     return {
                         email: emailFinal,
                         nombre,
-                        nombreCompleto: data?.nombreCompleto || nombre,
-                        cargo,
-                        rol: data?.rol || data?.role || user.role || cargo || 'Usuario',
+                        nombreCompleto: nombre,
+                        cargo: rol,
+                        rol,
                         facultyId,
                         facultadId: facultyId,
                         facultad,
                         nombreFacultad: facultad,
-                        refreshToken: data?.refreshToken || data?.refresh_token || null,
-                        accessToken: data?.accessToken || data?.access_token || data?.token || null
+                        refreshToken: data?.refreshToken || null,
+                        accessToken: data?.accessToken || null
                     };
                 };
 
                 const persistSession = (normalizedUser, accessToken, refreshToken) => {
+                    localStorage.setItem('unmsm_faculty_id', normalizedUser.facultyId || '');
+                    localStorage.setItem('unmsm_faculty_name', normalizedUser.facultad || '');
                     localStorage.setItem('unmsm_token', accessToken);
                     localStorage.setItem('accessToken', accessToken);
                     localStorage.setItem('token', accessToken);
@@ -850,8 +872,11 @@ const RemoteAPI = {
     // ========== DASHBOARD ==========
     dashboard: {
         async getPublicMetrics() {
-            try {
-                const response = await RemoteAPI.fetchWithTimeout(`${CONFIG.REMOTE_BASE}/dashboard/publico`);
+        try {
+            // ✅ Usar /v1/public/stats (el endpoint que SÍ existe)
+            const response = await fetch(`${CONFIG.REMOTE_BASE}/public/stats`, {
+                headers: { 'Accept': 'application/json' }
+            });
                 return { success: response.ok, data: await response.json() };
             } catch (error) {
                 return { success: false, error: error.message };
@@ -863,23 +888,25 @@ const RemoteAPI = {
     documentos: {
         async getAll(filtros = {}) {
             const params = new URLSearchParams(filtros).toString();
-            const url = `${CONFIG.REMOTE_BASE}/documentos${params ? '?' + params : ''}`;
+            const url = `${CONFIG.REMOTE_BASE}/portal/documents${params ? '?' + params : ''}`;
             
             try {
                 const response = await fetch(url, { headers: RemoteAPI.getHeaders() });
-                let payload = null;
-                try {
-                    payload = await response.json();
-                } catch (e) {
-                    payload = null;
+                
+                if (!response.ok) {
+                    // Backend falla (500), usar datos locales
+                    console.warn('⚠️ /portal/documents falló, usando datos locales');
+                    return LocalAPI.documentos.getAll(filtros);
                 }
+                
+                let payload = null;
+                try { payload = await response.json(); } catch (e) { payload = null; }
 
                 const data = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
-                const error = response.ok ? null : (payload?.message || payload?.error || `HTTP ${response.status}`);
-
-                return { success: response.ok, data, status: response.status, error };
+                return { success: true, data, status: response.status };
             } catch (error) {
-                return { success: false, error: error.message };
+                console.warn('⚠️ Error de red, usando datos locales:', error.message);
+                return LocalAPI.documentos.getAll(filtros);
             }
         },
 
@@ -1410,16 +1437,63 @@ const RemoteAPI = {
         // ========== PORTAL - DOCUMENTOS ==========
         documents: {
             async getAll(filtros = {}) {
-                const defaults = { page: 1, limit: 20, ...filtros };
+                // 🔧 FIX: Eliminar facultyId - el backend filtra por JWT automáticamente
+                // Los FACULTY_USER solo ven sus docs, ADMIN ven todos
+                const cleanFiltros = { ...filtros };
+                delete cleanFiltros.facultyId;        // ← UUID que causa 500
+                delete cleanFiltros.facultadId;       // ← por si acaso
+                
+                const defaults = { page: 1, limit: 20, ...cleanFiltros };
                 const params = new URLSearchParams(defaults).toString();
                 const url = `${CONFIG.REMOTE_BASE}/portal/documents?${params}`;
+                
                 try {
                     const response = await fetch(url, {
                         headers: RemoteAPI.getHeaders()
                     });
-                    return { success: response.ok, data: await response.json() };
+                    
+                    // 🔥 FIX: Si el backend devuelve error HTTP (500, 502, etc.)
+                    if (!response.ok) {
+                        console.warn(`⚠️ /portal/documents HTTP ${response.status} ${response.statusText}`);
+                        
+                        // Intentar leer el body de error para diagnóstico
+                        let errorBody = '';
+                        try {
+                            errorBody = await response.text();
+                            console.warn('⚠️ Error body:', errorBody.substring(0, 300));
+                        } catch (e) {}
+                        
+                        // Retornar error controlado (NO fallback automático a local)
+                        // El caller (facultades-documentos.js) decide qué hacer
+                        return { 
+                            success: false, 
+                            error: `HTTP ${response.status}: ${response.statusText}`,
+                            status: response.status,
+                            data: [],
+                            rawError: errorBody.substring(0, 500)
+                        };
+                    }
+                    
+                    // Solo parsear JSON si la respuesta fue exitosa
+                    const payload = await response.json();
+                    const data = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
+                    
+                    return { 
+                        success: true, 
+                        data,
+                        pagination: payload.pagination || null,
+                        status: response.status 
+                    };
+                    
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    // Error de red (servidor caído, CORS, etc.)
+                    console.warn('⚠️ Error de red en /portal/documents:', error.message);
+                    return { 
+                        success: false, 
+                        error: error.message,
+                        status: 0,
+                        data: []
+                    };
                 }
             },
 
@@ -1516,17 +1590,59 @@ const RemoteAPI = {
         // ========== PORTAL - REPORTES ==========
         reports: {
             async create(reportData) {
-                try {
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/reports`, {
-                        method: 'POST',
-                        headers: RemoteAPI.getHeaders(),
-                        body: JSON.stringify(reportData)
-                    });
-                    return { success: response.ok, data: await response.json() };
-                } catch (error) {
-                    return { success: false, error: error.message };
-                }
-            },
+                const url = `${CONFIG.REMOTE_BASE}/portal/reports`;
+                const headers = RemoteAPI.getHeaders();
+                
+                // Debug: mostrar qué se va a enviar
+                console.log('📤 POST', url);
+                console.log('📤 Headers:', { 
+                    ...headers, 
+                    Authorization: headers.Authorization ? 'Bearer ***' : 'SIN TOKEN' 
+                });
+                console.log('📤 Body:', JSON.stringify(reportData, null, 2));
+    
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(reportData)
+            });
+            
+            console.log('📥 Status:', response.status, response.statusText);
+            
+            let data = null;
+            const contentType = response.headers.get('content-type') || '';
+            
+            if (contentType.includes('application/json')) {
+                data = await response.json();
+                console.log('📥 JSON response:', data);
+            } else {
+                // Servidor devolvió HTML (página de error 403) o texto
+                const text = await response.text();
+                data = { 
+                    rawResponse: text.substring(0, 500),
+                    message: `Error ${response.status}: ${response.statusText}`
+                };
+                console.log('📥 Text/Error response:', text.substring(0, 200));
+            }
+            
+            return { 
+                success: response.ok, 
+                data: data,
+                status: response.status,
+                statusText: response.statusText
+            };
+        } catch (error) {
+            // Error de red (servidor no responde, CORS, etc.)
+            console.error('❌ Network error:', error);
+            return { 
+                success: false, 
+                error: error.message,
+                isNetworkError: true,
+                status: 0
+            };
+        }
+    },
 
             async addAssignment(id, assignmentData) {
                 try {
@@ -1912,7 +2028,11 @@ const RemoteAPI = {
 // EXPORTAR API SEGÚN MODO SELECCIONADO
 // ============================================
 // Forzar uso del modo remoto (usar la API real)
+// Forzar uso del modo remoto SIEMPRE
 CONFIG.MODE = 'remote';
+// Limpiar cualquier modo local que pudiera estar guardado
+localStorage.removeItem('api_mode');
+
 const API = RemoteAPI;
 
 // Helpers para cambiar modo

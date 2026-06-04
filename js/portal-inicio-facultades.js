@@ -124,77 +124,51 @@ document.addEventListener('DOMContentLoaded', function() {
             const correo = document.getElementById('correo').value.trim();
             const password = document.getElementById('password').value;
             
-            // Validación básica
             if (!correo || !password) {
                 showNotification('Por favor, complete todos los campos.', 'error');
                 return;
             }
             
-            // Validar formato de correo UNMSM
             if (!correo.endsWith('@unmsm.edu.pe')) {
                 showNotification('Debe usar un correo institucional @unmsm.edu.pe', 'error');
                 return;
             }
             
-            // Botón de carga
             const submitBtn = loginForm.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> <span>Verificando...</span>';
             
             try {
-                // LLAMADA REAL A LA API UNMSM
+                // ✅ LLAMADA A LA API - ya hace persistSession internamente
                 const result = await API.auth.login(correo, password);
                 
                 if (result.success) {
-                    // Guardar datos del usuario sin perder campos de perfil
-                    const data = result.data || {};
-                    const facultadRaw = data.facultadNombre || data.nombreFacultad || data.facultad;
-                    const facultad = typeof facultadRaw === 'object'
-                        ? (facultadRaw?.nombre || facultadRaw?.descripcion || facultadRaw?.name || null)
-                        : (facultadRaw || null);
-                    const nombreDesdeCorreo = correo.split('@')[0].replace(/\./g, ' ');
-                    const nombre = data.nombreCompleto || data.nombre || data.nombres || nombreDesdeCorreo;
-                    const cargo = data.cargo || data.puesto || data.rol || data.role || null;
-
-                    localStorage.setItem('unmsm_token', result.data.token);
-                    localStorage.setItem('unmsm_user', JSON.stringify({
-                        correo: data.correo || data.email || correo,
-                        email: data.email || data.correo || correo,
-                        nombre,
-                        nombreCompleto: nombre,
-                        cargo,
-                        rol: data.rol || data.role || cargo || 'Usuario',
-                        facultyId: data.facultyId || data.facultadId || data.faculty?.id || data.facultad?.id || null,
-                        facultadId: data.facultyId || data.facultadId || data.faculty?.id || data.facultad?.id || null,
-                        facultad,
-                        nombreFacultad: facultad
-                    }));
+                    // ✅ API.auth.login YA guardó el token y usuario en localStorage
+                    // Solo verificamos que se guardó correctamente
+                    const user = API.auth.getUser();
+                    console.log('Usuario autenticado:', user);
                     
                     showNotification('¡Bienvenido! Redirigiendo...', 'success');
 
-                    const roleText = String(result.data.rol || data.rol || data.role || cargo || '').toLowerCase();
+                    // Detectar rol para redirección
+                    const roleText = String(user?.rol || user?.role || '').toLowerCase();
                     const isAdmin = roleText.includes('admin');
 
-                    // Redirigir según el rol detectado
                     setTimeout(() => {
                         if (isAdmin) {
-                            window.location.href = 'portal-inicio-racio.html'; // Panel admin
+                            window.location.href = 'portal-inicio-racio.html';
                         } else {
-                            window.location.href = 'facultades-inicio.html'; // Dashboard de facultad
+                            window.location.href = 'facultades-inicio.html';
                         }
                     }, 1500);
                 } else {
-                    // Error de autenticación
-                    showNotification(
-                        result.data?.message || 'Credenciales incorrectas', 
-                        'error'
-                    );
+                    showNotification(result.error || 'Credenciales incorrectas', 'error');
                 }
             } catch (error) {
                 console.error('Error en login:', error);
                 showNotification(
-                    'Error de conexión. ' + (error.message.includes('timeout') 
+                    'Error de conexión. ' + (error.message?.includes('timeout') 
                         ? 'El servidor está iniciando, espere 60 segundos e intente de nuevo.' 
                         : 'Intente nuevamente.'), 
                     'error'

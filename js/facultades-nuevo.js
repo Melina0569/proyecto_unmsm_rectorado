@@ -623,6 +623,21 @@ function init() {
     console.log('✅ Sistema cargado correctamente');
 }
 
+window.addEventListener('message', (event) => {
+    const data = event.data || {};
+    
+    if (data.type === 'navigate-to' && data.url) {
+        console.log('📨 Navegación desde iframe:', data.url);
+        window.location.href = data.url;
+    }
+    
+    if (data.type === 'report-created' && data.docCode) {
+        console.log('📨 Reporte creado desde iframe:', data.docCode);
+        // Opcional: mostrar notificación
+        showToast(`Reporte ${data.docCode} creado exitosamente`, 'success');
+    }
+});
+
 // Ejecutar cuando el DOM esté listo
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

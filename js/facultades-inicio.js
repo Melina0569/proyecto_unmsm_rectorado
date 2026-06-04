@@ -79,19 +79,52 @@ async function loadDashboardData() {
             throw new Error('API no disponible');
         }
         
-        // Get current user for faculty filtering
         let user = null;
         try {
             user = API.auth.getUser();
         } catch (e) {
             console.log('No hay usuario autenticado');
         }
-        
-        const facultadId = user?.facultadId || user?.facultyId || user?.faculty?.id || user?.facultad?.id || null;
 
+        // Buscar facultadId en MÚLTIPLES fuentes
+        let facultadId = user?.facultadId 
+            || user?.facultyId 
+            || user?.faculty?.id 
+            || user?.facultad?.id 
+            || null;
+
+        // Si no está en el objeto user, buscar en localStorage directamente
         if (!facultadId) {
-            console.warn('No se encontró facultadId en la sesión; se omite la consulta remota para evitar un 403.');
-            throw new Error('No se pudo determinar la facultad de la sesión. Vuelve a iniciar sesión.');
+            try {
+                const userRaw = localStorage.getItem('unmsm_user');
+                if (userRaw) {
+                    const userData = JSON.parse(userRaw);
+                    facultadId = userData?.facultadId 
+                        || userData?.facultyId 
+                        || userData?.faculty?.id 
+                        || userData?.facultad?.id
+                        || userData?.facultadId  // con 'l' minúscula
+                        || null;
+                }
+            } catch (e) {
+                console.warn('Error leyendo unmsm_user:', e);
+            }
+        }
+
+        // Si aún no hay, buscar en keys separadas
+        if (!facultadId) {
+            facultadId = localStorage.getItem('unmsm_faculty_id') || null;
+        }
+
+        // DEBUG: Mostrar qué se encontró
+        console.log('🔍 facultadId encontrado:', facultadId);
+        console.log('🔍 Usuario:', user);
+
+        // Si NO hay facultadId, NO lanzar error, continuar sin filtro
+        if (!facultadId) {
+            console.warn('⚠️ No se encontró facultadId. Continuando sin filtro de facultad.');
+            // En lugar de throw, continuar con facultadId = null
+            // El backend puede devolver todos los documentos o requerir el filtro
         }
 
         // Load documents from API

@@ -86,6 +86,16 @@ function getFacultyIcon(code) {
 
     };
 
+
+
+
+
+
+
+
+
+    
+
     return icons[code] || 'school';
 }
 
