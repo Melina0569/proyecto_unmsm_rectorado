@@ -403,50 +403,33 @@ function extractArrayPayload(payload) {
 }
 
 async function loadApiDocuments() {
-	if (typeof API === "undefined" || !API.documentos || typeof API.documentos.getAll !== "function") {
-		return [];
-	}
+    if (typeof API === "undefined" || !API.admin?.documents?.getAdminDocuments) return [];
 
-	try {
-		const hasAdminDocuments = API.admin && API.admin.documents && typeof API.admin.documents.getAdminDocuments === 'function';
-		const requests = [];
+    try {
+        // 🔧 FIX: No enviar facultyId al backend (causa 500)
+        const result = await API.admin.documents.getAdminDocuments('', '', 1, 100);
+        
+        if (!result?.success) {
+            console.warn('Error cargando documentos:', result?.error);
+            return [];
+        }
+        
+        const allDocs = extractArrayPayload(result.data);
+        console.log(`📊 Documentos admin cargados: ${allDocs.length}`);
+        
+        // Normalizar
+        const normalized = allDocs.map((doc, i) => normalizeDocument(doc, i));
+        
+        // Eliminar duplicados por código
+        const unique = new Map();
+        normalized.forEach(doc => unique.set(doc.code, doc));
+        
+        return Array.from(unique.values());
 
-		if (hasAdminDocuments) {
-			const statusFilters = ["", "pending", "pendiente", "inProgress", "in_proceso", "completado", "aprobado"];
-			requests.push(...statusFilters.map((status) => API.admin.documents.getAdminDocuments('', status, 1, 20)));
-		} else {
-			requests.push(API.documentos.getAll({}));
-		}
-
-		const responses = await Promise.all(requests);
-		const mergedRows = [];
-		responses.forEach((response) => {
-			if (!response?.success) return;
-			const rows = extractArrayPayload(response.data);
-			if (rows.length) {
-				mergedRows.push(...rows);
-			}
-		});
-
-		if (!mergedRows.length) {
-			console.warn('La API devolvió documentos sin un arreglo reconocible o sin resultados útiles');
-			return [];
-		}
-
-		const uniqueByCode = new Map();
-		mergedRows.forEach((doc, index) => {
-			const normalized = normalizeDocument(doc, index);
-			const key = String(normalized.codigo || normalized.id || `doc-${index}`);
-			if (!uniqueByCode.has(key)) {
-				uniqueByCode.set(key, normalized);
-			}
-		});
-
-		return Array.from(uniqueByCode.values());
-	} catch (error) {
-		console.error("Error cargando documentos desde API:", error);
-		return [];
-	}
+    } catch (error) {
+        console.error("Error cargando documentos desde API:", error);
+        return [];
+    }
 }
 
 async function loadAccessRequests() {
@@ -934,95 +917,195 @@ function setupRefreshButton() {
 }
 
 function setupFacultyFilter() {
-	const input = document.getElementById("facultad-search");
-	const clearButton = document.getElementById("facultad-search-clear");
-	const status = document.getElementById("facultad-search-status");
-	const emptyState = document.getElementById("facultad-empty-state");
-	const cards = Array.from(document.querySelectorAll(".facultad-card"));
+    const input = document.getElementById("facultad-search");
+    const clearButton = document.getElementById("facultad-search-clear");
+    const status = document.getElementById("facultad-search-status");
+    const emptyState = document.getElementById("facultad-empty-state");
+    const cards = Array.from(document.querySelectorAll(".facultad-card"));
 
-	if (!input || !cards.length) {
-		return;
-	}
+    if (!input || !cards.length) return;
 
-	const total = cards.length;
+    const total = cards.length;
 
-	const applyFilter = () => {
-		const query = normalizeText(input.value || "");
-		let visibleCount = 0;
+    const applyFilter = () => {
+        const query = normalizeText(input.value || "");
+        let visibleCount = 0;
 
-		cards.forEach((card) => {
-			const label = normalizeText(card.textContent || "");
-			const visible = label.includes(query);
-			card.classList.toggle("hidden", !visible);
-			if (visible) {
-				visibleCount += 1;
-			}
-		});
+        cards.forEach((card) => {
+            // Buscar en nombre, código y data attributes
+            const name = normalizeText(card.textContent || "");
+            const code = normalizeText(card.dataset.facultyCode || "");
+            const fullName = normalizeText(card.getAttribute('title') || "");
+            
+            const visible = name.includes(query) || code.includes(query) || fullName.includes(query);
+            card.classList.toggle("hidden", !visible);
+            if (visible) visibleCount += 1;
+        });
 
-		if (status) {
-			status.textContent = query
-				? `Busqueda activa: ${visibleCount} resultado(s) de ${total} para "${input.value.trim()}"`
-				: `Mostrando ${total} de ${total} facultades`;
-		}
+        if (status) {
+            status.textContent = query
+                ? `Búsqueda activa: ${visibleCount} resultado(s) de ${total} para "${input.value.trim()}"`
+                : `Mostrando ${total} de ${total} facultades`;
+        }
 
-		if (clearButton) {
-			clearButton.classList.toggle("hidden", !query);
-		}
+        if (clearButton) {
+            clearButton.classList.toggle("hidden", !query);
+        }
 
-		if (emptyState) {
-			emptyState.classList.toggle("hidden", visibleCount > 0);
-		}
-	};
+        if (emptyState) {
+            emptyState.classList.toggle("hidden", visibleCount > 0);
+        }
+    };
 
-	input.addEventListener("input", (event) => {
-		applyFilter();
-	});
+    // Limpiar listeners anteriores para evitar duplicados
+    const newInput = input.cloneNode(true);
+    input.parentNode.replaceChild(newInput, input);
+    
+    newInput.addEventListener("input", applyFilter);
+    
+    if (clearButton) {
+        clearButton.addEventListener("click", () => {
+            newInput.value = "";
+            newInput.focus();
+            applyFilter();
+        });
+    }
 
-	if (clearButton) {
-		clearButton.addEventListener("click", () => {
-			input.value = "";
-			input.focus();
-			applyFilter();
-		});
-	}
-
-	applyFilter();
+    applyFilter();
 }
 
 async function setupFacultyNavigation() {
-	const cards = Array.from(document.querySelectorAll(".facultad-card"));
-	if (!cards.length) return;
+    const grid = document.getElementById("facultades-grid");
+    const emptyState = document.getElementById("facultad-empty-state");
+    const status = document.getElementById("facultad-search-status");
+    
+    if (!grid) return;
 
-	// Try to fetch faculties from API to map names -> ids
-	const mapByName = new Map();
-	try {
-		if (typeof API !== 'undefined' && API.admin && typeof API.admin.faculties?.getAll === 'function') {
-			const res = await API.admin.faculties.getAll();
-			const rows = (res && res.success)
-				? (Array.isArray(res.data) ? res.data : (Array.isArray(res.data?.items) ? res.data.items : []))
-				: [];
-			rows.forEach((f) => {
-				const name = (f?.name || f?.shortName || f?.facultad || '').trim();
-				if (name) mapByName.set(name.toLowerCase(), f?.id || '');
-			});
-		}
-	} catch (e) {
-		console.warn('No se pudieron cargar facultades para navegación:', e);
-	}
+    // Mostrar loading
+    grid.innerHTML = `
+        <div class="md:col-span-full text-center py-8">
+            <span class="material-symbols-outlined text-4xl text-blue-300 animate-spin">progress_activity</span>
+            <p class="text-sm text-slate-500 mt-2">Cargando facultades desde el sistema...</p>
+        </div>
+    `;
 
-	cards.forEach((card) => {
-		const labelNode = card.querySelector("span.text-xs.font-bold");
-		const facultyName = (labelNode?.textContent || "").trim();
-		if (!facultyName) return;
+    try {
+        // Cargar facultades desde la API
+        let faculties = [];
+        
+        if (typeof API !== 'undefined' && API.admin && API.admin.faculties?.getAll) {
+            const res = await API.admin.faculties.getAll();
+            if (res?.success && Array.isArray(res.data)) {
+                faculties = res.data;
+            }
+        }
+        
+        // Fallback: intentar con endpoint público
+        if (!faculties.length && typeof API !== 'undefined' && API.public?.faculties?.getAll) {
+            const res = await API.public.faculties.getAll();
+            if (res?.success && Array.isArray(res.data)) {
+                faculties = res.data;
+            }
+        }
 
-		const id = mapByName.get(facultyName.toLowerCase());
-		const target = id
-			? `racio-facultades-documentos.html?facultyId=${encodeURIComponent(id)}`
-			: `racio-facultades-documentos.html?facultad=${encodeURIComponent(facultyName)}`;
+        // Si no hay datos de API, mostrar error
+        if (!faculties.length) {
+            grid.innerHTML = `
+                <div class="md:col-span-full text-center py-8">
+                    <span class="material-symbols-outlined text-4xl text-slate-300">cloud_off</span>
+                    <p class="text-sm text-slate-500 mt-2">No se pudieron cargar las facultades desde el servidor.</p>
+                    <button onclick="location.reload()" class="mt-2 text-xs text-blue-600 hover:underline">Reintentar</button>
+                </div>
+            `;
+            if (status) status.textContent = "Error de conexión con el servidor";
+            return;
+        }
 
-		card.setAttribute("href", target);
-		card.setAttribute("title", `Ver expedientes de ${facultyName}`);
-	});
+        // Mapear iconos y colores por código de facultad
+        const facultyConfig = {
+            'MED': { icon: 'medical_services', color: 'red', glow: 'icon-glow-red' },
+            'DER': { icon: 'gavel', color: 'indigo', glow: 'icon-glow-indigo' },
+            'FLCH': { icon: 'history_edu', color: 'amber', glow: 'icon-glow-amber' },
+            'FFB': { icon: 'vaccines', color: 'cyan', glow: 'icon-glow-cyan' },
+            'FO': { icon: 'health_and_safety', color: 'teal', glow: 'icon-glow-teal' },
+            'FE': { icon: 'school', color: 'emerald', glow: 'icon-glow-emerald' },
+            'FQIQ': { icon: 'science', color: 'lime', glow: 'icon-glow-lime' },
+            'FMV': { icon: 'pets', color: 'orange', glow: 'icon-glow-orange' },
+            'FCA': { icon: 'work', color: 'purple', glow: 'icon-glow-purple' },
+            'FCB': { icon: 'biotech', color: 'green', glow: 'icon-glow-green' },
+            'FCC': { icon: 'money_bag', color: 'pink', glow: 'icon-glow-pink' },
+            'FCE': { icon: 'trending_up', color: 'yellow', glow: 'icon-glow-yellow' },
+            'FCF': { icon: 'antigravity', color: 'violet', glow: 'icon-glow-violet' },
+            'FCM': { icon: 'calculate', color: 'blue', glow: 'icon-glow-blue' },
+            'FCCSS': { icon: 'groups', color: 'rose', glow: 'icon-glow-rose' },
+            'FIGMMG': { icon: 'terrain', color: 'stone', glow: 'icon-glow-stone' },
+            'FII': { icon: 'precision_manufacturing', color: 'slate', glow: 'icon-glow-slate' },
+            'FP': { icon: 'psychology', color: 'fuchsia', glow: 'icon-glow-fuchsia' },
+            'FIEE': { icon: 'electrical_services', color: 'amber', glow: 'icon-glow-amber' },
+            'FISI': { icon: 'computer', color: 'sky', glow: 'icon-glow-sky' }
+        };
+
+        // Generar cards dinámicamente
+        grid.innerHTML = faculties.map(faculty => {
+            const config = facultyConfig[faculty.code] || { 
+                icon: 'school', 
+                color: 'slate', 
+                glow: 'icon-glow-slate' 
+            };
+            
+            const stats = faculty.stats || {};
+            const shortName = faculty.shortName || faculty.name?.replace('Facultad de ', '') || faculty.name;
+            const displayName = shortName.length > 25 ? shortName.substring(0, 22) + '...' : shortName;
+            
+            // URL con el ID real de la API
+            const targetUrl = `racio-facultades-documentos.html?facultyId=${encodeURIComponent(faculty.id)}&facultyCode=${encodeURIComponent(faculty.code)}&facultyName=${encodeURIComponent(faculty.name)}`;
+            
+            return `
+                <a class="facultad-card bg-white p-5 rounded-xl shadow-sm hover-lift transition-all duration-300 flex flex-col items-center justify-center gap-3 h-36 border border-gray-100 group ${config.glow}" 
+                   href="${targetUrl}" 
+                   title="${faculty.name} - Ver ${stats.flowsCount || 0} flujogramas, ${stats.indicatorsCount || 0} indicadores"
+                   data-faculty-id="${faculty.id}"
+                   data-faculty-code="${faculty.code}">
+                    
+                    <div class="w-12 h-12 rounded-full bg-${config.color}-50 text-${config.color}-500 flex items-center justify-center group-hover:bg-${config.color}-100 transition-all icon-bg relative">
+                        <span class="material-symbols-outlined text-2xl">${config.icon}</span>
+                        ${stats.flowsCount > 0 ? `
+                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-${config.color}-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+                                ${stats.flowsCount}
+                            </span>
+                        ` : ''}
+                    </div>
+                    
+                    <span class="text-xs font-bold text-gray-700 text-center leading-tight">${displayName}</span>
+                    
+                    ${stats.indicatorsCount > 0 || stats.processesCount > 0 ? `
+                        <div class="flex gap-1 mt-1">
+                            ${stats.indicatorsCount > 0 ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium">${stats.indicatorsCount} ind</span>` : ''}
+                            ${stats.flowsCount > 0 ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-green-600 font-medium">${stats.flowsCount} fluj</span>` : ''}
+                        </div>
+                    ` : ''}
+                </a>
+            `;
+        }).join('');
+
+        // Actualizar contador
+        if (status) {
+            status.textContent = `Mostrando ${faculties.length} de ${faculties.length} facultades`;
+        }
+
+        // Re-inicializar el filtro de búsqueda con los nuevos elementos
+        setupFacultyFilter();
+
+    } catch (error) {
+        console.error('Error cargando facultades:', error);
+        grid.innerHTML = `
+            <div class="md:col-span-full text-center py-8">
+                <span class="material-symbols-outlined text-4xl text-red-300">error</span>
+                <p class="text-sm text-red-500 mt-2">Error al cargar facultades: ${error.message}</p>
+                <button onclick="setupFacultyNavigation()" class="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700">Reintentar</button>
+            </div>
+        `;
+    }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

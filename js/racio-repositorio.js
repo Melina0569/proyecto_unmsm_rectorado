@@ -384,38 +384,55 @@ function mergeRemoteWithLocal(remoteDocs, localDocs) {
 }
 
 async function loadRemoteRepositoryDocuments(facultyIdOverride = "") {
-	if (
-		typeof API === "undefined"
-		|| !API.admin
-		|| !API.admin.repository
-		|| typeof API.admin.repository.get !== "function"
-	) {
-		return { success: false, docs: [] };
-	}
+    if (
+        typeof API === "undefined"
+        || !API.admin
+        || !API.admin.repository
+        || typeof API.admin.repository.get !== "function"
+    ) {
+        console.warn('API.admin.repository no disponible');
+        return { success: false, docs: [] };
+    }
 
-	try {
-		const params = new URLSearchParams(window.location.search);
-		const facultyId = facultyIdOverride || params.get("facultyId") || params.get("facultadId") || "";
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const facultyId = facultyIdOverride || params.get("facultyId") || params.get("facultadId") || "";
 
-		let response;
-		if (facultyId && typeof API.admin.repository.getByFaculty === "function") {
-			response = await API.admin.repository.getByFaculty(facultyId);
-		} else if (facultyId) {
-			response = await API.admin.repository.get({ facultyId });
-		} else {
-			response = await API.admin.repository.get();
-		}
+        console.log('📤 Cargando repositorio, facultyId:', facultyId || '(todas)');
 
-		if (!response?.success) {
-			return { success: false, docs: [] };
-		}
+        let response;
+        if (facultyId && typeof API.admin.repository.getByFaculty === "function") {
+            response = await API.admin.repository.getByFaculty(facultyId);
+        } else if (facultyId) {
+            response = await API.admin.repository.get({ facultyId });
+        } else {
+            response = await API.admin.repository.get();
+        }
 
-		const docs = flattenRemoteRepositoryPayload(response.data);
-		return { success: true, docs };
-	} catch (error) {
-		console.error("No se pudo cargar el repositorio administrativo:", error);
-		return { success: false, docs: [] };
-	}
+        console.log('📥 Respuesta repositorio:', response);
+
+        if (!response?.success) {
+            console.error('❌ Error repositorio:', response?.error);
+            return { success: false, docs: [] };
+        }
+
+        const docs = flattenRemoteRepositoryPayload(response.data);
+        console.log(`✅ Documentos aplanados: ${docs.length}`);
+        
+        if (docs.length > 0) {
+            console.log('📋 Primer doc:', {
+                codigo: docs[0].codigo,
+                facultad: docs[0].facultad,
+                tipo: docs[0].tipo,
+                estado: docs[0].estado
+            });
+        }
+
+        return { success: true, docs };
+    } catch (error) {
+        console.error("💥 Error cargando repositorio:", error);
+        return { success: false, docs: [] };
+    }
 }
 
 async function loadRepositoryDocuments(options = {}) {

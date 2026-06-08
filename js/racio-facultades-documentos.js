@@ -5,22 +5,88 @@ const STORAGE_KEYS = {
 const PAGE_SIZE = 8;
 
 const SORT_OPTIONS = [
-	{ value: "oldest", label: "Más antiguos" },
-	{ value: "newest", label: "Más recientes" },
-	{ value: "progress-desc", label: "Mayor progreso" },
-	{ value: "progress-asc", label: "Menor progreso" }
+    { value: "oldest", label: "Más antiguos" },
+    { value: "newest", label: "Más recientes" },
+    { value: "progress-desc", label: "Mayor progreso" },
+    { value: "progress-asc", label: "Menor progreso" }
+];
+
+// ✅ NUEVO: Opciones de status para la API
+const STATUS_OPTIONS = [
+    { value: "all", label: "Todos los estados" },
+    { value: "PENDING", label: "Pendiente" },
+    { value: "IN_PROGRESS", label: "En progreso" },
+    { value: "COMPLETED", label: "Completado" },
+    { value: "REJECTED", label: "Rechazado" }
 ];
 
 const state = {
 	allDocuments: [],
-	filteredDocuments: [],
-	faculties: [],
-	page: 1,
-	status: "all",
-	faculty: "all",
-	query: "",
-	sortBy: "oldest"
+    filteredDocuments: [],
+    faculties: [],
+    page: 1,
+    apiStatus: "",            // ✅ NUEVO: PENDING, IN_PROGRESS, COMPLETED, REJECTED para API
+    query: "",
+    sortBy: "oldest"
 };
+
+function getStatusDisplayLabel(value) {
+    return STATUS_OPTIONS.find(option => option.value === value)?.label || "Todos los estados";
+}
+
+function flattenRemoteRepositoryPayload(payload) {
+    if (Array.isArray(payload)) {
+        return payload.map((doc, index) => normalizeRemoteRepositoryDoc(doc, doc?.type || doc?.tipo, index));
+    }
+
+    const source = payload && typeof payload === "object" ? payload : {};
+    const buckets = [
+        { key: "indicators", type: "indicador" },
+        { key: "flows", type: "flujograma" },
+        { key: "characterizations", type: "caracterizacion" },
+        { key: "reports", type: "reporte" }
+    ];
+
+    const rows = [];
+    buckets.forEach(({ key, type }) => {
+        const items = Array.isArray(source[key]) ? source[key] : [];
+        items.forEach((doc, index) => {
+            rows.push({
+                id: doc?.id || doc?.code || `DOC-${index}`,
+                codigo: doc?.code || doc?.codigo || doc?.documentCode || doc?.id || `DOC-${index}`,
+                descripcion: doc?.title || doc?.descripcion || doc?.name || `Documento ${index}`,
+                facultad: doc?.faculty?.shortName || doc?.faculty?.name || doc?.nombreFacultad || doc?.facultad || "Facultad no registrada",
+                unidad: doc?.unit || doc?.unidad || doc?.area || "Oficina responsable",
+                tipo: type,
+                estado: doc?.status || doc?.estado || 'pendiente',
+                fecha: parseDate(doc?.approvedAt || doc?.publishedAt || doc?.updatedAt || doc?.createdAt || new Date()),
+                progress: inferProgress(doc?.status || doc?.estado)
+            });
+        });
+    });
+
+    return rows;
+}
+
+function normalizeRemoteRepositoryDoc(doc, forcedType, index) {
+    return {
+        id: doc?.id || doc?.code || `DOC-${index}`,
+        codigo: doc?.code || doc?.codigo || doc?.documentCode || doc?.id || `DOC-${index}`,
+        descripcion: doc?.title || doc?.descripcion || doc?.name || `Documento ${index}`,
+        facultad: doc?.faculty?.shortName || doc?.faculty?.name || doc?.nombreFacultad || doc?.facultad || "Facultad no registrada",
+        unidad: doc?.unit || doc?.unidad || doc?.area || "Oficina responsable",
+        tipo: forcedType || inferType(doc?.code || doc?.codigo),
+        estado: statusLabel(doc?.status || doc?.estado || "Aprobado"),
+        fecha: parseDate(doc?.approvedAt || doc?.publishedAt || doc?.updatedAt || doc?.createdAt || new Date())
+    };
+}
+
+function inferProgress(status) {
+    const s = normalizeText(status);
+    if (s.includes("complet") || s.includes("aprob")) return 100;
+    if (s.includes("proceso")) return 60;
+    return 15;
+}
 
 function normalizeText(value) {
 	return String(value || "")
@@ -302,39 +368,76 @@ async function loadApiFaculties() {
 }
 
 async function loadApiDocuments(facultyId = "", faculties = state.faculties) {
-	if (typeof API === "undefined" || !API.admin?.documents?.getAdminDocuments) return [];
+    if (typeof API === "undefined") {
+        console.warn('API no disponible');
+        return [];
+    }
 
-	try {
-		if (facultyId) {
-			const result = await API.admin.documents.getAdminDocuments(facultyId, "", 1, 50);
-			if (!result?.success) return [];
-			const list = extractArrayPayload(result.data);
-			return list.map((doc, i) => normalizeDocument(doc, i));
-		}
+    console.log('📤 Cargando documentos, facultyId:', facultyId || '(todas)', 'apiStatus:', state.apiStatus || '(todos)');
 
-		const ids = Array.isArray(faculties)
-			? faculties.map((item) => item.id).filter(Boolean)
-			: [];
+    // ═══════════════════════════════════════════════════════════
+    // ESTRATEGIA 1: Filtro específico facultyId + apiStatus
+    // ESTE es el único endpoint que funciona sin 500
+    // ═══════════════════════════════════════════════════════════
+    if (facultyId && facultyId !== "all" && state.apiStatus && state.apiStatus !== "all") {
+        try {
+            console.log(`🔄 /admin/documents?facultyId=${facultyId}&status=${state.apiStatus}`);
+            const result = await API.admin.documents.getFiltered(facultyId, state.apiStatus, 1, 100);
+            
+            if (result?.success) {
+                const docs = Array.isArray(result.data) ? result.data : [];
+                console.log(`✅ /admin/documents: ${docs.length} docs`);
+                return docs.map((doc, i) => normalizeDocument(doc, i));
+            } else {
+                console.warn('⚠️ /admin/documents error:', result?.error);
+                return [];
+            }
+        } catch (e) {
+            console.warn('⚠️ /admin/documents falló:', e.message);
+            return [];
+        }
+    }
 
-		if (!ids.length) return [];
+    // ═══════════════════════════════════════════════════════════
+    // ESTRATEGIA 2: /admin/repository (funciona, pero suele estar vacío)
+    // ═══════════════════════════════════════════════════════════
+    try {
+        console.log('🔄 /admin/repository...');
+        const repoResponse = await API.admin.repository.get(
+            facultyId && facultyId !== "all" ? { facultyId } : {}
+        );
+        
+        if (repoResponse?.success && repoResponse.data) {
+            const docs = flattenRemoteRepositoryPayload(repoResponse.data);
+            console.log(`✅ /admin/repository: ${docs.length} docs`);
+            if (docs.length > 0) {
+                return docs;
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ /admin/repository falló:', e.message);
+    }
 
-		const responses = await Promise.all(ids.map((id) => API.admin.documents.getAdminDocuments(id, "", 1, 50)));
-		const merged = [];
-		responses.forEach((result) => {
-			if (!result?.success) return;
-			extractArrayPayload(result.data).forEach((doc) => merged.push(doc));
-		});
+    // ═══════════════════════════════════════════════════════════
+    // ESTRATEGIA 3: /portal/documents (probablemente también 500)
+    // ═══════════════════════════════════════════════════════════
+    if (!facultyId || facultyId === "all") {
+        try {
+            const result = await API.portal.documents.getAll({ page: 1, limit: 100 });
+            if (result?.success && Array.isArray(result.data)) {
+                console.log(`✅ /portal/documents: ${result.data.length} docs`);
+                return result.data.map((doc, i) => normalizeDocument(doc, i));
+            }
+        } catch (e) {
+            console.warn('⚠️ /portal/documents falló:', e.message);
+        }
+    }
 
-		const uniqueByCode = new Map();
-		merged.forEach((doc, index) => {
-			const normalized = normalizeDocument(doc, index);
-			uniqueByCode.set(normalized.code, normalized);
-		});
-
-		return Array.from(uniqueByCode.values());
-	} catch {
-		return [];
-	}
+    // ═══════════════════════════════════════════════════════════
+    // ESTRATEGIA 4: Datos de demostración
+    // ═══════════════════════════════════════════════════════════
+    console.log('🔄 Usando datos de demostración...');
+    return buildFallbackDocuments(facultyId);
 }
 
 function loadLocalDocuments() {
@@ -351,9 +454,25 @@ function loadLocalDocuments() {
 }
 
 function statusLabel(status) {
-	if (status === "completado") return "COMPLETADO";
-	if (status === "en_proceso") return "EN PROCESO";
-	return "PENDIENTE";
+    // Mapear estados API a labels visuales
+    const labels = {
+        "PENDING": "PENDIENTE",
+        "IN_PROGRESS": "EN PROCESO", 
+        "COMPLETED": "COMPLETADO",
+        "REJECTED": "RECHAZADO",
+        "completado": "COMPLETADO",
+        "en_proceso": "EN PROCESO",
+        "pendiente": "PENDIENTE"
+    };
+    return labels[status] || status?.toUpperCase() || "PENDIENTE";
+}
+
+function inferProgress(status) {
+    const s = normalizeText(status);
+    if (s.includes("complet") || s.includes("aprob") || s.includes("COMPLETED")) return 100;
+    if (s.includes("proceso") || s.includes("PROGRESS") || s.includes("IN_PROGRESS")) return 60;
+    if (s.includes("rechaz") || s.includes("REJECTED")) return 0;
+    return 15;
 }
 
 function getFacultyDisplayLabel(value) {
@@ -367,21 +486,39 @@ function getSortDisplayLabel(value) {
 }
 
 function getDropdownConfig(type) {
-	if (type === "faculty") {
-		return {
-			root: document.querySelector('.custom-dropdown[data-dropdown="faculty"]'),
-			trigger: document.getElementById("filter-faculty-trigger"),
-			menu: document.getElementById("filter-faculty-menu"),
-			label: document.getElementById("filter-faculty-label")
-		};
-	}
+    if (type === "faculty") {
+        return {
+            root: document.querySelector('.custom-dropdown[data-dropdown="faculty"]'),
+            trigger: document.getElementById("filter-faculty-trigger"),
+            menu: document.getElementById("filter-faculty-menu"),
+            label: document.getElementById("filter-faculty-label")
+        };
+    }
+    
+    if (type === "status-api") {
+        return {
+            root: document.querySelector('.custom-dropdown[data-dropdown="status-api"]'),
+            trigger: document.getElementById("filter-status-api-trigger"),
+            menu: document.getElementById("filter-status-api-menu"),
+            label: document.getElementById("filter-status-api-label")
+        };
+    }
 
-	return {
-		root: document.querySelector('.custom-dropdown[data-dropdown="sort"]'),
-		trigger: document.getElementById("sort-by-trigger"),
-		menu: document.getElementById("sort-by-menu"),
-		label: document.getElementById("sort-by-label")
-	};
+    return {
+        root: document.querySelector('.custom-dropdown[data-dropdown="sort"]'),
+        trigger: document.getElementById("sort-by-trigger"),
+        menu: document.getElementById("sort-by-menu"),
+        label: document.getElementById("sort-by-label")
+    };
+}
+
+function renderStatusApiDropdownOptions() {
+    const config = getDropdownConfig("status-api");
+    if (!config.menu) return;
+
+    config.menu.innerHTML = STATUS_OPTIONS.map((option) => `
+        <button type="button" class="dropdown-option${option.value === state.apiStatus ? " active" : ""}" data-value="${option.value}" aria-selected="${option.value === state.apiStatus ? "true" : "false"}">${option.label}</button>
+    `).join("");
 }
 
 function syncDropdownSelection(type, value) {
@@ -407,7 +544,18 @@ function setDropdownOpen(type, open) {
 }
 
 function closeAllDropdowns() {
-	["faculty", "sort"].forEach((type) => setDropdownOpen(type, false));
+    ["faculty", "sort", "status-api"].forEach((type) => {  // ✅ Agregar "status-api"
+        const config = getDropdownConfig(type);
+        if (!config.root || !config.trigger || !config.menu) return;
+        
+        if (document.activeElement && config.menu.contains(document.activeElement)) {
+            config.trigger.focus();
+        }
+        
+        config.root.classList.remove("is-open");
+        config.trigger.setAttribute("aria-expanded", "false");
+        config.menu.setAttribute("aria-hidden", "true");
+    });
 }
 
 function toggleDropdown(type) {
@@ -442,86 +590,124 @@ function renderSortDropdownOptions() {
 }
 
 function setupDropdownInteractions() {
-	const facultyConfig = getDropdownConfig("faculty");
-	const sortConfig = getDropdownConfig("sort");
+    const facultyConfig = getDropdownConfig("faculty");
+    const sortConfig = getDropdownConfig("sort");
+    const statusApiConfig = getDropdownConfig("status-api");  // ✅ NUEVO
 
-	if (facultyConfig.trigger) {
-		facultyConfig.trigger.addEventListener("click", (event) => {
-			event.preventDefault();
-			event.stopPropagation();
-			toggleDropdown("faculty");
-		});
-	}
+    // Faculty dropdown (existente)
+    if (facultyConfig.trigger) {
+        facultyConfig.trigger.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleDropdown("faculty");
+        });
+    }
 
-	if (sortConfig.trigger) {
-		sortConfig.trigger.addEventListener("click", (event) => {
-			event.preventDefault();
-			event.stopPropagation();
-			toggleDropdown("sort");
-		});
-	}
+    // Sort dropdown (existente)
+    if (sortConfig.trigger) {
+        sortConfig.trigger.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleDropdown("sort");
+        });
+    }
 
-	if (facultyConfig.menu) {
-		facultyConfig.menu.addEventListener("click", (event) => {
-			const option = event.target.closest(".dropdown-option");
-			if (!option) return;
-			state.faculty = option.dataset.value || "all";
-			syncDropdownSelection("faculty", state.faculty);
-			closeAllDropdowns();
-			applyFilters();
-		});
-	}
+    // ✅ NUEVO: Status API dropdown
+    if (statusApiConfig.trigger) {
+        statusApiConfig.trigger.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleDropdown("status-api");
+        });
+    }
 
-	if (sortConfig.menu) {
-		sortConfig.menu.addEventListener("click", (event) => {
-			const option = event.target.closest(".dropdown-option");
-			if (!option) return;
-			state.sortBy = option.dataset.value || "oldest";
-			syncDropdownSelection("sort", state.sortBy);
-			closeAllDropdowns();
-			applyFilters();
-		});
-	}
+    // Faculty menu click
+    if (facultyConfig.menu) {
+        facultyConfig.menu.addEventListener("click", (event) => {
+            const option = event.target.closest(".dropdown-option");
+            if (!option) return;
+            state.faculty = option.dataset.value || "all";
+            syncDropdownSelection("faculty", state.faculty);
+            closeAllDropdowns();
+            // Recargar documentos con nuevo faculty + status API
+            reloadDocuments();
+        });
+    }
 
-	document.addEventListener("click", (event) => {
-		if (!facultyConfig.root?.contains(event.target) && !sortConfig.root?.contains(event.target)) {
-			closeAllDropdowns();
-		}
-	});
+    // Sort menu click (existente)
+    if (sortConfig.menu) {
+        sortConfig.menu.addEventListener("click", (event) => {
+            const option = event.target.closest(".dropdown-option");
+            if (!option) return;
+            state.sortBy = option.dataset.value || "oldest";
+            syncDropdownSelection("sort", state.sortBy);
+            closeAllDropdowns();
+            applyFilters();
+        });
+    }
 
-	document.addEventListener("keydown", (event) => {
-		if (event.key === "Escape") {
-			closeAllDropdowns();
-		}
-	});
+    // ✅ NUEVO: Status API menu click
+    if (statusApiConfig.menu) {
+        statusApiConfig.menu.addEventListener("click", (event) => {
+            const option = event.target.closest(".dropdown-option");
+            if (!option) return;
+            state.apiStatus = option.dataset.value || "";
+            syncDropdownSelection("status-api", state.apiStatus);
+            closeAllDropdowns();
+            // Recargar documentos desde API con nuevo status
+            reloadDocuments();
+        });
+    }
+
+    // Click outside (actualizar para incluir status-api)
+    document.addEventListener("click", (event) => {
+        if (!facultyConfig.root?.contains(event.target) && 
+            !sortConfig.root?.contains(event.target) &&
+            !statusApiConfig.root?.contains(event.target)) {
+            closeAllDropdowns();
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            closeAllDropdowns();
+        }
+    });
+}
+
+async function reloadDocuments() {
+    const facultyId = state.faculty === "all" ? "" : state.faculty;
+    const apiDocs = await loadApiDocuments(facultyId, state.faculties);
+    state.allDocuments = apiDocs;
+    applyFilters();
 }
 
 function applyFilters() {
-	const query = normalizeText(state.query);
+    const query = normalizeText(state.query);
 
-	state.filteredDocuments = state.allDocuments
-		.filter((doc) => {
-			if (state.faculty === "all") return true;
-			if (doc.facultyId && doc.facultyId === state.faculty) return true;
-			const selectedFacultyName = getFacultyDisplayLabel(state.faculty);
-			return normalizeText(doc.faculty) === normalizeText(selectedFacultyName);
-		})
-		.filter((doc) => state.status === "all" || doc.status === state.status)
-		.filter((doc) => {
-			if (!query) return true;
-			return [doc.code, doc.description, doc.faculty, doc.unit].some((value) => normalizeText(value).includes(query));
-		});
+    state.filteredDocuments = state.allDocuments
+        .filter((doc) => {
+            if (state.faculty === "all") return true;
+            if (doc.facultyId && doc.facultyId === state.faculty) return true;
+            const selectedFacultyName = getFacultyDisplayLabel(state.faculty);
+            return normalizeText(doc.faculty) === normalizeText(selectedFacultyName);
+        })
+        // ✅ ELIMINADO: filtro por state.status (tabs locales)
+        .filter((doc) => {
+            if (!query) return true;
+            return [doc.code, doc.description, doc.faculty, doc.unit].some((value) => normalizeText(value).includes(query));
+        });
 
-	state.filteredDocuments.sort((a, b) => {
-		if (state.sortBy === "newest") return b.date - a.date;
-		if (state.sortBy === "progress-desc") return b.progress - a.progress;
-		if (state.sortBy === "progress-asc") return a.progress - b.progress;
-		return a.date - b.date;
-	});
+    state.filteredDocuments.sort((a, b) => {
+        if (state.sortBy === "newest") return b.date - a.date;
+        if (state.sortBy === "progress-desc") return b.progress - b.progress;
+        if (state.sortBy === "progress-asc") return a.progress - b.progress;
+        return a.date - b.date;
+    });
 
-	state.page = 1;
-	renderTable();
-	updatePagination();
+    state.page = 1;
+    renderTable();
+    updatePagination();
 }
 
 function renderTable() {
@@ -634,15 +820,6 @@ function bindFilters() {
 			applyFilters();
 		});
 	}
-
-	tabs.forEach((tab) => {
-		tab.addEventListener("click", () => {
-			tabs.forEach((node) => node.classList.remove("active"));
-			tab.classList.add("active");
-			state.status = tab.dataset.status || "all";
-			applyFilters();
-		});
-	});
 }
 
 function buildFallbackDocuments() {
@@ -654,21 +831,55 @@ function buildFallbackDocuments() {
 	];
 }
 
+function getFacultyFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        id: params.get('facultyId'),
+        code: params.get('facultyCode'),
+        name: params.get('facultyName')
+    };
+}
+
 async function initializeDocuments() {
-	state.faculties = await loadApiFaculties();
-	populateFacultyFilter();
-	renderSortDropdownOptions();
+    const urlFaculty = getFacultyFromUrl();
+    
+    // Cargar facultades
+    state.faculties = await loadApiFaculties();
+    populateFacultyFilter();
+    renderSortDropdownOptions();
+    renderStatusApiDropdownOptions();
 
-	const preselectedFaculty = resolveFacultyFromQuery();
-	state.faculty = preselectedFaculty;
+    // Si viene facultyId en URL
+    if (urlFaculty.id) {
+        const exists = state.faculties.find(f => f.id === urlFaculty.id);
+        if (exists) {
+            state.faculty = urlFaculty.id;
+            // ✅ Pre-seleccionar PENDING para que el endpoint funcione
+            state.apiStatus = "PENDING";
+            
+            const pageTitle = document.querySelector('h1');
+            if (pageTitle && urlFaculty.name) {
+                pageTitle.innerHTML = `
+                    <span class="material-symbols-outlined text-blue-600">folder_shared</span>
+                    Documentos: ${decodeURIComponent(urlFaculty.name)}
+                `;
+            }
+        }
+    }
 
-	const apiDocs = await loadApiDocuments(state.faculty === "all" ? "" : state.faculty, state.faculties);
-	state.allDocuments = apiDocs;
+    // Sincronizar UI
+    syncDropdownSelection("faculty", state.faculty);
+    syncDropdownSelection("sort", state.sortBy);
+    syncDropdownSelection("status-api", state.apiStatus);
 
-	syncDropdownSelection("faculty", state.faculty);
-	syncDropdownSelection("sort", state.sortBy);
-
-	applyFilters();
+    // Cargar documentos
+    const apiDocs = await loadApiDocuments(
+        state.faculty === "all" ? "" : state.faculty, 
+        state.faculties
+    );
+    
+    state.allDocuments = apiDocs;
+    applyFilters();
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

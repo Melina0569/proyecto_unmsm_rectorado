@@ -128,7 +128,7 @@ async function loadDashboardData() {
         }
 
         // Load documents from API
-        const resultado = await API.documentos.getAll({ facultadId });
+        const resultado = await API.portal.documents.getAll({ facultyId: facultadId });
         
         if (!resultado.success) {
             throw new Error(resultado.error || 'Error al cargar datos');
@@ -1179,22 +1179,44 @@ document.addEventListener('DOMContentLoaded', async function() {
         }, 400);
     }
 
-    function ejecutarLogout() {
+    async function ejecutarLogout() {
         logoutModal.classList.add('hide-modal');
         logoutModal.classList.remove('show-modal');
-        
-        setTimeout(() => {
-            // Limpiar todo
-            localStorage.clear();
-            sessionStorage.clear();
-            
-            // Llamar al backend (opcional)
-            fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-            
-            // Redirigir después de animación
-            window.location.href = 'portal-inicio.html';
-        }, 400);
-    }
+    
+            setTimeout(async () => {
+                // 1. Llamar al backend PRIMERO (antes de limpiar el token)
+                try {
+                    // Usar la API híbrida que ya maneja el token automáticamente
+                    if (typeof API !== 'undefined' && API.auth && API.auth.logout) {
+                        await API.auth.logout();
+                    } else {
+                        // Fallback manual si API no está disponible
+                        const token = localStorage.getItem('unmsm_token') 
+                            || localStorage.getItem('token') 
+                            || localStorage.getItem('accessToken');
+                        
+                        if (token) {
+                            await fetch('http://localhost:8080/v1/auth/logout', {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                }
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.log('Logout backend (silencioso):', error.message);
+                }
+
+                // 2. Limpiar TODO el almacenamiento local
+                localStorage.clear();
+                sessionStorage.clear();
+
+                // 3. Redirigir reemplazando el historial (no deja rastro de la sesión)
+                window.location.replace('index.html');
+            }, 400);
+        }
 
     if (logoutBtn && logoutModal) {
         logoutBtn.addEventListener('click', function(e) {

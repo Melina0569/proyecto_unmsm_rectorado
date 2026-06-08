@@ -245,10 +245,8 @@ const LocalAPI = {
             { id: 20, name: 'Ingeniería de Sistemas e Informática', code: 'FISI', icon: 'computer', color: 'sky', indicators: 16, flows: 8, processes: 5, createdAt: new Date().toISOString() }
         ];**/
         
-        const defaultfaculties = await getFaculties();
+        const defaultFaculties = await getFaculties();
         localStorage.setItem(this.db.faculties, JSON.stringify(defaultFaculties));
-        localStorage.setItem(this.db.indicators, JSON.stringify([]));
-        localStorage.setItem(this.db.processes, JSON.stringify([]));
         console.log('✅ 20 facultades cargadas en LocalStorage');
     },
 
@@ -887,26 +885,26 @@ const RemoteAPI = {
     // ========== DOCUMENTOS ==========
     documentos: {
         async getAll(filtros = {}) {
-            const params = new URLSearchParams(filtros).toString();
+            const cleanFiltros = { ...filtros };
+            //delete cleanFiltros.facultadId;
+            //delete cleanFiltros.facultyId;
+
+            const params = new URLSearchParams(cleanFiltros).toString();
             const url = `${CONFIG.REMOTE_BASE}/portal/documents${params ? '?' + params : ''}`;
-            
+
             try {
                 const response = await fetch(url, { headers: RemoteAPI.getHeaders() });
-                
-                if (!response.ok) {
-                    // Backend falla (500), usar datos locales
-                    console.warn('⚠️ /portal/documents falló, usando datos locales');
-                    return LocalAPI.documentos.getAll(filtros);
-                }
-                
-                let payload = null;
-                try { payload = await response.json(); } catch (e) { payload = null; }
 
-                const data = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
+                if (!response.ok) {
+                    console.warn(`⚠️ /portal/documents HTTP ${response.status} ${response.statusText}`);
+                    return { success: false, data: [], status: response.status, error: response.statusText };
+                }
+
+                const payload = await response.json();
+                const data = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
                 return { success: true, data, status: response.status };
             } catch (error) {
-                console.warn('⚠️ Error de red, usando datos locales:', error.message);
-                return LocalAPI.documentos.getAll(filtros);
+                return { success: false, data: [], status: 0, error: error.message };
             }
         },
 
@@ -1250,25 +1248,52 @@ const RemoteAPI = {
         // ========== ADMIN - REPOSITORIO ==========
         repository: {
             async get(filtros = {}) {
-                const params = new URLSearchParams(filtros).toString();
+                // 🔧 FIX: No enviar facultyId vacío o mal formado
+                const cleanFiltros = { ...filtros };
+                
+                // Si facultyId está vacío, eliminarlo para no enviar parámetro vacío
+                if (!cleanFiltros.facultyId || cleanFiltros.facultyId === '') {
+                    delete cleanFiltros.facultyId;
+                }
+                delete cleanFiltros.facultadId;
+                
+                const params = new URLSearchParams(cleanFiltros).toString();
                 const url = `${CONFIG.REMOTE_BASE}/admin/repository${params ? '?' + params : ''}`;
+                
+                console.log('📤 GET', url);
+                
                 try {
                     const response = await fetch(url, {
                         headers: RemoteAPI.getHeaders()
                     });
-                    return { success: response.ok, data: await response.json() };
+                    
+                    if (!response.ok) {
+                        const text = await response.text();
+                        console.warn(`⚠️ /admin/repository ${response.status}:`, text.substring(0, 300));
+                        return { 
+                            success: false, 
+                            error: `HTTP ${response.status}: ${response.statusText}`,
+                            status: response.status,
+                            data: null
+                        };
+                    }
+                    
+                    const data = await response.json();
+                    console.log('✅ /admin/repository:', data);
+                    return { success: true, data, status: response.status };
+                    
                 } catch (error) {
                     return { success: false, error: error.message };
                 }
             },
 
-            async getByFaculty(facultyId) {
-                if (!facultyId) {
-                    return { success: false, error: 'facultyId es requerido' };
-                }
-                return this.get({ facultyId });
-            }
-        },
+    async getByFaculty(facultyId) {
+        if (!facultyId) {
+            return { success: false, error: 'facultyId es requerido' };
+        }
+        return this.get({ facultyId });
+    }
+},
 
         // ========== ADMIN - DOCUMENTOS ==========
         documents: {
@@ -1284,6 +1309,18 @@ const RemoteAPI = {
                 } catch (error) {
                     return { success: false, error: error.message };
                 }
+            },
+
+            // ✅ Método compatible con tu curl - soporta PENDING, IN_PROGRESS, COMPLETED, REJECTED
+            async getFiltered(facultyId, status = '', page = 1, limit = 20) {
+                const validStatuses = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'];
+                const filters = { page, limit };
+                
+                if (facultyId) filters.facultyId = facultyId;
+                if (status && validStatuses.includes(status)) filters.status = status;
+                
+                console.log(`📤 Admin documents filter: faculty=${facultyId}, status=${status}`);
+                return this.getAll(filters);
             },
 
 			// Helper compatible con facultyId + status opcional
@@ -1436,66 +1473,47 @@ const RemoteAPI = {
 
         // ========== PORTAL - DOCUMENTOS ==========
         documents: {
-            async getAll(filtros = {}) {
-                // 🔧 FIX: Eliminar facultyId - el backend filtra por JWT automáticamente
-                // Los FACULTY_USER solo ven sus docs, ADMIN ven todos
-                const cleanFiltros = { ...filtros };
-                delete cleanFiltros.facultyId;        // ← UUID que causa 500
-                delete cleanFiltros.facultadId;       // ← por si acaso
-                
-                const defaults = { page: 1, limit: 20, ...cleanFiltros };
-                const params = new URLSearchParams(defaults).toString();
-                const url = `${CONFIG.REMOTE_BASE}/portal/documents?${params}`;
-                
-                try {
-                    const response = await fetch(url, {
-                        headers: RemoteAPI.getHeaders()
-                    });
+                async getAll(filtros = {}) {
+                    // 🔥 FIX: No intentar /admin/documents sin filtros (da 500)
+                    // Solo usar /portal/documents directamente
                     
-                    // 🔥 FIX: Si el backend devuelve error HTTP (500, 502, etc.)
-                    if (!response.ok) {
-                        console.warn(`⚠️ /portal/documents HTTP ${response.status} ${response.statusText}`);
+                    const cleanFiltros = { ...filtros };
+                    delete cleanFiltros.facultyId;
+                    delete cleanFiltros.facultadId;
+                    
+                    const defaults = { page: 1, limit: 20, ...cleanFiltros };
+                    const params = new URLSearchParams(defaults).toString();
+                    
+                    // ✅ Solo /portal/documents, sin fallback a /admin/documents
+                    console.log('🔄 /portal/documents?' + params);
+                    try {
+                        const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/documents?${params}`, {
+                            headers: RemoteAPI.getHeaders()
+                        });
                         
-                        // Intentar leer el body de error para diagnóstico
-                        let errorBody = '';
-                        try {
-                            errorBody = await response.text();
-                            console.warn('⚠️ Error body:', errorBody.substring(0, 300));
-                        } catch (e) {}
+                        if (!response.ok) {
+                            const text = await response.text();
+                            return { 
+                                success: false, 
+                                error: `HTTP ${response.status}: ${text.substring(0, 100)}`,
+                                status: response.status,
+                                data: []
+                            };
+                        }
                         
-                        // Retornar error controlado (NO fallback automático a local)
-                        // El caller (facultades-documentos.js) decide qué hacer
+                        const payload = await response.json();
+                        const data = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
+                        return { success: true, data, status: response.status };
+                        
+                    } catch (error) {
                         return { 
                             success: false, 
-                            error: `HTTP ${response.status}: ${response.statusText}`,
-                            status: response.status,
-                            data: [],
-                            rawError: errorBody.substring(0, 500)
+                            error: error.message,
+                            status: 0,
+                            data: []
                         };
                     }
-                    
-                    // Solo parsear JSON si la respuesta fue exitosa
-                    const payload = await response.json();
-                    const data = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
-                    
-                    return { 
-                        success: true, 
-                        data,
-                        pagination: payload.pagination || null,
-                        status: response.status 
-                    };
-                    
-                } catch (error) {
-                    // Error de red (servidor caído, CORS, etc.)
-                    console.warn('⚠️ Error de red en /portal/documents:', error.message);
-                    return { 
-                        success: false, 
-                        error: error.message,
-                        status: 0,
-                        data: []
-                    };
-                }
-            },
+                },
 
             async getById(id) {
                 try {
