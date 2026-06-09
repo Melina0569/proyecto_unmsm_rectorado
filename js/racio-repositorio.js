@@ -339,30 +339,44 @@ function normalizeRemoteRepositoryDoc(doc, forcedType, index) {
 }
 
 function flattenRemoteRepositoryPayload(payload) {
-	if (Array.isArray(payload)) {
-		return payload.map((doc, index) => normalizeRemoteRepositoryDoc(doc, doc?.type || doc?.tipo, index));
-	}
+    // Si es null/undefined
+    if (!payload) return [];
+    
+    // Si es array (workaround de localStorage o respuesta directa)
+    if (Array.isArray(payload)) {
+        return payload.map((doc, index) => normalizeRemoteRepositoryDoc(doc, doc?.type || doc?.tipo, index));
+    }
 
-	const source = payload && typeof payload === "object" ? payload : {};
-	const buckets = [
-		{ key: "indicators", type: "indicador" },
-		{ key: "flows", type: "flujograma" },
-		{ key: "characterizations", type: "caracterizacion" },
-		{ key: "reports", type: "reporte" }
-	];
+    // Estructura esperada del backend: { flows: [], indicators: [], characterizations: [], reports: [] }
+    const source = payload && typeof payload === "object" ? payload : {};
+    const buckets = [
+        { key: "indicators", type: "indicador" },
+        { key: "flows", type: "flujograma" },
+        { key: "characterizations", type: "caracterizacion" },
+        { key: "reports", type: "reporte" }
+    ];
 
-	const rows = [];
-	buckets.forEach(({ key, type }) => {
-		safeArray(source[key]).forEach((doc, index) => {
-			rows.push(normalizeRemoteRepositoryDoc(doc, type, index));
-		});
-	});
+    const rows = [];
+    buckets.forEach(({ key, type }) => {
+        const bucketData = source[key];
+        if (Array.isArray(bucketData) && bucketData.length > 0) {
+            bucketData.forEach((doc, index) => {
+                rows.push(normalizeRemoteRepositoryDoc(doc, type, index));
+            });
+        }
+    });
 
-	if (!rows.length && Array.isArray(source.items)) {
-		return source.items.map((doc, index) => normalizeRemoteRepositoryDoc(doc, doc?.type || doc?.tipo, index));
-	}
+    // Si no encontró nada en los buckets, intentar estructura plana
+    if (!rows.length && Array.isArray(source.items)) {
+        return source.items.map((doc, index) => normalizeRemoteRepositoryDoc(doc, doc?.type || doc?.tipo, index));
+    }
+    
+    // Si no encontró nada, intentar si el payload mismo es un documento
+    if (!rows.length && source.id) {
+        rows.push(normalizeRemoteRepositoryDoc(source, source.type || source.tipo, 0));
+    }
 
-	return rows;
+    return rows;
 }
 
 function mergeRemoteWithLocal(remoteDocs, localDocs) {
@@ -411,26 +425,80 @@ async function loadRemoteRepositoryDocuments(facultyIdOverride = "") {
 
         console.log('📥 Respuesta repositorio:', response);
 
-        if (!response?.success) {
-            console.error('❌ Error repositorio:', response?.error);
-            return { success: false, docs: [] };
+        let remoteDocs = [];
+        
+        if (response?.success && response.data) {
+            remoteDocs = flattenRemoteRepositoryPayload(response.data);
+            console.log(`✅ Documentos remotos aplanados: ${remoteDocs.length}`);
+        } else {
+            console.warn('⚠️ Repositorio remoto no disponible o vacío:', response?.error);
         }
 
-        const docs = flattenRemoteRepositoryPayload(response.data);
-        console.log(`✅ Documentos aplanados: ${docs.length}`);
-        
-        if (docs.length > 0) {
+        // 🔧 WORKAROUND: Si el repositorio remoto está vacío o falló,
+        // cargar documentos aprobados desde localStorage
+        if (remoteDocs.length === 0) {
+            console.log('📦 Intentando cargar desde localStorage...');
+            const localApproved = JSON.parse(localStorage.getItem('sigpro_approved_docs') || '[]');
+            
+            if (localApproved.length > 0) {
+                console.log(`💾 ${localApproved.length} documentos aprobados en localStorage`);
+                
+                // Convertir al formato normalizado del repositorio
+                remoteDocs = localApproved.map((doc, index) => ({
+                    id: doc.id || `local-${index}`,
+                    codigo: doc.codigo || doc.code || `DOC-${index + 1}`,
+                    descripcion: doc.descripcion || doc.title || doc.name || 'Documento aprobado',
+                    facultad: doc.facultad || doc.faculty?.name || 'UNMSM',
+                    unidad: doc.unidad || 'Oficina de Racionalización',
+                    tipo: normalizeRepositoryType(doc.tipo || doc.type, doc.codigo),
+                    estado: statusLabel(doc.estado || doc.status || 'Aprobado'),
+                    fecha: parseDate(doc.approvedAt || doc.fecha || doc.fechaAprobacion),
+                    detail: doc,
+                    publicUrl: doc.publicUrl || null,
+                    isLocalFallback: true // Flag para identificar workaround
+                }));
+                
+                console.log(`✅ ${remoteDocs.length} documentos cargados desde localStorage`);
+            }
+        }
+
+        if (remoteDocs.length > 0) {
             console.log('📋 Primer doc:', {
-                codigo: docs[0].codigo,
-                facultad: docs[0].facultad,
-                tipo: docs[0].tipo,
-                estado: docs[0].estado
+                codigo: remoteDocs[0].codigo,
+                facultad: remoteDocs[0].facultad,
+                tipo: remoteDocs[0].tipo,
+                estado: remoteDocs[0].estado,
+                isLocal: remoteDocs[0].isLocalFallback || false
             });
         }
 
-        return { success: true, docs };
+        return { success: true, docs: remoteDocs };
     } catch (error) {
         console.error("💥 Error cargando repositorio:", error);
+        
+        // 🔧 FALLBACK DE EMERGENCIA: Si todo falla, intentar solo localStorage
+        try {
+            const localApproved = JSON.parse(localStorage.getItem('sigpro_approved_docs') || '[]');
+            if (localApproved.length > 0) {
+                console.log('🆘 Fallback de emergencia: usando localStorage');
+                const emergencyDocs = localApproved.map((doc, index) => ({
+                    id: doc.id || `emergency-${index}`,
+                    codigo: doc.codigo || `DOC-${index + 1}`,
+                    descripcion: doc.descripcion || 'Documento aprobado',
+                    facultad: doc.facultad || 'UNMSM',
+                    unidad: 'Oficina de Racionalización',
+                    tipo: 'reporte',
+                    estado: 'Aprobado',
+                    fecha: parseDate(doc.approvedAt),
+                    detail: doc,
+                    isLocalFallback: true
+                }));
+                return { success: true, docs: emergencyDocs };
+            }
+        } catch (localError) {
+            console.error('❌ Fallback local también falló:', localError);
+        }
+        
         return { success: false, docs: [] };
     }
 }

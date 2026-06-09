@@ -406,7 +406,6 @@ async function loadApiDocuments() {
     if (typeof API === "undefined" || !API.admin?.documents?.getAdminDocuments) return [];
 
     try {
-        // 🔧 FIX: No enviar facultyId al backend (causa 500)
         const result = await API.admin.documents.getAdminDocuments('', '', 1, 100);
         
         if (!result?.success) {
@@ -417,12 +416,11 @@ async function loadApiDocuments() {
         const allDocs = extractArrayPayload(result.data);
         console.log(`📊 Documentos admin cargados: ${allDocs.length}`);
         
-        // Normalizar
         const normalized = allDocs.map((doc, i) => normalizeDocument(doc, i));
         
-        // Eliminar duplicados por código
+        // ✅ FIX: usar doc.codigo (no doc.code)
         const unique = new Map();
-        normalized.forEach(doc => unique.set(doc.code, doc));
+        normalized.forEach(doc => unique.set(doc.codigo, doc));
         
         return Array.from(unique.values());
 
@@ -432,31 +430,85 @@ async function loadApiDocuments() {
     }
 }
 
+function toRelativeTime(date) {
+    if (!date || !(date instanceof Date)) return "--";
+    
+    const diffMs = Date.now() - date.getTime();
+    if (diffMs < 0) return "Ahora"; // Fecha futura
+    
+    if (diffMs < 60 * 1000) return "Ahora";
+
+    const minutes = Math.floor(diffMs / (60 * 1000));
+    if (minutes < 60) return `Hace ${minutes} min`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `Hace ${hours} h`;
+
+    const days = Math.floor(hours / 24);
+    if (days === 1) return "Ayer";
+    if (days < 7) return `Hace ${days} días`;
+    
+    return new Intl.DateTimeFormat("es-PE", {
+        day: "2-digit",
+        month: "short"
+    }).format(date);
+}
+
 async function loadAccessRequests() {
-	if (typeof API === "undefined" || !API.admin?.accessRequests?.getAll) {
-		return [];
-	}
+    let apiRequests = [];
+    let apiSuccess = false;
 
-	try {
-		const response = await API.admin.accessRequests.getAll("PENDING");
-		if (!response?.success) {
-			console.warn("No se pudieron cargar solicitudes de acceso:", response);
-			return [];
-		}
+    // 1. Intentar API sin filtro de status (evita 500 del backend)
+    if (typeof API !== "undefined" && API.admin?.accessRequests?.getAll) {
+        try {
+            const response = await API.admin.accessRequests.getAll();
+            if (response?.success && response.status !== 500) {
+                const rows = extractArrayPayload(response.data);
+                // Filtrar PENDING en el frontend
+                apiRequests = rows.filter(item => 
+                    String(item.status || item.estado || '').toUpperCase() === 'PENDING'
+                );
+                apiSuccess = true;
+                console.log(`✅ ${apiRequests.length} solicitudes PENDING desde API`);
+            } else {
+                console.warn('⚠️ API accessRequests error:', response?.error);
+            }
+        } catch (error) {
+            console.warn('❌ API accessRequests exception:', error);
+        }
+    }
 
-		const rows = extractArrayPayload(response.data);
-		if (!rows.length) {
-			return [];
-		}
+    // 2. Fallback: localStorage (solicitudes guardadas desde el portal de registro)
+    let localRequests = [];
+    try {
+        localRequests = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
+        localRequests = localRequests.filter(r => 
+            String(r.status || '').toUpperCase() === 'PENDING'
+        );
+    } catch {}
 
-		return rows
-			.map((item, index) => normalizeAccessRequest(item, index))
-			.filter(Boolean)
-			.sort((a, b) => (b.requestedAt?.getTime?.() || 0) - (a.requestedAt?.getTime?.() || 0));
-	} catch (error) {
-		console.error("Error cargando solicitudes de acceso:", error);
-		return [];
-	}
+    // 3. Si la API falló pero hay datos locales, usarlos
+    if (!apiSuccess && localRequests.length > 0) {
+        console.log(`📦 Usando ${localRequests.length} solicitudes desde localStorage`);
+    }
+
+    // 4. Merge API + localStorage, eliminar duplicados por email
+    const merged = new Map();
+    
+    [...apiRequests, ...localRequests].forEach(req => {
+        const email = req.email || req.correo || '';
+        if (email && !merged.has(email)) {
+            merged.set(email, req);
+        }
+    });
+
+    const result = Array.from(merged.values())
+        .map((item, index) => normalizeAccessRequest(item, index))
+        .filter(Boolean)
+        .sort((a, b) => (b.requestedAt?.getTime?.() || 0) - (a.requestedAt?.getTime?.() || 0));
+
+    console.log(`📋 Total solicitudes pendientes: ${result.length}`);
+    return result;
 }
 
 function updateCounters(documents) {
@@ -631,7 +683,7 @@ function renderNotifications(documents) {
 
 	list.innerHTML = latest.map((doc) => {
 		const style = getNotificationStyle(doc.estado);
-		const relativeTime = toRelativeTime(doc.fechaObj || doc.fecha);
+		const relativeTime = toRelativeTime(doc.fecha instanceof Date ? doc.fecha : new Date(doc.fecha));
 		// Si es corrección, ir a racio-expedientes con el código
 		const detailUrl = doc.codigo ? `racio-expedientes.html?codigo=${encodeURIComponent(doc.codigo)}` : buildExpedienteDetailUrl(doc);
 		return `

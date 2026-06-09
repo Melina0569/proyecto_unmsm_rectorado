@@ -995,11 +995,35 @@ const RemoteAPI = {
     repositorio: {
         async getAprobados(filtros = {}) {
             const params = new URLSearchParams(filtros).toString();
+            // ✅ Usar el endpoint correcto del backend
             const url = `${CONFIG.REMOTE_BASE}/repositorio${params ? '?' + params : ''}`;
             
             try {
                 const response = await fetch(url, { headers: RemoteAPI.getHeaders() });
+                if (!response.ok) {
+                    // Fallback: si /repositorio no existe, usar /public/reps/ directamente
+                    console.warn('⚠️ /repositorio no disponible, intentando /public/reps/');
+                    return this.getPublicReps(filtros);
+                }
                 return { success: response.ok, data: await response.json() };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        },
+
+        // ✅ NUEVO: Acceso directo a archivos públicos aprobados
+        async getPublicReps(filtros = {}) {
+            try {
+                // Si no hay endpoint de listado, construir desde localStorage
+                const approvedDocs = JSON.parse(localStorage.getItem('sigpro_approved_docs') || '[]');
+                
+                // Filtrar por facultad si se especifica
+                let data = approvedDocs;
+                if (filtros.facultyId) {
+                    data = data.filter(d => d.facultyId === filtros.facultyId);
+                }
+                
+                return { success: true, data };
             } catch (error) {
                 return { success: false, error: error.message };
             }
@@ -1305,13 +1329,36 @@ const RemoteAPI = {
                     const response = await fetch(url, {
                         headers: RemoteAPI.getHeaders()
                     });
-                    return { success: response.ok, data: await response.json() };
+                    
+                    // Si no es OK, leer como texto para no crashear con HTML de error
+                    if (!response.ok) {
+                        const text = await response.text();
+                        let errorData = null;
+                        try {
+                            errorData = JSON.parse(text);
+                        } catch {
+                            errorData = { message: text.substring(0, 200) };
+                        }
+                        return { 
+                            success: false, 
+                            status: response.status,
+                            error: errorData?.message || `HTTP ${response.status}: ${response.statusText}`,
+                            data: errorData
+                        };
+                    }
+                    
+                    const data = await response.json();
+                    return { success: true, status: response.status, data };
+                    
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    return { 
+                        success: false, 
+                        status: 0,
+                        error: error.message || "Error de red"
+                    };
                 }
             },
 
-            // ✅ Método compatible con tu curl - soporta PENDING, IN_PROGRESS, COMPLETED, REJECTED
             async getFiltered(facultyId, status = '', page = 1, limit = 20) {
                 const validStatuses = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'];
                 const filters = { page, limit };
@@ -1323,49 +1370,108 @@ const RemoteAPI = {
                 return this.getAll(filters);
             },
 
-			// Helper compatible con facultyId + status opcional
-			async getAdminDocuments(facultyId, status = '', page = 1, limit = 20) {
+            async getAdminDocuments(facultyId, status = '', page = 1, limit = 20) {
                 const filters = { page, limit };
-
-                if (facultyId) {
-                    filters.facultyId = facultyId;
-                }
-
-                if (status) {
-                    filters.status = status;
-                }
-
+                if (facultyId) filters.facultyId = facultyId;
+                if (status) filters.status = status;
                 return this.getAll(filters);
-			},
+            },
 
             async getReview(id) {
                 try {
                     const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/documents/${id}/review`, {
                         headers: RemoteAPI.getHeaders()
                     });
-                    return { success: response.ok, data: await response.json() };
+                    
+                    // Si no es OK, leer como texto primero
+                    if (!response.ok) {
+                        const text = await response.text();
+                        let errorData = null;
+                        try {
+                            errorData = JSON.parse(text);
+                        } catch {
+                            errorData = { message: text.substring(0, 200) };
+                        }
+                        return { 
+                            success: false, 
+                            status: response.status,
+                            error: errorData?.message || `HTTP ${response.status}: ${response.statusText}`,
+                            data: errorData
+                        };
+                    }
+                    
+                    const data = await response.json();
+                    return { success: true, status: response.status, data };
+                    
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    return { 
+                        success: false, 
+                        status: 0,
+                        error: error.message || "Error de red"
+                    };
                 }
             },
 
             async requestCorrection(id, subject, observations, attachments = []) {
-                const params = new URLSearchParams({
-                    subject,
-                    observations,
-                    attachments: attachments.join(',')
-                });
+                const url = new URL(`${CONFIG.REMOTE_BASE}/admin/documents/${encodeURIComponent(id)}/request-correction`);
+                
+                // Parámetros obligatorios
+                url.searchParams.append('subject', subject);
+                url.searchParams.append('observations', observations);
+                
+                // 🔧 FIX: Solo agregar attachments si hay valores reales y no vacíos
+                const validAttachments = (Array.isArray(attachments) ? attachments : [attachments])
+                    .filter(a => a && String(a).trim() !== '' && String(a).toLowerCase() !== 'string');
+                
+                if (validAttachments.length > 0) {
+                    validAttachments.forEach(file => {
+                        url.searchParams.append('attachments', String(file).trim());
+                    });
+                }
+                
+                console.log('📤 request-correction URL:', url.toString());
+
                 try {
-                    const response = await fetch(
-                        `${CONFIG.REMOTE_BASE}/admin/documents/${id}/request-correction?${params.toString()}`,
-                        {
-                            method: 'POST',
-                            headers: RemoteAPI.getHeaders()
+                    const response = await fetch(url.toString(), {
+                        method: 'POST',
+                        headers: {
+                            ...RemoteAPI.getHeaders(),
+                            'Content-Length': '0'  // Indicar body vacío explícitamente
                         }
-                    );
-                    return { success: response.ok, data: await response.json() };
+                    });
+                    
+                    let data = null;
+                    const contentType = response.headers.get('content-type') || '';
+                    
+                    if (contentType.includes('application/json')) {
+                        data = await response.json();
+                    } else {
+                        const text = await response.text();
+                        data = { raw: text.substring(0, 500) };
+                    }
+                    
+                    if (!response.ok) {
+                        console.error('❌ request-correction error:', data);
+                        
+                        // Si es 500 y hay attachments, reintentar SIN attachments como fallback
+                        if (response.status === 500 && validAttachments.length > 0) {
+                            console.warn('⚠️ Reintentando sin attachments debido a error 500...');
+                            return this.requestCorrection(id, subject, observations, []);
+                        }
+                    }
+                    
+                    return { 
+                        success: response.ok, 
+                        data,
+                        status: response.status 
+                    };
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    console.error('❌ request-correction exception:', error);
+                    return { 
+                        success: false, 
+                        error: error.message,
+                        status: 0 
+                    };
                 }
             },
 
@@ -1375,25 +1481,66 @@ const RemoteAPI = {
                         method: 'POST',
                         headers: RemoteAPI.getHeaders()
                     });
-                    return { success: response.ok, data: await response.json() };
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        // ✅ Guardar en localStorage con todos los campos necesarios
+                        const approvedDocs = JSON.parse(localStorage.getItem('sigpro_approved_docs') || '[]');
+                        
+                        // Obtener info completa del documento
+                        const docInfo = await this.getById(id); // o desde localStorage
+                        
+                        approvedDocs.push({
+                            id: id,
+                            publicUrl: data.publicUrl,
+                            codigo: docInfo.codigo || id.substring(0, 8).toUpperCase(),
+                            descripcion: docInfo.descripcion || 'Documento aprobado',
+                            tipo: docInfo.tipo || 'reporte',
+                            facultad: docInfo.nombreFacultad || docInfo.facultad || 'UNMSM',
+                            facultyId: docInfo.facultyId || '',
+                            estado: 'APPROVED',
+                            approvedAt: new Date().toISOString(),
+                            fecha: new Date()
+                        });
+                        
+                        localStorage.setItem('sigpro_approved_docs', JSON.stringify(approvedDocs));
+                    }
+                    
+                    return { success: response.ok, data, status: response.status };
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    return { success: false, error: error.message, status: 0 };
                 }
             }
         },
 
         // ========== ADMIN - SOLICITUDES DE ACCESO ==========
         accessRequests: {
-            async getAll(status = 'PENDING') {
-                const params = new URLSearchParams({ status }).toString();
+            async getAll(status = '') {
+                // 🔧 FIX: No enviar status=PENDING (da 500 en backend por Hibernate proxy)
+                // Traer todas y filtrar en el frontend
+                const url = `${CONFIG.REMOTE_BASE}/admin/access-requests`;
+                
                 try {
-                    const response = await fetch(
-                        `${CONFIG.REMOTE_BASE}/admin/access-requests?${params}`,
-                        {
-                            headers: RemoteAPI.getHeaders()
-                        }
-                    );
-                    return { success: response.ok, data: await response.json() };
+                    const response = await fetch(url, {
+                        headers: RemoteAPI.getHeaders()
+                    });
+                    
+                    if (!response.ok) {
+                        const text = await response.text();
+                        let errorData = null;
+                        try { errorData = JSON.parse(text); } catch { errorData = { message: text.substring(0, 200) }; }
+                        return { 
+                            success: false, 
+                            status: response.status,
+                            error: errorData?.message || `HTTP ${response.status}`,
+                            data: errorData
+                        };
+                    }
+                    
+                    const data = await response.json();
+                    return { success: true, status: response.status, data };
+                    
                 } catch (error) {
                     return { success: false, error: error.message };
                 }
@@ -1528,12 +1675,36 @@ const RemoteAPI = {
 
             async getReview(id) {
                 try {
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/documents/${id}/review`, {
+                    const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/documents/${id}/review`, {
                         headers: RemoteAPI.getHeaders()
                     });
-                    return { success: response.ok, data: await response.json() };
+                    
+                    // Si la respuesta no es OK, intentar leer el body como texto primero
+                    if (!response.ok) {
+                        const text = await response.text();
+                        let errorData = null;
+                        try {
+                            errorData = JSON.parse(text); // Intentar parsear como JSON
+                        } catch {
+                            errorData = { message: text.substring(0, 200) };
+                        }
+                        return { 
+                            success: false, 
+                            status: response.status,
+                            error: errorData?.message || `HTTP ${response.status}: ${response.statusText}`,
+                            data: errorData
+                        };
+                    }
+                    
+                    const data = await response.json();
+                    return { success: true, status: response.status, data };
+                    
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    return { 
+                        success: false, 
+                        status: 0,
+                        error: error.message || "Error de red"
+                    };
                 }
             },
 

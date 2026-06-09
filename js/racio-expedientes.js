@@ -2530,17 +2530,25 @@ async function renderSelectedDocument() {
         // Intentar cargar revisión desde API admin (si está disponible)
         let reviewPayload = null;
         let reviewError = null;
+
+        // ✅ FIX: Intentar con ID UUID primero, luego con código
+        const reviewId = doc.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(doc.id) 
+            ? doc.id 
+            : doc.codigo;
+
         if (typeof API !== 'undefined' && API.admin?.documents?.getReview) {
             try {
-                const resp = await API.admin.documents.getReview(doc.id || doc.codigo);
-                if (resp && resp.success && resp.data) reviewPayload = resp.data;
-                else if (resp && !resp.success) {
-                    reviewError = resp.error || resp.message || JSON.stringify(resp);
-                    console.warn('API review returned error:', reviewError, resp);
+                const resp = await API.admin.documents.getReview(reviewId);
+                if (resp && resp.success && resp.data) {
+                    reviewPayload = resp.data;
+                    console.log('✅ Review cargada:', reviewPayload);
+                } else if (resp && !resp.success) {
+                    reviewError = resp.error || resp.data?.message || `Error ${resp.status || 'desconocido'}`;
+                    console.warn('⚠️ API review error:', reviewError, resp);
                 }
             } catch (err) {
-                reviewError = String(err || "Error desconocido");
-                console.warn('API review no disponible:', err);
+                reviewError = String(err || "Error de conexión");
+                console.warn('❌ API review exception:', err);
             }
         }
 
