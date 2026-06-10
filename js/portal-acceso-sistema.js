@@ -240,7 +240,8 @@
             email: formData.correo,
             firstName: formData.firstName,
             lastName: formData.lastName,
-            facultyId: formData.facultadId,
+            // ✅ FIX: Convertir facultyId a número si es posible
+            facultyId: parseInt(formData.facultadId) || formData.facultadId,
             phone: formData.telefono || '',
             position: formData.cargo,
             message: formData.mensaje || 'Solicitud de acceso al sistema SIGPRO'
@@ -296,7 +297,8 @@
             firstName: formData.firstName,
             lastName: formData.lastName,
             faculty: formData.facultadNombre,
-            facultyId: formData.facultadId,
+            // ✅ FIX: Guardar facultyId como número para consistencia
+            facultyId: parseInt(formData.facultadId) || formData.facultadId,
             facultyCode: formData.facultadCode,
             phone: formData.telefono,
             position: formData.cargo,

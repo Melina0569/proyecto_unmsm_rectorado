@@ -462,16 +462,24 @@ async function loadAccessRequests() {
     if (typeof API !== "undefined" && API.admin?.accessRequests?.getAll) {
         try {
             const response = await API.admin.accessRequests.getAll();
-            if (response?.success && response.status !== 500) {
-                const rows = extractArrayPayload(response.data);
+            console.log('📥 API accessRequests response:', response);
+            
+            // ✅ FIX: Verificar si la respuesta es exitosa (puede venir como array directo o como objeto)
+            const isSuccess = response?.success === true || Array.isArray(response) || Array.isArray(response?.data);
+            
+            if (isSuccess) {
+                const rows = extractArrayPayload(response.data || response);
+                console.log('📊 Raw API rows:', rows.length);
+                
                 // Filtrar PENDING en el frontend
-                apiRequests = rows.filter(item => 
-                    String(item.status || item.estado || '').toUpperCase() === 'PENDING'
-                );
+                apiRequests = rows.filter(item => {
+                    const status = String(item.status || item.estado || '').toUpperCase();
+                    return status === 'PENDING' || status === 'PENDIENTE';
+                });
                 apiSuccess = true;
                 console.log(`✅ ${apiRequests.length} solicitudes PENDING desde API`);
             } else {
-                console.warn('⚠️ API accessRequests error:', response?.error);
+                console.warn('⚠️ API accessRequests no exitosa:', response?.error || 'Sin datos');
             }
         } catch (error) {
             console.warn('❌ API accessRequests exception:', error);
@@ -481,22 +489,33 @@ async function loadAccessRequests() {
     // 2. Fallback: localStorage (solicitudes guardadas desde el portal de registro)
     let localRequests = [];
     try {
-        localRequests = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
-        localRequests = localRequests.filter(r => 
-            String(r.status || '').toUpperCase() === 'PENDING'
-        );
-    } catch {}
+        const raw = localStorage.getItem('sigpro_access_requests');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            localRequests = Array.isArray(parsed) ? parsed : [];
+            console.log('📦 localStorage raw:', localRequests.length, 'solicitudes');
+            
+            localRequests = localRequests.filter(r => {
+                const status = String(r.status || '').toUpperCase();
+                return status === 'PENDING' || status === 'PENDIENTE';
+            });
+            console.log('📦 localStorage PENDING:', localRequests.length);
+        }
+    } catch (e) {
+        console.error('❌ Error leyendo localStorage:', e);
+        localRequests = [];
+    }
 
     // 3. Si la API falló pero hay datos locales, usarlos
     if (!apiSuccess && localRequests.length > 0) {
-        console.log(`📦 Usando ${localRequests.length} solicitudes desde localStorage`);
+        console.log(`📦 Usando ${localRequests.length} solicitudes desde localStorage (API falló)`);
     }
 
     // 4. Merge API + localStorage, eliminar duplicados por email
     const merged = new Map();
     
     [...apiRequests, ...localRequests].forEach(req => {
-        const email = req.email || req.correo || '';
+        const email = (req.email || req.correo || '').toLowerCase().trim();
         if (email && !merged.has(email)) {
             merged.set(email, req);
         }
@@ -507,7 +526,7 @@ async function loadAccessRequests() {
         .filter(Boolean)
         .sort((a, b) => (b.requestedAt?.getTime?.() || 0) - (a.requestedAt?.getTime?.() || 0));
 
-    console.log(`📋 Total solicitudes pendientes: ${result.length}`);
+    console.log(`📋 Total solicitudes pendientes a mostrar: ${result.length}`);
     return result;
 }
 
@@ -544,48 +563,67 @@ function toRelativeTime(date) {
 }
 
 function renderAccessRequests(requests) {
-	dashboardAccessRequests = Array.isArray(requests) ? requests : [];
-	const list = document.getElementById("access-requests-list");
-	const status = document.getElementById("access-requests-status");
-	if (!list) return;
+    dashboardAccessRequests = Array.isArray(requests) ? requests : [];
+    const list = document.getElementById("access-requests-list");
+    const status = document.getElementById("access-requests-status");
+    if (!list) return;
 
-	if (!dashboardAccessRequests.length) {
-		if (status) status.textContent = "Sin solicitudes pendientes";
-		list.innerHTML = `
-			<div class="rounded-xl border border-gray-100 bg-gray-50/60 p-4 text-sm text-gray-500 md:col-span-3">
-				No hay solicitudes de acceso pendientes en este momento.
-			</div>
-		`;
-		return;
-	}
+    if (!dashboardAccessRequests.length) {
+        if (status) status.textContent = "Sin solicitudes pendientes";
+        list.innerHTML = `
+            <div class="rounded-xl border border-gray-100 bg-gray-50/60 p-4 text-sm text-gray-500 md:col-span-3">
+                No hay solicitudes de acceso pendientes en este momento.
+            </div>
+        `;
+        return;
+    }
 
-	if (status) status.textContent = `Mostrando ${dashboardAccessRequests.length} solicitud(es) pendiente(s)`;
-	list.innerHTML = dashboardAccessRequests.slice(0, 3).map((request) => {
-		const relativeTime = toRelativeTime(request.requestedAt || new Date());
-		const initials = initialsFromName(request.fullName);
-		return `
-			<article class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm hover-lift transition-all">
-				<div class="flex items-start gap-3">
-					<div class="w-11 h-11 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black">
-						${escapeHtml(initials)}
-					</div>
-					<div class="min-w-0 flex-1">
-						<div class="flex justify-between items-start gap-2">
-							<div>
-								<h4 class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(request.fullName)}</h4>
-								<p class="text-xs text-gray-500 truncate">${escapeHtml(request.email || "Sin correo")}</p>
-							</div>
-							<span class="text-[10px] text-gray-400 font-medium whitespace-nowrap">${escapeHtml(relativeTime)}</span>
-						</div>
-						<p class="text-xs text-gray-600 mt-2 line-clamp-2"><strong>Facultad:</strong> ${escapeHtml(request.faculty)}</p>
-						${request.position ? `<p class="text-xs text-gray-600 mt-1 line-clamp-2"><strong>Cargo:</strong> ${escapeHtml(request.position)}</p>` : ""}
-						${request.message ? `<p class="text-xs text-gray-500 mt-2 line-clamp-2">${escapeHtml(request.message)}</p>` : ""}
-						<div class="mt-3 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 uppercase">PENDING</div>
-					</div>
-				</div>
-			</article>
-		`;
-	}).join("");
+    if (status) status.textContent = `Mostrando ${dashboardAccessRequests.length} solicitud(es) pendiente(s)`;
+    
+    // ✅ FIX: Agregar data-id para poder aprobar/rechazar
+    list.innerHTML = dashboardAccessRequests.slice(0, 5).map((request) => {
+        const relativeTime = toRelativeTime(request.requestedAt || new Date());
+        const initials = initialsFromName(request.fullName);
+        const requestId = request.id || request.email; // Usar email como fallback ID para localStorage
+        
+        return `
+            <article class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm hover-lift transition-all" data-request-id="${requestId}">
+                <div class="flex items-start gap-3">
+                    <div class="w-11 h-11 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+                        ${escapeHtml(initials)}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex justify-between items-start gap-2">
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(request.fullName)}</h4>
+                                <p class="text-xs text-gray-500 truncate">${escapeHtml(request.email || "Sin correo")}</p>
+                            </div>
+                            <span class="text-[10px] text-gray-400 font-medium whitespace-nowrap">${escapeHtml(relativeTime)}</span>
+                        </div>
+                        <p class="text-xs text-gray-600 mt-2 line-clamp-2"><strong>Facultad:</strong> ${escapeHtml(request.faculty)}</p>
+                        ${request.position ? `<p class="text-xs text-gray-600 mt-1 line-clamp-2"><strong>Cargo:</strong> ${escapeHtml(request.position)}</p>` : ""}
+                        ${request.message ? `<p class="text-xs text-gray-500 mt-2 line-clamp-2">${escapeHtml(request.message)}</p>` : ""}
+                        
+                        <!-- ✅ FIX: Botones de acción -->
+                        <div class="mt-3 flex gap-2">
+                            <button onclick="handleApproveRequest('${requestId}', '${request.email}')" 
+                                    class="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1">
+                                <span class="material-symbols-outlined text-sm">check</span>
+                                Aprobar
+                            </button>
+                            <button onclick="handleRejectRequest('${requestId}', '${request.email}')" 
+                                    class="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1">
+                                <span class="material-symbols-outlined text-sm">close</span>
+                                Rechazar
+                            </button>
+                        </div>
+                        
+                        <div class="mt-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 uppercase">PENDING</div>
+                    </div>
+                </div>
+            </article>
+        `;
+    }).join("");
 }
 
 function getNotificationStyle(status) {
@@ -1157,6 +1195,81 @@ async function setupFacultyNavigation() {
                 <button onclick="setupFacultyNavigation()" class="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700">Reintentar</button>
             </div>
         `;
+    }
+}
+
+async function handleApproveRequest(requestId, email) {
+    if (!confirm(`¿Aprobar solicitud de acceso para ${email}?`)) return;
+    
+    try {
+        // 1. Intentar aprobar via API
+        if (typeof API !== 'undefined' && API.admin?.accessRequests?.approve) {
+            const result = await API.admin.accessRequests.approve(requestId);
+            if (result.success) {
+                console.log('✅ Solicitud aprobada en API:', result.data);
+            }
+        }
+        
+        // 2. Actualizar localStorage
+        updateLocalRequestStatus(email, 'APPROVED');
+        
+        // 3. Recargar lista
+        await loadAccessRequests().then(requests => {
+            renderAccessRequests(requests);
+        });
+        
+        alert('Solicitud aprobada correctamente');
+        
+    } catch (error) {
+        console.error('Error aprobando:', error);
+        alert('Error al aprobar solicitud');
+    }
+}
+
+// ✅ NUEVO: Rechazar solicitud
+async function handleRejectRequest(requestId, email) {
+    const reason = prompt(`¿Motivo del rechazo para ${email}?`, 'No cumple requisitos');
+    if (reason === null) return; // Cancelado
+    
+    try {
+        // 1. Intentar rechazar via API
+        if (typeof API !== 'undefined' && API.admin?.accessRequests?.reject) {
+            const result = await API.admin.accessRequests.reject(requestId, { reason });
+            if (result.success) {
+                console.log('✅ Solicitud rechazada en API:', result.data);
+            }
+        }
+        
+        // 2. Actualizar localStorage
+        updateLocalRequestStatus(email, 'REJECTED');
+        
+        // 3. Recargar lista
+        await loadAccessRequests().then(requests => {
+            renderAccessRequests(requests);
+        });
+        
+        alert('Solicitud rechazada correctamente');
+        
+    } catch (error) {
+        console.error('Error rechazando:', error);
+        alert('Error al rechazar solicitud');
+    }
+}
+
+// ✅ NUEVO: Actualizar estado en localStorage
+function updateLocalRequestStatus(email, newStatus) {
+    try {
+        const requests = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
+        const updated = requests.map(req => {
+            if ((req.email || req.correo || '').toLowerCase() === email.toLowerCase()) {
+                return { ...req, status: newStatus, updatedAt: new Date().toISOString() };
+            }
+            return req;
+        });
+        localStorage.setItem('sigpro_access_requests', JSON.stringify(updated));
+        console.log(`📝 Solicitud ${email} actualizada a ${newStatus}`);
+    } catch (e) {
+        console.error('Error actualizando localStorage:', e);
     }
 }
 

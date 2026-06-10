@@ -1560,13 +1560,27 @@ const RemoteAPI = {
 
             async reject(id, rejectionData) {
                 try {
+                    // ✅ FIX: El backend espera { reason: "..." } o similar, no un objeto genérico
+                    // Ajusta según lo que tu backend realmente espera
+                    const body = {
+                        reason: rejectionData.reason || rejectionData.additionalProp1 || 'Solicitud rechazada',
+                        ...rejectionData
+                    };
+
                     const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/access-requests/${id}/reject`, {
                         method: 'POST',
                         headers: RemoteAPI.getHeaders(),
-                        body: JSON.stringify(rejectionData)
+                        body: JSON.stringify(body)
                     });
-                    return { success: response.ok, data: await response.json() };
+                    
+                    if (!response.ok) {
+                        const text = await response.text();
+                        console.error('❌ Reject error:', text);
+                    }
+                    
+                    return { success: response.ok, data: await response.json().catch(() => ({})) };
                 } catch (error) {
+                    console.error('❌ Reject exception:', error);
                     return { success: false, error: error.message };
                 }
             }
@@ -1664,7 +1678,7 @@ const RemoteAPI = {
 
             async getById(id) {
                 try {
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/documents/${id}`, {
+                    const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/access-requests/${id}`, {
                         headers: RemoteAPI.getHeaders()
                     });
                     return { success: response.ok, data: await response.json() };
