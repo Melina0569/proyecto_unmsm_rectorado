@@ -925,7 +925,9 @@ async function refreshRacioViewFromStorage(force = false) {
 	const detailVisible = Boolean(detailView && !detailView.classList.contains("hidden"));
 	const currentCode = state.selectedCode;
 
-	await loadRepositoryDocuments({ includeRemote: false });
+	// ✅ FIX: Cuando hay cambios en sigpro_approved_docs, forzar recarga remota
+	// para que el fallback de localStorage se active
+	await loadRepositoryDocuments({ includeRemote: true });
 	if (currentCode && state.documents.some((doc) => doc.codigo === currentCode)) {
 		state.selectedCode = currentCode;
 	}
@@ -949,6 +951,7 @@ function setupRealTimeSync() {
 			key === STORAGE_KEYS.DOCUMENTOS_LISTA
 			|| key === STORAGE_KEYS.DOCUMENTOS_DETALLE
 			|| key.startsWith(`${STORAGE_KEYS.HISTORIAL_DATOS}_`)
+			|| key === "sigpro_approved_docs"  // ← AGREGAR ESTA LÍNEA
 		) {
 			void refreshRacioViewFromStorage(true);
 		}
@@ -1192,4 +1195,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 	renderCards();
 	wireFilters();
 	setupRealTimeSync();
+	// 🔔 Detectar si venimos de una aprobación reciente
+    const justApproved = sessionStorage.getItem('sigpro_just_approved');
+    if (justApproved) {
+        sessionStorage.removeItem('sigpro_just_approved');
+        console.log('🔄 Recargando repositorio por aprobación reciente...');
+        await loadRepositoryDocuments({ includeRemote: true });
+        applyFilters();
+        renderCards();
+    }
 });

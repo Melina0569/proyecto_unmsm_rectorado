@@ -1,6 +1,152 @@
 const STORAGE_KEYS = {
 	DOCUMENTOS_LISTA: "sigpro_documentos_lista"
 };
+// ✅ NUEVO: Funciones globales para aprobar/rechazar solicitudes
+window.handleApproveRequest = async function(requestId, email) {
+    if (!confirm(`¿Aprobar solicitud de acceso para ${email}?`)) return;
+    
+    try {
+        let apiSuccess = false;
+        let apiMessage = '';
+        
+        // 1. Intentar aprobar via API
+        if (typeof API !== 'undefined' && API.admin?.accessRequests?.approve) {
+            const result = await API.admin.accessRequests.approve(requestId);
+            
+            if (result.success) {
+                apiSuccess = true;
+                apiMessage = result.data?.message || 'Solicitud aprobada en el servidor.';
+                console.log('✅ Solicitud aprobada en API:', result.data);
+            } else {
+                console.warn('⚠️ API approve falló:', result.error);
+            }
+        }
+        
+        // 2. Actualizar localStorage por email (fallback siempre)
+        updateLocalRequestStatus(email, 'APPROVED');
+
+		// ✅ NUEVO: Actualizar estado por ID (UUID del backend)
+		function updateLocalRequestStatusById(requestId, newStatus) {
+			try {
+				const requests = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
+				const updated = requests.map(req => {
+					if ((req.id || req.requestId || '') === requestId) {
+						return { 
+							...req, 
+							status: newStatus, 
+							estado: newStatus,
+							updatedAt: new Date().toISOString() 
+						};
+					}
+					return req;
+				});
+				localStorage.setItem('sigpro_access_requests', JSON.stringify(updated));
+				
+				// Disparar evento para sincronizar otras pestañas
+				window.dispatchEvent(new StorageEvent('storage', {
+					key: 'sigpro_access_requests',
+					newValue: JSON.stringify(updated)
+				}));
+				
+				console.log(`📝 Solicitud ID ${requestId} actualizada a ${newStatus}`);
+			} catch (e) {
+				console.error('Error actualizando localStorage por ID:', e);
+			}
+		}
+				
+        // 3. También intentar actualizar por ID si el requestId es un UUID válido
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+            updateLocalRequestStatusById(requestId, 'APPROVED');
+        }
+        
+        // 4. Recargar lista
+        await loadAccessRequests().then(requests => {
+            renderAccessRequests(requests);
+        });
+        
+        // 5. Mensaje al usuario
+        const successMsg = apiSuccess 
+            ? `${apiMessage}\n\nLa solicitud ha sido procesada.`
+            : 'Solicitud aprobada localmente. Verifique la conexión con el servidor.';
+        alert(successMsg);
+        
+    } catch (error) {
+        console.error('Error aprobando:', error);
+        alert('Error al aprobar solicitud: ' + error.message);
+    }
+};
+
+window.handleRejectRequest = async function(requestId, email) {
+    const reason = prompt(`¿Motivo del rechazo para ${email}?`, 'No cumple requisitos');
+    if (reason === null) return;
+    
+    try {
+        let apiSuccess = false;
+        
+        // 1. Intentar rechazar via API
+        if (typeof API !== 'undefined' && API.admin?.accessRequests?.reject) {
+            const result = await API.admin.accessRequests.reject(requestId, { 
+                reason,
+                additionalProp1: reason
+            });
+            
+            if (result.success) {
+                apiSuccess = true;
+                console.log('✅ Solicitud rechazada en API:', result.data);
+            } else {
+                console.warn('⚠️ API reject falló:', result.error);
+            }
+        }
+        
+        // 2. Actualizar localStorage
+        updateLocalRequestStatus(email, 'REJECTED');
+        
+        // 3. También por ID si es UUID
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+            updateLocalRequestStatusById(requestId, 'REJECTED');
+        }
+        
+        // 4. Recargar lista
+        await loadAccessRequests().then(requests => {
+            renderAccessRequests(requests);
+        });
+        
+        alert(apiSuccess ? 'Solicitud rechazada correctamente.' : 'Solicitud rechazada localmente.');
+        
+    } catch (error) {
+        console.error('Error rechazando:', error);
+        alert('Error al rechazar solicitud: ' + error.message);
+    }
+};
+
+window.updateLocalRequestStatus = function(email, newStatus) {
+    try {
+        const requests = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
+        const updated = requests.map(req => {
+            if ((req.email || req.correo || '').toLowerCase() === email.toLowerCase()) {
+                return { 
+                    ...req, 
+                    status: newStatus, 
+                    estado: newStatus,
+                    updatedAt: new Date().toISOString() 
+                };
+            }
+            return req;
+        });
+        localStorage.setItem('sigpro_access_requests', JSON.stringify(updated));
+        
+        // 🔥 Disparar evento para sincronizar otras pestañas
+        window.dispatchEvent(new StorageEvent('storage', {
+            key: 'sigpro_access_requests',
+            newValue: JSON.stringify(updated)
+        }));
+        
+        console.log(`📝 Solicitud ${email} actualizada a ${newStatus}`);
+    } catch (e) {
+        console.error('Error actualizando localStorage:', e);
+    }
+};
+
 
 let dashboardDocuments = [];
 let dashboardAccessRequests = [];
@@ -580,11 +726,16 @@ function renderAccessRequests(requests) {
 
     if (status) status.textContent = `Mostrando ${dashboardAccessRequests.length} solicitud(es) pendiente(s)`;
     
-    // ✅ FIX: Agregar data-id para poder aprobar/rechazar
     list.innerHTML = dashboardAccessRequests.slice(0, 5).map((request) => {
         const relativeTime = toRelativeTime(request.requestedAt || new Date());
         const initials = initialsFromName(request.fullName);
-        const requestId = request.id || request.email; // Usar email como fallback ID para localStorage
+        
+        // ✅ FIX: Priorizar el ID real (UUID) del backend, luego requestId, luego id, luego email
+        const requestId = request.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request.id)
+            ? request.id  // UUID válido del backend
+            : (request.requestId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request.requestId)
+                ? request.requestId  // requestId válido
+                : (request.id || request.email)); // Fallback
         
         return `
             <article class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm hover-lift transition-all" data-request-id="${requestId}">
@@ -604,14 +755,14 @@ function renderAccessRequests(requests) {
                         ${request.position ? `<p class="text-xs text-gray-600 mt-1 line-clamp-2"><strong>Cargo:</strong> ${escapeHtml(request.position)}</p>` : ""}
                         ${request.message ? `<p class="text-xs text-gray-500 mt-2 line-clamp-2">${escapeHtml(request.message)}</p>` : ""}
                         
-                        <!-- ✅ FIX: Botones de acción -->
+                        <!-- ✅ FIX: Botones con requestId correcto -->
                         <div class="mt-3 flex gap-2">
-                            <button onclick="handleApproveRequest('${requestId}', '${request.email}')" 
+                            <button onclick="handleApproveRequest('${requestId}', '${escapeHtml(request.email)}')" 
                                     class="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1">
                                 <span class="material-symbols-outlined text-sm">check</span>
                                 Aprobar
                             </button>
-                            <button onclick="handleRejectRequest('${requestId}', '${request.email}')" 
+                            <button onclick="handleRejectRequest('${requestId}', '${escapeHtml(request.email)}')" 
                                     class="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1">
                                 <span class="material-symbols-outlined text-sm">close</span>
                                 Rechazar
@@ -1288,4 +1439,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 	await loadAdminFacultiesTable();
 	await loadAndRenderAdminStats();
 	await loadDashboardData();
+	
+	// ✅ FIX: Cerrar correctamente el callback del event listener
+	window.addEventListener('storage', (event) => {
+		if (event.key === 'sigpro_access_requests') {
+			console.log('🔄 Solicitudes actualizadas desde otra pestaña');
+			loadAccessRequests().then(requests => renderAccessRequests(requests));
+		}
+	}); 
 });

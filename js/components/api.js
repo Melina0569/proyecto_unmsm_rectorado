@@ -792,15 +792,46 @@ const RemoteAPI = {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(registroData)
                 });
+                
+                const data = await response.json();
+                
+                // ✅ FIX: Guardar solicitud en localStorage para que el dashboard la muestre
+                if (response.ok && data.requestId) {
+                    const pendingRequest = {
+                        id: data.requestId,
+                        requestId: data.requestId,
+                        email: registroData.email,
+                        firstName: registroData.firstName,
+                        lastName: registroData.lastName,
+                        fullName: `${registroData.firstName} ${registroData.lastName}`.trim(),
+                        facultyId: registroData.facultyId,
+                        faculty: registroData.facultyName || registroData.faculty || 'Facultad no especificada',
+                        position: registroData.position || '',
+                        phone: registroData.phone || '',
+                        message: registroData.message || '',
+                        status: 'PENDING',
+                        estado: 'PENDING',
+                        requestedAt: new Date().toISOString(),
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    const existing = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
+                    existing.push(pendingRequest);
+                    localStorage.setItem('sigpro_access_requests', JSON.stringify(existing));
+                    
+                    console.log('✅ Solicitud guardada en localStorage:', pendingRequest);
+                }
+                
                 return { 
                     success: response.ok, 
-                    data: await response.json(), 
+                    data: data, 
                     status: response.status 
                 };
             } catch (error) {
                 return { success: false, error: error.message };
             }
         },
+
 
         async refresh(refreshToken) {
             try {
@@ -1485,30 +1516,63 @@ const RemoteAPI = {
                     const data = await response.json();
                     
                     if (response.ok) {
-                        // ✅ Guardar en localStorage con todos los campos necesarios
-                        const approvedDocs = JSON.parse(localStorage.getItem('sigpro_approved_docs') || '[]');
+                        // ✅ OBTENER INFO COMPLETA del documento antes de guardar
+                        const allDocs = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+                        const docInfo = allDocs.find(d => (d.id === id || d.codigo === id)) || {};
                         
-                        // Obtener info completa del documento
-                        const docInfo = await this.getById(id); // o desde localStorage
-                        
-                        approvedDocs.push({
+                        // Normalizar el documento aprobado
+                        const approvedDoc = {
                             id: id,
-                            publicUrl: data.publicUrl,
-                            codigo: docInfo.codigo || id.substring(0, 8).toUpperCase(),
-                            descripcion: docInfo.descripcion || 'Documento aprobado',
-                            tipo: docInfo.tipo || 'reporte',
-                            facultad: docInfo.nombreFacultad || docInfo.facultad || 'UNMSM',
-                            facultyId: docInfo.facultyId || '',
-                            estado: 'APPROVED',
+                            code: docInfo.codigo || id,
+                            codigo: docInfo.codigo || id,
+                            title: docInfo.descripcion || docInfo.nombre || data.title || 'Documento aprobado',
+                            descripcion: docInfo.descripcion || docInfo.nombre || data.title || 'Documento aprobado',
+                            name: docInfo.descripcion || docInfo.nombre || data.title || 'Documento aprobado',
+                            type: docInfo.tipo || data.type || 'reporte',
+                            tipo: docInfo.tipo || data.type || 'reporte',
+                            status: 'APPROVED',
+                            estado: 'aprobado',
+                            faculty: docInfo.nombreFacultad || docInfo.facultad || data.facultyName || 'UNMSM',
+                            facultad: docInfo.nombreFacultad || docInfo.facultad || data.facultyName || 'UNMSM',
+                            nombreFacultad: docInfo.nombreFacultad || docInfo.facultad || data.facultyName || 'UNMSM',
+                            facultyId: docInfo.facultyId || data.facultyId || '',
+                            unit: docInfo.unidad || data.unit || 'Oficina de Racionalización',
+                            unidad: docInfo.unidad || data.unit || 'Oficina de Racionalización',
+                            publicUrl: data.publicUrl || data.urlPublica || `/public/reps/${id}`,
                             approvedAt: new Date().toISOString(),
-                            fecha: new Date()
-                        });
+                            fechaAprobacion: new Date().toISOString(),
+                            fecha: new Date().toISOString(),
+                            updatedAt: new Date().toISOString(),
+                            // Campos para compatibilidad con normalizeRemoteRepositoryDoc
+                            approvedAt: data.approvedAt || new Date().toISOString(),
+                            publishedAt: data.publishedAt || new Date().toISOString(),
+                            createdAt: docInfo.fecha || docInfo.createdAt || new Date().toISOString()
+                        };
+                        
+                        // Guardar en sigpro_approved_docs
+                        const approvedDocs = JSON.parse(localStorage.getItem('sigpro_approved_docs') || '[]');
+                        const existingIndex = approvedDocs.findIndex(d => d.id === id || d.codigo === approvedDoc.codigo);
+                        
+                        if (existingIndex >= 0) {
+                            approvedDocs[existingIndex] = { ...approvedDocs[existingIndex], ...approvedDoc };
+                        } else {
+                            approvedDocs.push(approvedDoc);
+                        }
                         
                         localStorage.setItem('sigpro_approved_docs', JSON.stringify(approvedDocs));
+                        
+                        // 🔥 DISPARAR EVENTO de storage para sincronizar otras pestañas
+                        window.dispatchEvent(new StorageEvent('storage', {
+                            key: 'sigpro_approved_docs',
+                            newValue: JSON.stringify(approvedDocs)
+                        }));
+                        
+                        console.log('✅ Documento aprobado guardado en localStorage:', approvedDoc);
                     }
                     
                     return { success: response.ok, data, status: response.status };
                 } catch (error) {
+                    console.error('❌ Error en approve:', error);
                     return { success: false, error: error.message, status: 0 };
                 }
             }
@@ -1548,42 +1612,93 @@ const RemoteAPI = {
 
             async approve(id) {
                 try {
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/access-requests/${id}/approve`, {
-                        method: 'POST',
-                        headers: RemoteAPI.getHeaders()
-                    });
-                    return { success: response.ok, data: await response.json() };
+                    const response = await fetch(
+                        `${CONFIG.REMOTE_BASE}/admin/access-requests/${id}/approve`,
+                        {
+                            method: 'POST',
+                            headers: RemoteAPI.getHeaders()
+                        }
+                    );
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Error ${response.status}: ${errorText.substring(0, 200)}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log('✅ Solicitud aprobada:', data);
+                    
+                    // Actualizar localStorage
+                    try {
+                        const requests = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
+                        const updated = requests.map(req => {
+                            if ((req.id || req.requestId || '') === id) {
+                                return { 
+                                    ...req, 
+                                    status: 'APPROVED', 
+                                    estado: 'APPROVED',
+                                    approvedAt: new Date().toISOString(),
+                                    updatedAt: new Date().toISOString()
+                                };
+                            }
+                            return req;
+                        });
+                        localStorage.setItem('sigpro_access_requests', JSON.stringify(updated));
+                        
+                        window.dispatchEvent(new StorageEvent('storage', {
+                            key: 'sigpro_access_requests',
+                            newValue: JSON.stringify(updated)
+                        }));
+                    } catch (e) {
+                        console.warn('No se pudo actualizar localStorage:', e);
+                    }
+                    
+                    return { success: true, data, status: response.status };
+                    
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    console.error('❌ Error en approve:', error);
+                    return { success: false, error: error.message, status: 0 };
                 }
             },
 
             async reject(id, rejectionData) {
-                try {
-                    // ✅ FIX: El backend espera { reason: "..." } o similar, no un objeto genérico
-                    // Ajusta según lo que tu backend realmente espera
-                    const body = {
-                        reason: rejectionData.reason || rejectionData.additionalProp1 || 'Solicitud rechazada',
-                        ...rejectionData
-                    };
+            try {
+                // ✅ FIX: El backend espera { additionalProp1, additionalProp2, additionalProp3 }
+                // Mapeamos "reason" a additionalProp1 para compatibilidad
+                const body = {
+                    additionalProp1: rejectionData.reason || rejectionData.additionalProp1 || 'Solicitud rechazada',
+                    additionalProp2: rejectionData.additionalProp2 || '',
+                    additionalProp3: rejectionData.additionalProp3 || ''
+                };
 
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/access-requests/${id}/reject`, {
-                        method: 'POST',
-                        headers: RemoteAPI.getHeaders(),
-                        body: JSON.stringify(body)
-                    });
-                    
-                    if (!response.ok) {
-                        const text = await response.text();
-                        console.error('❌ Reject error:', text);
-                    }
-                    
-                    return { success: response.ok, data: await response.json().catch(() => ({})) };
-                } catch (error) {
-                    console.error('❌ Reject exception:', error);
-                    return { success: false, error: error.message };
+                const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/access-requests/${id}/reject`, {
+                    method: 'POST',
+                    headers: RemoteAPI.getHeaders(),
+                    body: JSON.stringify(body)
+                });
+                
+                let data = null;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    data = { message: 'Solicitud rechazada' };
                 }
+                
+                if (!response.ok) {
+                    console.error('❌ Reject error:', data);
+                    return { 
+                        success: false, 
+                        error: data?.message || `HTTP ${response.status}`,
+                        status: response.status 
+                    };
+                }
+                
+                return { success: true, data, status: response.status };
+            } catch (error) {
+                console.error('❌ Reject exception:', error);
+                return { success: false, error: error.message, status: 0 };
             }
+        }
         }
     },
 
@@ -2252,3 +2367,75 @@ API.getMode = () => CONFIG.MODE;
 window.API = API;
 console.log(`✅ API UNMSM cargada en modo: ${CONFIG.MODE.toUpperCase()}`);
 console.log(`   Base URL: ${CONFIG.MODE === 'remote' ? CONFIG.REMOTE_BASE : 'LocalStorage'}`);
+
+// ============================================
+// FUNCIONES UTILITARIAS DIRECTAS
+// ============================================
+
+/**
+ * Aprueba una solicitud de acceso directamente via API.
+ * Más simple que usar API.admin.accessRequests.approve()
+ * 
+ * @param {string} idSolicitud - UUID de la solicitud
+ * @param {string} token - Bearer token (opcional, se autodetecta si no se pasa)
+ * @returns {Promise<Object>} - Respuesta del servidor
+ */
+async function aprobarSolicitud(idSolicitud, token) {
+    const authToken = token || localStorage.getItem('token') || localStorage.getItem('unmsm_token');
+    
+    try {
+        const response = await fetch(
+            `${CONFIG.REMOTE_BASE}/admin/access-requests/${idSolicitud}/approve`,
+            {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Authorization": `Bearer ${authToken}`
+                }
+            }
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Error ${response.status}: ${errorText.substring(0, 200)}`);
+        }
+
+        const data = await response.json();
+        console.log("✅ Solicitud aprobada:", data);
+
+        // ✅ Actualizar localStorage
+        try {
+            const requests = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
+            const updated = requests.map(req => {
+                if ((req.id || req.requestId || '') === idSolicitud) {
+                    return { 
+                        ...req, 
+                        status: 'APPROVED', 
+                        estado: 'APPROVED',
+                        approvedAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    };
+                }
+                return req;
+            });
+            localStorage.setItem('sigpro_access_requests', JSON.stringify(updated));
+            
+            // Sincronizar otras pestañas
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'sigpro_access_requests',
+                newValue: JSON.stringify(updated)
+            }));
+        } catch (e) {
+            console.warn('No se pudo actualizar localStorage:', e);
+        }
+
+        return { success: true, data };
+
+    } catch (error) {
+        console.error("❌ Error aprobando solicitud:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Exponer globalmente
+window.aprobarSolicitud = aprobarSolicitud;

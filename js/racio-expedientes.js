@@ -811,46 +811,154 @@ function syncCorrectionToSharedStorages(doc, correctionRequest) {
 async function approveCurrentExpediente() {
     const doc = state.selectedDocument || state.allDocuments[0] || null;
     if (!doc) return;
+    
     if (doc.estado === "completado") {
         window.alert("Este expediente ya fue aprobado.");
         return;
     }
-    if (!window.confirm("¿Aprobar y enviar al repositorio?")) return;
+    
+    if (!window.confirm("¿Aprobar y enviar al repositorio público?")) return;
 
     const approveButton = document.getElementById("approve-expediente-btn");
     if (approveButton) {
         approveButton.disabled = true;
+        approveButton.innerHTML = '<span class="material-symbols-outlined animate-spin">refresh</span> APROBANDO...';
         approveButton.classList.add("opacity-80", "cursor-wait");
     }
 
     try {
-        const user = getCurrentUser();
-        if (typeof API !== "undefined" && API.documentos?.updateEstado && doc.id) {
-            await Promise.resolve(API.documentos.updateEstado(doc.id, "APROBADO", user?.id || 1));
+        // 🔥 DETERMINAR ID CORRECTO (UUID o código)
+        const docId = doc.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(doc.id)
+            ? doc.id  // UUID válido
+            : doc.codigo; // Fallback al código
+
+        console.log('📤 Aprobando documento:', docId);
+
+        // 🔥 LLAMADA A LA API REAL
+        let apiResult;
+        if (typeof API !== "undefined" && API.admin?.documents?.approve) {
+            apiResult = await API.admin.documents.approve(docId);
+        } else {
+            // Fallback si API no está cargada
+            const token = localStorage.getItem('unmsm_token') || localStorage.getItem('token');
+            const response = await fetch(`http://localhost:8080/v1/admin/documents/${docId}/approve`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            apiResult = { 
+                success: response.ok, 
+                data: await response.json().catch(() => ({})),
+                status: response.status 
+            };
         }
-        upsertDocumentoAprobado(doc);
-        upsertExpedienteRepositorio(doc);
-        
+
+        console.log('📥 Respuesta API:', apiResult);
+
+        if (!apiResult.success) {
+            throw new Error(apiResult.error || apiResult.data?.message || `Error ${apiResult.status}`);
+        }
+
+        // ✅ ÉXITO: Actualizar estado local
+        const publicUrl = apiResult.data?.publicUrl || `/public/reps/${docId}`;
         const approvedDate = new Date();
+
+        // Guardar en localStorage para persistencia
+        upsertDocumentoAprobado({
+            ...doc,
+            estado: "completado",
+            progreso: 100,
+            fechaAprobacion: approvedDate.toISOString(),
+            publicUrl: publicUrl
+        });
+        upsertExpedienteRepositorio({
+            ...doc,
+            estado: "aprobado",
+            fechaAprobacion: approvedDate.toISOString(),
+            publicUrl: publicUrl
+        });
+
+        // ✅ FIX: Guardar también en sigpro_approved_docs (key que usa el repositorio como fallback)
+        const approvedDocs = JSON.parse(localStorage.getItem('sigpro_approved_docs') || '[]');
+        const approvedDoc = {
+            id: doc.id || doc.codigo,
+            code: doc.codigo,
+            codigo: doc.codigo,
+            title: doc.descripcion || 'Documento aprobado',
+            descripcion: doc.descripcion || 'Documento aprobado',
+            name: doc.descripcion || 'Documento aprobado',
+            type: doc.tipo || 'reporte',
+            tipo: doc.tipo || 'reporte',
+            status: 'APPROVED',
+            estado: 'aprobado',
+            faculty: doc.facultad || 'UNMSM',
+            facultad: doc.facultad || 'UNMSM',
+            nombreFacultad: doc.facultad || 'UNMSM',
+            facultyId: doc.facultyId || '',
+            unit: doc.unidad || 'Oficina de Racionalización',
+            unidad: doc.unidad || 'Oficina de Racionalización',
+            publicUrl: publicUrl,
+            approvedAt: approvedDate.toISOString(),
+            fechaAprobacion: approvedDate.toISOString(),
+            fecha: approvedDate.toISOString(),
+            updatedAt: approvedDate.toISOString(),
+            publishedAt: approvedDate.toISOString(),
+            createdAt: doc.fecha || approvedDate.toISOString()
+        };
+
+        const existingIndex = approvedDocs.findIndex(d => d.id === (doc.id || doc.codigo) || d.codigo === doc.codigo);
+        if (existingIndex >= 0) {
+            approvedDocs[existingIndex] = { ...approvedDocs[existingIndex], ...approvedDoc };
+        } else {
+            approvedDocs.push(approvedDoc);
+        }
+
+        localStorage.setItem('sigpro_approved_docs', JSON.stringify(approvedDocs));
+
+        // 🔥 Disparar evento para sincronizar otras pestañas
+        window.dispatchEvent(new StorageEvent('storage', {
+            key: 'sigpro_approved_docs',
+            newValue: JSON.stringify(approvedDocs)
+        }));
+
+        // Actualizar estado en memoria
         doc.estado = "completado";
         doc.progreso = 100;
         doc.fecha = approvedDate;
-        state.allDocuments = state.allDocuments.map((item) => item.codigo === doc.codigo ? {
-            ...item, estado: "completado", progreso: 100, fecha: approvedDate
-        } : item);
+        doc.publicUrl = publicUrl;
+        
+        state.allDocuments = state.allDocuments.map((item) => 
+            item.codigo === doc.codigo ? { ...item, estado: "completado", progreso: 100, fecha: approvedDate, publicUrl } : item
+        );
         state.selectedDocument = doc;
 
+        // 🔔 Disparar evento para otras vistas
+        document.dispatchEvent(new CustomEvent('historial-actualizado', {
+            detail: { codigo: doc.codigo, accion: 'aprobado', publicUrl }
+        }));
+
+        // 🔔 Notificación visual
         renderDocumentList();
         await renderSelectedDocument();
-        window.alert("Expediente aprobado y disponible en repositorios.");
+        
+        // ✅ REDIRECCIÓN AL REPOSITORIO
+        sessionStorage.setItem('sigpro_just_approved', 'true');
+        window.alert(`✅ Expediente aprobado y publicado.\n\nSe redirigirá al repositorio...`);
+        window.location.href = 'racio-repositorio.html';
+
     } catch (error) {
-        console.error("Error aprobando:", error);
-        window.alert("No se pudo completar la aprobación.");
+        console.error("❌ Error aprobando:", error);
+        window.alert(`No se pudo completar la aprobación:\n${error.message}`);
     } finally {
-        if (approveButton) approveButton.classList.remove("cursor-wait");
-        updateApproveButtonState(state.selectedDocument);
+        if (approveButton) {
+            approveButton.classList.remove("cursor-wait", "opacity-80");
+            updateApproveButtonState(state.selectedDocument);
+        }
     }
 }
+
 
 // ==========================================
 // USUARIO Y AUTENTICACIÓN
