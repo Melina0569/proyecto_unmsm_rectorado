@@ -331,15 +331,15 @@ const LocalAPI = {
             };
         },
 
-        async registro(userData) {
-            await simulateDelay(600);
+        //async registro(userData) {
+            //await simulateDelay(600);
             // Simulación: registro exitoso
-            return { 
-                success: true, 
-                data: { message: 'Usuario registrado correctamente' },
-                status: 201 
-            };
-        },
+            //return { 
+                //success: true, 
+                //data: { message: 'Usuario registrado correctamente' },
+                //status: 201 
+            //};
+        //},
 
         async logout() {
             localStorage.removeItem('unmsm_token');
@@ -787,15 +787,30 @@ const RemoteAPI = {
 
         async register(registroData) {
             try {
+                // ✅ Validar que facultyId sea string (UUID) o número, no forzar conversión
+                const payload = {
+                    email: registroData.email,
+                    firstName: registroData.firstName,
+                    lastName: registroData.lastName,
+                    facultyId: registroData.facultyId,        // ← UUID string, sin parseInt
+                    phone: registroData.phone || '',
+                    position: registroData.position || '',
+                    message: registroData.message || 'Solicitud de acceso al sistema SIGPRO'
+                };
+
                 const response = await fetch(`${CONFIG.REMOTE_BASE}/auth/register`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(registroData)
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                        // ❌ Sin Authorization — es endpoint público
+                    },
+                    body: JSON.stringify(payload)
                 });
                 
                 const data = await response.json();
                 
-                // ✅ FIX: Guardar solicitud en localStorage para que el dashboard la muestre
+                // Guardar en localStorage como backup
                 if (response.ok && data.requestId) {
                     const pendingRequest = {
                         id: data.requestId,
@@ -804,7 +819,7 @@ const RemoteAPI = {
                         firstName: registroData.firstName,
                         lastName: registroData.lastName,
                         fullName: `${registroData.firstName} ${registroData.lastName}`.trim(),
-                        facultyId: registroData.facultyId,
+                        facultyId: registroData.facultyId,        // ← UUID string preservado
                         faculty: registroData.facultyName || registroData.faculty || 'Facultad no especificada',
                         position: registroData.position || '',
                         phone: registroData.phone || '',

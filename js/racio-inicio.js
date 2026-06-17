@@ -1,6 +1,45 @@
 const STORAGE_KEYS = {
 	DOCUMENTOS_LISTA: "sigpro_documentos_lista"
 };
+
+// ============================================
+// UTILIDADES COMPARTIDAS
+// ============================================
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function updateLocalRequestStatusById(requestId, newStatus) {
+    try {
+        const requests = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
+        const updated = requests.map(req => {
+            if ((req.id || req.requestId || '') === requestId) {
+                return { 
+                    ...req, 
+                    status: newStatus, 
+                    estado: newStatus,
+                    updatedAt: new Date().toISOString() 
+                };
+            }
+            return req;
+        });
+        localStorage.setItem('sigpro_access_requests', JSON.stringify(updated));
+        
+        window.dispatchEvent(new StorageEvent('storage', {
+            key: 'sigpro_access_requests',
+            newValue: JSON.stringify(updated)
+        }));
+        
+        console.log(`📝 Solicitud ID ${requestId} actualizada a ${newStatus}`);
+    } catch (e) {
+        console.error('Error actualizando localStorage por ID:', e);
+    }
+}
+
 // ✅ NUEVO: Funciones globales para aprobar/rechazar solicitudes
 window.handleApproveRequest = async function(requestId, email) {
     if (!confirm(`¿Aprobar solicitud de acceso para ${email}?`)) return;
@@ -9,7 +48,7 @@ window.handleApproveRequest = async function(requestId, email) {
         let apiSuccess = false;
         let apiMessage = '';
         
-        // 1. Intentar aprobar via API
+        // 1. Intentar aprobar via API (requestId debe ser UUID del backend)
         if (typeof API !== 'undefined' && API.admin?.accessRequests?.approve) {
             const result = await API.admin.accessRequests.approve(requestId);
             
@@ -25,36 +64,7 @@ window.handleApproveRequest = async function(requestId, email) {
         // 2. Actualizar localStorage por email (fallback siempre)
         updateLocalRequestStatus(email, 'APPROVED');
 
-		// ✅ NUEVO: Actualizar estado por ID (UUID del backend)
-		function updateLocalRequestStatusById(requestId, newStatus) {
-			try {
-				const requests = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
-				const updated = requests.map(req => {
-					if ((req.id || req.requestId || '') === requestId) {
-						return { 
-							...req, 
-							status: newStatus, 
-							estado: newStatus,
-							updatedAt: new Date().toISOString() 
-						};
-					}
-					return req;
-				});
-				localStorage.setItem('sigpro_access_requests', JSON.stringify(updated));
-				
-				// Disparar evento para sincronizar otras pestañas
-				window.dispatchEvent(new StorageEvent('storage', {
-					key: 'sigpro_access_requests',
-					newValue: JSON.stringify(updated)
-				}));
-				
-				console.log(`📝 Solicitud ID ${requestId} actualizada a ${newStatus}`);
-			} catch (e) {
-				console.error('Error actualizando localStorage por ID:', e);
-			}
-		}
-				
-        // 3. También intentar actualizar por ID si el requestId es un UUID válido
+        // 3. También actualizar por ID si es UUID válido
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
             updateLocalRequestStatusById(requestId, 'APPROVED');
         }
@@ -463,25 +473,29 @@ function buildExpedienteDetailUrl(doc) {
 }
 
 function normalizeAccessRequest(item, index) {
-	if (!item || typeof item !== "object") {
-		return null;
-	}
+    if (!item || typeof item !== "object") {
+        return null;
+    }
 
-	const firstName = item.firstName || item.first_name || item.nombre || item.name || "";
-	const lastName = item.lastName || item.last_name || item.apellido || item.surname || "";
-	const fullName = String(`${firstName} ${lastName}`).trim() || item.email || `Solicitud ${index + 1}`;
-	const requestedAt = item.requestedAt || item.requested_at || item.createdAt || item.created_at || item.fecha || new Date().toISOString();
+    const firstName = item.firstName || item.first_name || item.nombre || item.name || "";
+    const lastName = item.lastName || item.last_name || item.apellido || item.surname || "";
+    const fullName = String(`${firstName} ${lastName}`).trim() || item.email || `Solicitud ${index + 1}`;
+    const requestedAt = item.requestedAt || item.requested_at || item.createdAt || item.created_at || item.fecha || new Date().toISOString();
 
-	return {
-		id: item.id || item.requestId || item.code || `${index + 1}`,
-		email: item.email || item.correo || "",
-		fullName,
-		faculty: item.faculty?.name || item.faculty?.nombre || item.faculty || item.facultad || "Sin facultad",
-		position: item.position || item.cargo || "",
-		message: item.message || item.mensaje || "",
-		status: String(item.status || "PENDING").toUpperCase(),
-		requestedAt: new Date(requestedAt)
-	};
+    // ✅ FIX: Asegurar que el ID sea el UUID del backend si existe
+    const id = item.id || item.requestId || item.code || `${index + 1}`;
+
+    return {
+        id: id,
+        requestId: item.requestId || item.id,  // ← Guardar ambos para compatibilidad
+        email: item.email || item.correo || "",
+        fullName,
+        faculty: item.faculty?.name || item.faculty?.nombre || item.faculty || item.facultad || "Sin facultad",
+        position: item.position || item.cargo || "",
+        message: item.message || item.mensaje || "",
+        status: String(item.status || "PENDING").toUpperCase(),
+        requestedAt: new Date(requestedAt)
+    };
 }
 
 function mergeDocuments(primary, secondary) {
@@ -659,13 +673,18 @@ async function loadAccessRequests() {
 
     // 4. Merge API + localStorage, eliminar duplicados por email
     const merged = new Map();
-    
-    [...apiRequests, ...localRequests].forEach(req => {
-        const email = (req.email || req.correo || '').toLowerCase().trim();
-        if (email && !merged.has(email)) {
-            merged.set(email, req);
-        }
-    });
+
+	[...apiRequests, ...localRequests].forEach(req => {
+		// Priorizar requestId (UUID) como clave, luego email
+		const key = (req.id || req.requestId || '').toString().trim();
+		const emailKey = (req.email || req.correo || '').toLowerCase().trim();
+		
+		if (key && key.length > 10 && !merged.has(key)) {
+			merged.set(key, req);  // Usar UUID como clave
+		} else if (emailKey && !merged.has(emailKey)) {
+			merged.set(emailKey, req);  // Fallback a email
+		}
+	});
 
     const result = Array.from(merged.values())
         .map((item, index) => normalizeAccessRequest(item, index))

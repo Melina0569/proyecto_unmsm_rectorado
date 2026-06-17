@@ -240,9 +240,8 @@
             email: formData.correo,
             firstName: formData.firstName,
             lastName: formData.lastName,
-            // ✅ FIX: Convertir facultyId a número si es posible
-            facultyId: parseInt(formData.facultadId) || formData.facultadId,
-            phone: formData.telefono || '',
+            facultyId: formData.facultadId,
+            phone: formData.telefono || null,   // ← envía null si está vacío
             position: formData.cargo,
             message: formData.mensaje || 'Solicitud de acceso al sistema SIGPRO'
         };
@@ -254,6 +253,7 @@
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
+                // ❌ Sin Authorization — es endpoint público
             },
             body: JSON.stringify(payload)
         });
@@ -298,7 +298,7 @@
             lastName: formData.lastName,
             faculty: formData.facultadNombre,
             // ✅ FIX: Guardar facultyId como número para consistencia
-            facultyId: parseInt(formData.facultadId) || formData.facultadId,
+            facultyId: formData.facultadId,
             facultyCode: formData.facultadCode,
             phone: formData.telefono,
             position: formData.cargo,
@@ -358,7 +358,7 @@
                 lastName: nameParts.slice(midPoint).join(' ') || nameParts[0],
                 cargo: document.getElementById('cargo').value.trim(),
                 mensaje: document.getElementById('mensaje').value.trim(),
-                telefono: '' // No hay campo de teléfono en el formulario actual
+                telefono: document.getElementById('telefono')?.value.trim() || '',
             };
 
             // Validaciones
