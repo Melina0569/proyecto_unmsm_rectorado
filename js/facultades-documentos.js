@@ -417,158 +417,80 @@ function initThemeToggle() {
 // Carga de Datos desde API
 // ==========================================
 
+// ==========================================
+// Carga de Datos desde API + Fallback
+// ==========================================
+
 async function loadDashboardData() {
     try {
         showToast('Cargando documentos...', 'info');
         
-        // VERIFICAR si API existe
-        if (typeof API === 'undefined') {
-            console.warn('API no disponible');
-            throw new Error('API no disponible');
-        }
-        
-        // Obtener usuario actual
-        let user = null;
-        try {
-            user = API.auth.getUser();
-        } catch (e) {
-            console.log('No hay usuario autenticado');
-        }
-        
-        const facultadId = user?.facultadId || user?.facultad?.id || null;
-        
-        // ========== NUEVO: Intentar múltiples fuentes de datos ==========
         let apiDocuments = [];
-        let estadisticas = { pendientes: 0, enProceso: 0, completados: 0 };
         
-        // 1. INTENTAR: Portal documents (con auth) - más probable que tenga datos
-        if (API.portal?.documents?.getAll) {
-            try {
-                const docsResult = await API.portal.documents.getAll({ 
-                    page: 1,
-                    limit: 50 
-                });
-                
-                // 🔥 FIX: Detectar si el backend falló (500 u otro error)
-                if (!docsResult || !docsResult.success) {
-                    console.warn('⚠️ /portal/documents falló:', docsResult?.error || 'Sin respuesta');
-                    // No lanzar error, solo dejar apiDocuments vacío y continuar con locales
-                } else if (Array.isArray(docsResult.data)) {
-                    console.log('✅ Documentos desde portal:', docsResult.data.length);
-                    apiDocuments = docsResult.data.map((doc, idx) => ({
-                        id: doc.id || `portal-${idx}`,
-                        fecha: doc.createdAt?.split('T')[0] 
-                            || doc.fechaCreacion?.split('T')[0] 
-                            || new Date().toISOString().split('T')[0],
-                        hora: doc.createdAt 
-                            ? new Date(doc.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H'
-                            : doc.fechaCreacion 
-                                ? new Date(doc.fechaCreacion).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H'
-                                : '10:30 H',
-                        codigo: doc.code || doc.codigo || `DOC-${idx}`,
-                        descripcion: doc.title || doc.nombre || doc.descripcion || 'Documento del portal',
-                        generadoPor: doc.createdBy?.fullName 
-                            || doc.createdBy?.email 
-                            || doc.generadoPor 
-                            || 'Facultad',
-                        estado: mapEstado(doc.status || doc.estado || 'PENDING'),
-                        progreso: doc.progress 
-                            || calculateProgress(doc.status || doc.estado || 'PENDING'),
-                        facultadId: doc.faculty?.id || doc.facultyId || facultadId || 1,
-                        tipo: (doc.type || doc.tipo || 'DOCUMENT').toLowerCase(),
-                        origen: 'api'
-                    }));
-                    
-                    // Calcular estadísticas desde los documentos reales
-                    estadisticas = {
-                        pendientes: apiDocuments.filter(d => d.estado === 'pendiente').length,
-                        enProceso: apiDocuments.filter(d => d.estado === 'en_proceso').length,
-                        completados: apiDocuments.filter(d => d.estado === 'completado').length
-                    };
-                }
-            } catch (e) {
-                console.log('Portal documents falló:', e.message);
+        // 1. Intentar cargar PENDING (funciona)
+        const rPending = await API.portal.documents.getAll({ 
+            status: 'PENDING', page: 1, limit: 50 
+        });
+        if (rPending.success && Array.isArray(rPending.data)) {
+            apiDocuments.push(...rPending.data);
+        }
+        
+        // 2. Intentar REJECTED (funciona)
+        const rRejected = await API.portal.documents.getAll({ 
+            status: 'REJECTED', page: 1, limit: 50 
+        });
+        if (rRejected.success && Array.isArray(rRejected.data)) {
+            apiDocuments.push(...rRejected.data);
+        }
+        
+        // 3. Los que fallan (IN_PROGRESS, COMPLETED) - intentar sin filtro
+        if (apiDocuments.length === 0) {
+            const rAll = await API.portal.documents.getAll({ page: 1, limit: 50 });
+            if (rAll.success && Array.isArray(rAll.data)) {
+                apiDocuments.push(...rAll.data);
             }
         }
         
-        // 2. FALLBACK: Public stats (sin auth) - si portal falló
-        if (apiDocuments.length === 0 && API.public?.stats?.get) {
-            try {
-                const statsResult = await API.public.stats.get();
-                if (statsResult.success && statsResult.data) {
-                    console.log('✅ Stats públicos:', statsResult.data);
-                    
-                    const totales = statsResult.data.totalesGlobales || {};
-                    const conteos = statsResult.data.conteosPorFacultad || [];
-                    
-                    // Generar documentos mock desde conteos por facultad
-                    apiDocuments = conteos.map((f, idx) => ({
-                        id: `public-${idx}`,
-                        fecha: new Date().toISOString().split('T')[0],
-                        hora: '10:30 H',
-                        codigo: `DOC-${String(f.facultad || 'FAC').substring(0,3).toUpperCase()}-26-${String(idx+1).padStart(2,'0')}`,
-                        descripcion: `Documentos de ${f.facultad || 'Facultad'}`,
-                        generadoPor: 'Facultad',
-                        estado: 'pendiente',
-                        progreso: 5,
-                        facultadId: idx + 1,
-                        tipo: 'documento',
-                        origen: 'api'
-                    }));
-                    
-                    estadisticas = {
-                        pendientes: Math.floor((totales.totalDocumentos || 0) * 0.6),
-                        enProceso: Math.floor((totales.totalDocumentos || 0) * 0.2),
-                        completados: totales.totalAprobados || 0
-                    };
-                }
-            } catch (e) {
-                console.log('Public stats falló:', e.message);
-            }
-        }
+        // 4. Mapear al formato de tu tabla
+        const mappedDocs = apiDocuments.map((doc, idx) => ({
+            id: doc.id || `api-${idx}`,
+            fecha: doc.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+            hora: doc.createdAt 
+                ? new Date(doc.createdAt).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' }) + ' H'
+                : '00:00 H',
+            codigo: doc.code || doc.codigo || `DOC-${idx}`,
+            descripcion: doc.title || doc.nombre || doc.descripcion || 'Documento del sistema',
+            generadoPor: doc.createdBy?.fullName || doc.createdBy?.email || 'Facultad',
+            estado: mapEstado(doc.status || doc.estado || 'PENDING'),
+            progreso: calculateProgress(doc.status || doc.estado || 'PENDING'),
+            facultadId: doc.faculty?.id || doc.facultyId || 1,
+            tipo: (doc.type || doc.tipo || 'DOCUMENT').toLowerCase(),
+            origen: 'api'
+        }));
         
-        // 3. MERGE con documentos locales (SIEMPRE, incluso si API falló)
+        // 5. Merge con documentos locales (creados desde el portal)
         const localDocuments = loadLocalDocuments();
-        
-        if (apiDocuments.length > 0) {
-            // API funcionó: mergear API + locales (API tiene prioridad)
-            allDocuments = mergeDocuments(apiDocuments, localDocuments);
-            updateStatsCards(estadisticas);
-        } else {
-            // API falló o no devolvió datos: usar solo locales
-            console.log('📦 Usando solo documentos locales');
-            allDocuments = localDocuments;
-            updateStatsFromCurrentDocuments();
-        }
-        
-        // Si hay documentos de API, mezclar con locales
-        if (apiDocuments.length > 0) {
-            allDocuments = mergeDocuments(apiDocuments, localDocuments);
-            updateStatsCards(estadisticas);
-        } else {
-            // Si no hay API, solo locales
-            allDocuments = localDocuments;
-            updateStatsFromCurrentDocuments();
-        }
-        
+        allDocuments = mergeDocuments(mappedDocs, localDocuments);
         filteredDocuments = [...allDocuments];
+        
+        // 6. Actualizar contadores de las tarjetas
+        updateStatsFromCurrentDocuments();
+        
+        // 7. Renderizar tabla
         renderTable();
         
-        showToast('Datos cargados correctamente', 'success');
+        // Mensaje al usuario
+        if (allDocuments.length === 0) {
+            showToast('No hay documentos. Crea uno desde el portal.', 'info', 4000);
+        } else {
+            showToast(`${allDocuments.length} documentos cargados`, 'success');
+        }
         
     } catch (error) {
-        console.error('Error cargando dashboard:', error);
-        showToast('Usando datos de ejemplo', 'warning');
+        console.error('Error:', error);
+        // Fallback completo
         loadMockData();
     }
-    
-    const localDocs = loadLocalDocuments();
-        if (localDocs.length > 0) {
-            allDocuments = mergeDocuments(allDocuments, localDocs);
-            filteredDocuments = [...allDocuments];
-            updateStatsFromCurrentDocuments();
-            renderTable();
-        }
 }
 
 //function generateDocumentsFromReportes(reportes) {
@@ -930,21 +852,25 @@ function updatePagination() {
 // Event Listeners
 // ==========================================
 
+// ==========================================
+// Event Listeners - Las tarjetas filtran la tabla
+// ==========================================
+
 function initEventListeners() {
     // Filtros de tarjetas
     document.querySelectorAll('.lava-card').forEach(card => {
         card.addEventListener('click', () => {
-            const filter = card.dataset.filter;
+            const filter = card.dataset.filter; // 'pendiente' | 'en_proceso' | 'completado' | 'todos'
             currentFilter = filter;
             currentPage = 1;
             
-            // Actualizar UI activa
+            // UI: resaltar tarjeta activa
             document.querySelectorAll('.lava-card').forEach(c => {
-                c.classList.remove('ring-2', 'ring-offset-2', 'ring-primary');
+                c.classList.remove('ring-2', 'ring-offset-2', 'ring-primary', 'scale-105');
             });
-            card.classList.add('ring-2', 'ring-offset-2', 'ring-primary');
+            card.classList.add('ring-2', 'ring-offset-2', 'ring-primary', 'scale-105');
             
-            // Filtrar documentos
+            // Aplicar filtro
             if (filter === 'todos') {
                 filteredDocuments = [...allDocuments];
             } else {
@@ -952,7 +878,15 @@ function initEventListeners() {
             }
             
             renderTable();
-            showToast(`Filtrando: ${formatEstado(filter)}`, 'info');
+            
+            const label = {
+                'pendiente': 'Pendientes',
+                'en_proceso': 'En Proceso', 
+                'completado': 'Completados',
+                'todos': 'Todos'
+            }[filter];
+            
+            showToast(`Mostrando: ${label} (${filteredDocuments.length})`, 'info');
         });
     });
     
@@ -1253,14 +1187,43 @@ function mergeDocuments(baseDocuments, additionalDocuments) {
     return Array.from(byCode.values());
 }
 
+// ==========================================
+// Actualizar contadores de las 4 tarjetas
+// ==========================================
+
 function updateStatsFromCurrentDocuments() {
     const stats = {
         pendientes: allDocuments.filter(d => d.estado === 'pendiente').length,
         enProceso: allDocuments.filter(d => d.estado === 'en_proceso').length,
         completados: allDocuments.filter(d => d.estado === 'completado').length
     };
+    
+    const total = stats.pendientes + stats.enProceso + stats.completados;
+    
+    // Actualizar DOM de las tarjetas
+    updateCardCount('count-pendiente', stats.pendientes, 'PENDIENTE');
+    updateCardCount('count-en-proceso', stats.enProceso, 'EN PROCESO');
+    updateCardCount('count-completado', stats.completados, 'COMPLETADO');
+    updateCardCount('count-todos', total, 'TODOS');
+}
 
-    updateStatsCards(stats);
+function updateCardCount(elementId, count, label) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    // Animar el cambio
+    const current = parseInt(element.textContent || '0');
+    const duration = 600;
+    const start = performance.now();
+    
+    const step = (now) => {
+        const progress = Math.min((now - start) / duration, 1);
+        const value = Math.round(current + (count - current) * progress);
+        element.textContent = value;
+        if (progress < 1) requestAnimationFrame(step);
+    };
+    
+    requestAnimationFrame(step);
 }
 
 function persistLocalDocuments() {

@@ -40,126 +40,165 @@ function updateLocalRequestStatusById(requestId, newStatus) {
     }
 }
 
-// ✅ NUEVO: Funciones globales para aprobar/rechazar solicitudes
+// ============================================
+// HANDLERS ACTUALIZADOS CON VALIDACIÓN DE UUID
+// ============================================
+
+function isValidUUID(str) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(str));
+}
+
 window.handleApproveRequest = async function(requestId, email) {
-    if (!confirm(`¿Aprobar solicitud de acceso para ${email}?`)) return;
+    if (!requestId || !email) {
+        requestId = currentRequestId;
+        email = currentRequestEmail;
+    }
+    
+    const validUUID = isValidUUID(requestId);
     
     try {
         let apiSuccess = false;
         let apiMessage = '';
         
-        // 1. Intentar aprobar via API (requestId debe ser UUID del backend)
-        if (typeof API !== 'undefined' && API.admin?.accessRequests?.approve) {
-            const result = await API.admin.accessRequests.approve(requestId);
-            
-            if (result.success) {
-                apiSuccess = true;
-                apiMessage = result.data?.message || 'Solicitud aprobada en el servidor.';
-                console.log('✅ Solicitud aprobada en API:', result.data);
-            } else {
-                console.warn('⚠️ API approve falló:', result.error);
+        // Solo llamar API si el ID es un UUID válido del backend
+        if (validUUID && typeof API !== 'undefined' && API.admin?.accessRequests?.approve) {
+            try {
+                const result = await API.admin.accessRequests.approve(requestId);
+                if (result.success) {
+                    apiSuccess = true;
+                    apiMessage = result.data?.message || 'Solicitud aprobada en el servidor.';
+                    console.log('✅ Solicitud aprobada en API:', result.data);
+                } else {
+                    console.warn('⚠️ API approve falló:', result.error);
+                }
+            } catch (apiError) {
+                console.warn('⚠️ Error en API approve:', apiError.message);
             }
+        } else if (!validUUID) {
+            console.log('ℹ️ ID no es UUID válido del backend, solo se actualiza localStorage:', requestId);
         }
         
-        // 2. Actualizar localStorage por email (fallback siempre)
+        // Actualizar localStorage SIEMPRE (funciona para UUID y no-UUID)
         updateLocalRequestStatus(email, 'APPROVED');
-
-        // 3. También actualizar por ID si es UUID válido
-        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+        
+        // También actualizar por ID si es UUID
+        if (validUUID) {
             updateLocalRequestStatusById(requestId, 'APPROVED');
         }
         
-        // 4. Recargar lista
-        await loadAccessRequests().then(requests => {
-            renderAccessRequests(requests);
-        });
+        // Recargar lista con manejo de errores
+        try {
+            await loadAccessRequests().then(requests => {
+                renderAccessRequests(requests);
+            });
+        } catch (reloadError) {
+            console.warn('⚠️ Error recargando lista tras aprobar:', reloadError);
+        }
         
-        // 5. Mensaje al usuario
-        const successMsg = apiSuccess 
-            ? `${apiMessage}\n\nLa solicitud ha sido procesada.`
-            : 'Solicitud aprobada localmente. Verifique la conexión con el servidor.';
-        alert(successMsg);
+        closeApproveModal();
+        
+        // Mensaje según si fue API o solo local
+        if (apiSuccess) {
+            showToast('success', '¡Solicitud aprobada!', `Se enviaron las credenciales a ${email}`);
+        } else if (validUUID) {
+            showToast('success', 'Aprobada localmente', `La solicitud fue aprobada pero el servidor no respondió. Se sincronizará más tarde.`);
+        } else {
+            showToast('success', 'Solicitud aprobada', `La solicitud de ${email} fue aprobada localmente.`);
+        }
         
     } catch (error) {
         console.error('Error aprobando:', error);
-        alert('Error al aprobar solicitud: ' + error.message);
+        closeApproveModal();
+        showToast('error', 'Error al aprobar', error.message || 'Ocurrió un error inesperado');
     }
 };
 
-window.handleRejectRequest = async function(requestId, email) {
-    const reason = prompt(`¿Motivo del rechazo para ${email}?`, 'No cumple requisitos');
-    if (reason === null) return;
+window.handleRejectRequest = async function(requestId, email, reason) {
+    if (!requestId || !email) {
+        requestId = currentRequestId;
+        email = currentRequestEmail;
+    }
+    
+    // Obtener motivo del modal si no viene como parámetro
+    if (!reason) {
+        const selectReason = document.getElementById("reject-reason-select")?.value;
+        const textReason = document.getElementById("reject-reason-text")?.value.trim();
+        reason = textReason || selectReason || 'No cumple requisitos';
+        
+        if (!selectReason && !textReason) {
+            showToast('error', 'Motivo requerido', 'Por favor selecciona o escribe un motivo de rechazo');
+            return;
+        }
+    }
+    
+    const validUUID = isValidUUID(requestId);
     
     try {
         let apiSuccess = false;
         
-        // 1. Intentar rechazar via API
-        if (typeof API !== 'undefined' && API.admin?.accessRequests?.reject) {
-            const result = await API.admin.accessRequests.reject(requestId, { 
-                reason,
-                additionalProp1: reason
-            });
-            
-            if (result.success) {
-                apiSuccess = true;
-                console.log('✅ Solicitud rechazada en API:', result.data);
-            } else {
-                console.warn('⚠️ API reject falló:', result.error);
+        // Solo llamar API si el ID es un UUID válido del backend
+        if (validUUID && typeof API !== 'undefined' && API.admin?.accessRequests?.reject) {
+            try {
+                const result = await API.admin.accessRequests.reject(requestId, { 
+                    reason,
+                    additionalProp1: reason
+                });
+                
+                if (result.success) {
+                    apiSuccess = true;
+                    console.log('✅ Solicitud rechazada en API:', result.data);
+                } else {
+                    console.warn('⚠️ API reject falló:', result.error);
+                }
+            } catch (apiError) {
+                console.warn('⚠️ Error en API reject:', apiError.message);
             }
+        } else if (!validUUID) {
+            console.log('ℹ️ ID no es UUID válido del backend, solo se actualiza localStorage:', requestId);
         }
         
-        // 2. Actualizar localStorage
+        // Actualizar localStorage SIEMPRE
         updateLocalRequestStatus(email, 'REJECTED');
         
-        // 3. También por ID si es UUID
-        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
+        // También por ID si es UUID
+        if (validUUID) {
             updateLocalRequestStatusById(requestId, 'REJECTED');
         }
         
-        // 4. Recargar lista
-        await loadAccessRequests().then(requests => {
-            renderAccessRequests(requests);
-        });
+        // Recargar lista con manejo de errores
+        try {
+            await loadAccessRequests().then(requests => {
+                renderAccessRequests(requests);
+            });
+        } catch (reloadError) {
+            console.warn('⚠️ Error recargando lista tras rechazar:', reloadError);
+        }
         
-        alert(apiSuccess ? 'Solicitud rechazada correctamente.' : 'Solicitud rechazada localmente.');
+        closeRejectModal();
+        
+        // Mensaje según resultado
+        if (apiSuccess) {
+            showToast('success', 'Solicitud rechazada', `Se notificó a ${email} sobre el rechazo.`);
+        } else if (validUUID) {
+            showToast('success', 'Rechazada localmente', `La solicitud fue rechazada pero el servidor no respondió. Se sincronizará más tarde.`);
+        } else {
+            showToast('success', 'Solicitud rechazada', `La solicitud de ${email} fue rechazada localmente.`);
+        }
         
     } catch (error) {
         console.error('Error rechazando:', error);
-        alert('Error al rechazar solicitud: ' + error.message);
-    }
-};
-
-window.updateLocalRequestStatus = function(email, newStatus) {
-    try {
-        const requests = JSON.parse(localStorage.getItem('sigpro_access_requests') || '[]');
-        const updated = requests.map(req => {
-            if ((req.email || req.correo || '').toLowerCase() === email.toLowerCase()) {
-                return { 
-                    ...req, 
-                    status: newStatus, 
-                    estado: newStatus,
-                    updatedAt: new Date().toISOString() 
-                };
-            }
-            return req;
-        });
-        localStorage.setItem('sigpro_access_requests', JSON.stringify(updated));
-        
-        // 🔥 Disparar evento para sincronizar otras pestañas
-        window.dispatchEvent(new StorageEvent('storage', {
-            key: 'sigpro_access_requests',
-            newValue: JSON.stringify(updated)
-        }));
-        
-        console.log(`📝 Solicitud ${email} actualizada a ${newStatus}`);
-    } catch (e) {
-        console.error('Error actualizando localStorage:', e);
+        closeRejectModal();
+        showToast('error', 'Error al rechazar', error.message || 'Ocurrió un error inesperado');
     }
 };
 
 
 let dashboardDocuments = [];
 let dashboardAccessRequests = [];
+// Variables para modales de solicitudes
+let currentRequestId = null;
+let currentRequestEmail = null;
+let currentRequestData = null;
 
 function formatSpanishDate(date) {
 	const dayName = new Intl.DateTimeFormat("es-PE", { weekday: "long" }).format(date);
@@ -624,7 +663,6 @@ async function loadAccessRequests() {
             const response = await API.admin.accessRequests.getAll();
             console.log('📥 API accessRequests response:', response);
             
-            // ✅ FIX: Verificar si la respuesta es exitosa (puede venir como array directo o como objeto)
             const isSuccess = response?.success === true || Array.isArray(response) || Array.isArray(response?.data);
             
             if (isSuccess) {
@@ -642,7 +680,7 @@ async function loadAccessRequests() {
                 console.warn('⚠️ API accessRequests no exitosa:', response?.error || 'Sin datos');
             }
         } catch (error) {
-            console.warn('❌ API accessRequests exception:', error);
+            console.warn('❌ API accessRequests exception:', error.message);
         }
     }
 
@@ -674,17 +712,19 @@ async function loadAccessRequests() {
     // 4. Merge API + localStorage, eliminar duplicados por email
     const merged = new Map();
 
-	[...apiRequests, ...localRequests].forEach(req => {
-		// Priorizar requestId (UUID) como clave, luego email
-		const key = (req.id || req.requestId || '').toString().trim();
-		const emailKey = (req.email || req.correo || '').toLowerCase().trim();
-		
-		if (key && key.length > 10 && !merged.has(key)) {
-			merged.set(key, req);  // Usar UUID como clave
-		} else if (emailKey && !merged.has(emailKey)) {
-			merged.set(emailKey, req);  // Fallback a email
-		}
-	});
+    [...apiRequests, ...localRequests].forEach(req => {
+        const key = (req.id || req.requestId || '').toString().trim();
+        const emailKey = (req.email || req.correo || '').toLowerCase().trim();
+        
+        // Si es UUID, usarlo como clave principal
+        if (isValidUUID(key)) {
+            if (!merged.has(key)) {
+                merged.set(key, req);
+            }
+        } else if (emailKey && !merged.has(emailKey)) {
+            merged.set(emailKey, req);
+        }
+    });
 
     const result = Array.from(merged.values())
         .map((item, index) => normalizeAccessRequest(item, index))
@@ -736,8 +776,10 @@ function renderAccessRequests(requests) {
     if (!dashboardAccessRequests.length) {
         if (status) status.textContent = "Sin solicitudes pendientes";
         list.innerHTML = `
-            <div class="rounded-xl border border-gray-100 bg-gray-50/60 p-4 text-sm text-gray-500 md:col-span-3">
-                No hay solicitudes de acceso pendientes en este momento.
+            <div class="rounded-xl border border-gray-100 bg-gray-50/60 p-8 text-center md:col-span-3">
+                <span class="material-symbols-outlined text-4xl text-gray-300 mb-2">inbox</span>
+                <p class="text-sm text-gray-500 font-medium">No hay solicitudes de acceso pendientes en este momento.</p>
+                <p class="text-xs text-gray-400 mt-1">Las nuevas solicitudes aparecerán aquí automáticamente.</p>
             </div>
         `;
         return;
@@ -749,17 +791,31 @@ function renderAccessRequests(requests) {
         const relativeTime = toRelativeTime(request.requestedAt || new Date());
         const initials = initialsFromName(request.fullName);
         
-        // ✅ FIX: Priorizar el ID real (UUID) del backend, luego requestId, luego id, luego email
         const requestId = request.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request.id)
-            ? request.id  // UUID válido del backend
+            ? request.id
             : (request.requestId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request.requestId)
-                ? request.requestId  // requestId válido
-                : (request.id || request.email)); // Fallback
+                ? request.requestId
+                : (request.id || request.email));
+        
+        const requestData = encodeURIComponent(JSON.stringify({
+            id: requestId,
+            email: request.email,
+            fullName: request.fullName,
+            faculty: request.faculty,
+            position: request.position,
+            message: request.message,
+            requestedAt: request.requestedAt?.toISOString?.() || request.requestedAt,
+            initials: initials,
+            relativeTime: relativeTime
+        }));
         
         return `
-            <article class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm hover-lift transition-all" data-request-id="${requestId}">
+            <article class="access-request-card rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-300 hover:shadow-lg" 
+                     data-request-id="${requestId}" 
+                     data-request='${requestData}'
+                     onclick="openRequestDetail(this)">
                 <div class="flex items-start gap-3">
-                    <div class="w-11 h-11 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+                    <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600 flex items-center justify-center font-black text-sm shadow-sm">
                         ${escapeHtml(initials)}
                     </div>
                     <div class="min-w-0 flex-1">
@@ -768,27 +824,28 @@ function renderAccessRequests(requests) {
                                 <h4 class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(request.fullName)}</h4>
                                 <p class="text-xs text-gray-500 truncate">${escapeHtml(request.email || "Sin correo")}</p>
                             </div>
-                            <span class="text-[10px] text-gray-400 font-medium whitespace-nowrap">${escapeHtml(relativeTime)}</span>
+                            <span class="text-[10px] text-gray-400 font-medium whitespace-nowrap bg-gray-50 px-2 py-0.5 rounded-full">${escapeHtml(relativeTime)}</span>
                         </div>
-                        <p class="text-xs text-gray-600 mt-2 line-clamp-2"><strong>Facultad:</strong> ${escapeHtml(request.faculty)}</p>
-                        ${request.position ? `<p class="text-xs text-gray-600 mt-1 line-clamp-2"><strong>Cargo:</strong> ${escapeHtml(request.position)}</p>` : ""}
-                        ${request.message ? `<p class="text-xs text-gray-500 mt-2 line-clamp-2">${escapeHtml(request.message)}</p>` : ""}
+                        <p class="text-xs text-gray-600 mt-2 line-clamp-1"><span class="font-medium">Facultad:</span> ${escapeHtml(request.faculty)}</p>
+                        ${request.position ? `<p class="text-xs text-gray-600 mt-1 line-clamp-1"><span class="font-medium">Cargo:</span> ${escapeHtml(request.position)}</p>` : ""}
                         
-                        <!-- ✅ FIX: Botones con requestId correcto -->
-                        <div class="mt-3 flex gap-2">
-                            <button onclick="handleApproveRequest('${requestId}', '${escapeHtml(request.email)}')" 
-                                    class="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1">
+                        <div class="card-actions mt-3 flex gap-2">
+                            <button onclick="event.stopPropagation(); openApproveModal('${requestId}', '${escapeHtml(request.email)}')" 
+                                    class="flex-1 px-3 py-2 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition-all hover:shadow-lg hover:shadow-green-600/20 flex items-center justify-center gap-1.5">
                                 <span class="material-symbols-outlined text-sm">check</span>
                                 Aprobar
                             </button>
-                            <button onclick="handleRejectRequest('${requestId}', '${escapeHtml(request.email)}')" 
-                                    class="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1">
+                            <button onclick="event.stopPropagation(); openRejectModal('${requestId}', '${escapeHtml(request.email)}')" 
+                                    class="flex-1 px-3 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-all hover:shadow-lg hover:shadow-red-600/20 flex items-center justify-center gap-1.5">
                                 <span class="material-symbols-outlined text-sm">close</span>
                                 Rechazar
                             </button>
                         </div>
                         
-                        <div class="mt-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 uppercase">PENDING</div>
+                        <div class="mt-2 inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 uppercase tracking-wider border border-blue-100">
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 animate-pulse"></span>
+                            Pendiente
+                        </div>
                     </div>
                 </div>
             </article>
@@ -1368,62 +1425,202 @@ async function setupFacultyNavigation() {
     }
 }
 
-async function handleApproveRequest(requestId, email) {
-    if (!confirm(`¿Aprobar solicitud de acceso para ${email}?`)) return;
+// ============================================
+// MODALES DE SOLICITUDES
+// ============================================
+
+function openRequestDetail(cardElement) {
+    const data = JSON.parse(decodeURIComponent(cardElement.dataset.request));
+    currentRequestId = data.id;
+    currentRequestEmail = data.email;
+    currentRequestData = data;
     
-    try {
-        // 1. Intentar aprobar via API
-        if (typeof API !== 'undefined' && API.admin?.accessRequests?.approve) {
-            const result = await API.admin.accessRequests.approve(requestId);
-            if (result.success) {
-                console.log('✅ Solicitud aprobada en API:', result.data);
-            }
-        }
+    const modal = document.getElementById("request-detail-modal");
+    const content = document.getElementById("request-detail-content");
+    
+    const requestedDate = data.requestedAt 
+        ? new Date(data.requestedAt).toLocaleDateString('es-PE', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : 'Fecha no disponible';
+    
+    content.innerHTML = `
+        <div class="request-detail-header">
+            <div class="request-detail-avatar">${escapeHtml(data.initials)}</div>
+            <div class="request-detail-meta">
+                <div class="request-detail-name">${escapeHtml(data.fullName)}</div>
+                <div class="request-detail-email">${escapeHtml(data.email)}</div>
+                <span class="request-detail-badge request-detail-badge--pending">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1 animate-pulse"></span>
+                    Solicitud pendiente
+                </span>
+            </div>
+            <button onclick="closeRequestDetailModal()" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors text-gray-500">
+                <span class="material-symbols-outlined text-sm">close</span>
+            </button>
+        </div>
         
-        // 2. Actualizar localStorage
-        updateLocalRequestStatus(email, 'APPROVED');
+        <div class="request-detail-info-grid">
+            <div class="request-detail-info-item">
+                <div class="request-detail-info-label">Facultad</div>
+                <div class="request-detail-info-value">${escapeHtml(data.faculty || 'No especificada')}</div>
+            </div>
+            <div class="request-detail-info-item">
+                <div class="request-detail-info-label">Cargo / Posición</div>
+                <div class="request-detail-info-value">${escapeHtml(data.position || 'No especificado')}</div>
+            </div>
+            <div class="request-detail-info-item">
+                <div class="request-detail-info-label">Fecha de solicitud</div>
+                <div class="request-detail-info-value">${requestedDate}</div>
+            </div>
+            <div class="request-detail-info-item">
+                <div class="request-detail-info-label">ID de solicitud</div>
+                <div class="request-detail-info-value font-mono text-xs text-gray-500">${escapeHtml(String(data.id).substring(0, 20))}${String(data.id).length > 20 ? '...' : ''}</div>
+            </div>
+        </div>
         
-        // 3. Recargar lista
-        await loadAccessRequests().then(requests => {
-            renderAccessRequests(requests);
-        });
+        ${data.message ? `
+        <div class="request-detail-message">
+            <div class="request-detail-message-label">
+                <span class="material-symbols-outlined text-xs align-middle mr-1">chat</span>
+                Mensaje del solicitante
+            </div>
+            <div class="request-detail-message-text">"${escapeHtml(data.message)}"</div>
+        </div>
+        ` : ''}
         
-        alert('Solicitud aprobada correctamente');
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5">
+            <div class="flex items-start gap-2">
+                <span class="material-symbols-outlined text-blue-600 text-sm mt-0.5">info</span>
+                <div class="text-sm text-blue-800">
+                    <p class="font-semibold mb-1">Acciones disponibles</p>
+                    <p class="text-xs leading-relaxed">
+                        Al <strong>aprobar</strong>, el usuario recibirá credenciales por correo. 
+                        Al <strong>rechazar</strong>, se le notificará con el motivo indicado.
+                    </p>
+                </div>
+            </div>
+        </div>
         
-    } catch (error) {
-        console.error('Error aprobando:', error);
-        alert('Error al aprobar solicitud');
-    }
+        <div class="request-detail-actions">
+            <button onclick="closeRequestDetailModal(); setTimeout(() => openApproveModal('${data.id}', '${escapeHtml(data.email)}'), 300);" 
+                    class="request-detail-btn request-detail-btn--approve">
+                <span class="material-symbols-outlined text-sm">check</span>
+                Aprobar solicitud
+            </button>
+            <button onclick="closeRequestDetailModal(); setTimeout(() => openRejectModal('${data.id}', '${escapeHtml(data.email)}'), 300);" 
+                    class="request-detail-btn request-detail-btn--reject">
+                <span class="material-symbols-outlined text-sm">close</span>
+                Rechazar solicitud
+            </button>
+            <button onclick="closeRequestDetailModal()" 
+                    class="request-detail-btn request-detail-btn--close">
+                Cerrar
+            </button>
+        </div>
+    `;
+    
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
 }
 
-// ✅ NUEVO: Rechazar solicitud
-async function handleRejectRequest(requestId, email) {
-    const reason = prompt(`¿Motivo del rechazo para ${email}?`, 'No cumple requisitos');
-    if (reason === null) return; // Cancelado
+function closeRequestDetailModal() {
+    const modal = document.getElementById("request-detail-modal");
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+}
+
+function openApproveModal(requestId, email) {
+    currentRequestId = requestId;
+    currentRequestEmail = email;
+    const modal = document.getElementById("approve-confirm-modal");
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function closeApproveModal() {
+    const modal = document.getElementById("approve-confirm-modal");
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+}
+
+function openRejectModal(requestId, email) {
+    currentRequestId = requestId;
+    currentRequestEmail = email;
+    document.getElementById("reject-reason-select").value = "";
+    document.getElementById("reject-reason-text").value = "";
+    const modal = document.getElementById("reject-confirm-modal");
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+}
+
+function closeRejectModal() {
+    const modal = document.getElementById("reject-confirm-modal");
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+}
+
+function showToast(type, title, message) {
+    const toast = document.getElementById("request-toast");
+    const icon = document.getElementById("request-toast-icon");
+    const titleEl = document.getElementById("request-toast-title");
+    const messageEl = document.getElementById("request-toast-message");
     
-    try {
-        // 1. Intentar rechazar via API
-        if (typeof API !== 'undefined' && API.admin?.accessRequests?.reject) {
-            const result = await API.admin.accessRequests.reject(requestId, { reason });
-            if (result.success) {
-                console.log('✅ Solicitud rechazada en API:', result.data);
-            }
+    toast.className = `request-toast request-toast--${type}`;
+    icon.textContent = type === 'success' ? 'check_circle' : 'error';
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    toast.classList.add("is-visible");
+    
+    setTimeout(() => {
+        toast.classList.remove("is-visible");
+    }, 4000);
+}
+
+function setupRequestModals() {
+    document.getElementById("request-detail-backdrop")?.addEventListener("click", closeRequestDetailModal);
+    document.getElementById("approve-confirm-backdrop")?.addEventListener("click", closeApproveModal);
+    document.getElementById("reject-confirm-backdrop")?.addEventListener("click", closeRejectModal);
+    
+    document.getElementById("approve-cancel")?.addEventListener("click", closeApproveModal);
+    document.getElementById("reject-cancel")?.addEventListener("click", closeRejectModal);
+    
+    document.getElementById("approve-confirm")?.addEventListener("click", () => handleApproveRequest());
+    document.getElementById("reject-confirm")?.addEventListener("click", () => handleRejectRequest());
+    
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            closeRequestDetailModal();
+            closeApproveModal();
+            closeRejectModal();
         }
-        
-        // 2. Actualizar localStorage
-        updateLocalRequestStatus(email, 'REJECTED');
-        
-        // 3. Recargar lista
-        await loadAccessRequests().then(requests => {
-            renderAccessRequests(requests);
-        });
-        
-        alert('Solicitud rechazada correctamente');
-        
-    } catch (error) {
-        console.error('Error rechazando:', error);
-        alert('Error al rechazar solicitud');
-    }
+    });
+    
+    document.getElementById("reject-reason-select")?.addEventListener("change", function() {
+        const textArea = document.getElementById("reject-reason-text");
+        const reasons = {
+            'incomplete_data': 'Los datos proporcionados están incompletos o contienen errores. Por favor, revise su información y vuelva a solicitar el acceso.',
+            'invalid_email': 'El correo institucional proporcionado no es válido o no pertenece a la UNMSM. Se requiere un correo @unmsm.edu.pe.',
+            'not_authorized': 'La facultad o unidad a la que pertenece no está autorizada para acceder al sistema en este momento.',
+            'duplicate': 'Ya existe una solicitud de acceso activa o un usuario registrado con este correo electrónico.',
+            'other': ''
+        };
+        if (reasons[this.value] && !textArea.value.trim()) {
+            textArea.value = reasons[this.value];
+        }
+    });
 }
 
 // ✅ NUEVO: Actualizar estado en localStorage
@@ -1455,6 +1652,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 	setupRefreshButton();
 	setupFacultyFilter();
 	setupFacultyNavigation();
+	setupRequestModals();
 	await loadAdminFacultiesTable();
 	await loadAndRenderAdminStats();
 	await loadDashboardData();

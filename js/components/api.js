@@ -342,8 +342,16 @@ const LocalAPI = {
         //},
 
         async logout() {
+            // Usar la misma limpieza completa que RemoteAPI
+            localStorage.removeItem('token');
             localStorage.removeItem('unmsm_token');
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('unmsm_access_token');
+            localStorage.removeItem('unmsm_refresh_token');
+            localStorage.removeItem('unmsm_token_expires_at');
             localStorage.removeItem('unmsm_user');
+            localStorage.removeItem('unmsm_faculty_id');
+            localStorage.removeItem('unmsm_faculty_name');
             return { success: true };
         },
 
@@ -689,13 +697,16 @@ const RemoteAPI = {
                     localStorage.setItem('unmsm_token', accessToken);
                     localStorage.setItem('accessToken', accessToken);
                     localStorage.setItem('token', accessToken);
+                    // ✅ GUARDAR REFRESH TOKEN
                     if (refreshToken) {
                         localStorage.setItem('unmsm_refresh_token', refreshToken);
-                    } else {
-                        localStorage.removeItem('unmsm_refresh_token');
                     }
-
+                    
                     localStorage.setItem('unmsm_user', JSON.stringify(normalizedUser));
+                    
+                    // ✅ GUARDAR EXPIRACIÓN (1 hora = 3600 segundos)
+                    const expiresAt = Date.now() + (3600 * 1000);
+                    localStorage.setItem('unmsm_token_expires_at', String(expiresAt));
                 };
 
                 const loginWithJson = async (path) => {
@@ -868,10 +879,18 @@ const RemoteAPI = {
                 const data = await response.json();
 
                 if (response.ok && data.accessToken) {
+                    // ✅ ACTUALIZAR TOKENS
                     localStorage.setItem('unmsm_token', data.accessToken);
-                    if (data.refreshToken) {
-                        localStorage.setItem('unmsm_refresh_token', data.refreshToken);
-                    }
+                    localStorage.setItem('accessToken', data.accessToken);
+                    localStorage.setItem('token', data.accessToken);
+                    
+                    const newExpiresAt = Date.now() + ((data.expiresIn || 3600) * 1000);
+                    localStorage.setItem('unmsm_token_expires_at', String(newExpiresAt));
+                    
+                    console.log('✅ Token renovado exitosamente');
+                } else {
+                    // Refresh token inválido → limpiar todo
+                    this.clearSession();
                 }
 
                 return { 
@@ -890,17 +909,27 @@ const RemoteAPI = {
 
         async logout() {
             try {
+                // Notificar al backend (opcional, el refresh token expira solo)
                 await fetch(`${CONFIG.REMOTE_BASE}/auth/logout`, {
                     method: 'POST',
-                    headers: RemoteAPI.getHeaders()
+                    headers: this.getHeaders()
                 });
             } catch (e) {
                 console.log('Logout silencioso');
             }
+            this.clearSession();
+            return { success: true };
+        },
+
+        clearSession() {
             localStorage.removeItem('unmsm_token');
             localStorage.removeItem('unmsm_refresh_token');
             localStorage.removeItem('unmsm_user');
-            return { success: true };
+            localStorage.removeItem('unmsm_token_expires_at');
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('token');
+            localStorage.removeItem('unmsm_faculty_id');
+            localStorage.removeItem('unmsm_faculty_name');
         },
 
         isAuthenticated() {
@@ -910,6 +939,13 @@ const RemoteAPI = {
         getUser() {
             const user = localStorage.getItem('unmsm_user');
             return user ? JSON.parse(user) : null;
+        },
+
+        // ✅ NUEVO: Verificar si el token está por expirar
+        isTokenExpiringSoon(minutesBefore = 5) {
+            const expiresAt = parseInt(localStorage.getItem('unmsm_token_expires_at') || '0');
+            if (!expiresAt) return true;
+            return Date.now() >= (expiresAt - (minutesBefore * 60 * 1000));
         }
     },
 
@@ -2454,3 +2490,96 @@ async function aprobarSolicitud(idSolicitud, token) {
 
 // Exponer globalmente
 window.aprobarSolicitud = aprobarSolicitud;
+
+// ============================================
+// INTERCEPTOR FETCH CON AUTO-REFRESH (AGREGAR AL FINAL)
+// ============================================
+
+(function setupFetchInterceptor() {
+    const originalFetch = window.fetch;
+    
+    let isRefreshing = false;
+    let refreshSubscribers = [];
+
+    function subscribeTokenRefresh(callback) {
+        refreshSubscribers.push(callback);
+    }
+
+    function onTokenRefreshed(newToken) {
+        refreshSubscribers.forEach(callback => callback(newToken));
+        refreshSubscribers = [];
+    }
+
+    // ✅ FUNCIÓN PÚBLICA: Hacer peticiones con auto-refresh
+    window.apiFetch = async function(url, options = {}) {
+        // Verificar si token está por expirar y renovar preventivamente
+        if (RemoteAPI.auth.isTokenExpiringSoon(2)) {
+            console.log('⏰ Token por expirar, renovando preventivamente...');
+            const refreshResult = await RemoteAPI.auth.refresh();
+            if (!refreshResult.success) {
+                console.error('❌ No se pudo renovar token preventivamente');
+            }
+        }
+
+        let response = await originalFetch(url, options);
+
+        // Si no es 401, retornar normalmente
+        if (response.status !== 401) {
+            return response;
+        }
+
+        // ✅ 401 DETECTADO → Intentar refresh
+        console.log('🔄 Token expirado (401), intentando renovar...');
+
+        if (isRefreshing) {
+            // Esperar a que termine el refresh en curso
+            return new Promise((resolve) => {
+                subscribeTokenRefresh((newToken) => {
+                    // Reintentar la petición original con el nuevo token
+                    const newOptions = { ...options };
+                    if (newToken) {
+                        newOptions.headers = {
+                            ...newOptions.headers,
+                            'Authorization': `Bearer ${newToken}`
+                        };
+                    }
+                    resolve(originalFetch(url, newOptions));
+                });
+            });
+        }
+
+        isRefreshing = true;
+
+        try {
+            const refreshResult = await RemoteAPI.auth.refresh();
+            
+            if (refreshResult.success && refreshResult.data?.accessToken) {
+                const newToken = refreshResult.data.accessToken;
+                onTokenRefreshed(newToken);
+                
+                // Reintentar petición original con nuevo token
+                const newOptions = { ...options };
+                newOptions.headers = {
+                    ...newOptions.headers,
+                    'Authorization': `Bearer ${newToken}`
+                };
+                
+                return originalFetch(url, newOptions);
+            } else {
+                // Refresh falló → redirigir a login
+                onTokenRefreshed(null);
+                console.error('❌ Refresh token inválido, redirigiendo a login...');
+                RemoteAPI.auth.clearSession();
+                window.location.replace('portal-inicio.html');
+                throw new Error('Sesión expirada');
+            }
+        } finally {
+            isRefreshing = false;
+        }
+    };
+
+    // ✅ REEMPLAZAR fetch global con el interceptor
+    window.fetch = window.apiFetch;
+    
+    console.log('✅ Interceptor fetch con auto-refresh activado');
+})();
