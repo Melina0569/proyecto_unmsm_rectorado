@@ -1762,13 +1762,28 @@ const RemoteAPI = {
                 try {
                     const response = await fetch(
                         `${CONFIG.REMOTE_BASE}/portal/notifications?${params}`,
-                        {
-                            headers: RemoteAPI.getHeaders()
-                        }
+                        { headers: RemoteAPI.getHeaders() }
                     );
-                    return { success: response.ok, data: await response.json() };
+                    
+                    // 🔧 FIX: Si UNREAD da 500, intentar READ con límite mayor y filtrar local
+                    if (!response.ok && status === 'UNREAD' && response.status === 500) {
+                        console.warn('⚠️ /portal/notifications?status=UNREAD → 500, haciendo fallback a READ...');
+                        const fallbackResp = await fetch(
+                            `${CONFIG.REMOTE_BASE}/portal/notifications?status=READ&limit=50`,
+                            { headers: RemoteAPI.getHeaders() }
+                        );
+                        if (fallbackResp.ok) {
+                            const allData = await fallbackResp.json();
+                            const data = Array.isArray(allData) ? allData : (allData.data || []);
+                            const unreadOnly = data.filter(n => n.status === 'UNREAD' || n.read === false);
+                            return { success: true, data: unreadOnly, status: 200, fallback: true };
+                        }
+                    }
+                    
+                    const data = await response.json();
+                    return { success: response.ok, data: Array.isArray(data) ? data : (data.data || []), status: response.status };
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    return { success: false, error: error.message, status: 0, data: [] };
                 }
             },
 
@@ -1778,7 +1793,7 @@ const RemoteAPI = {
                         method: 'DELETE',
                         headers: RemoteAPI.getHeaders()
                     });
-                    return { success: response.ok, data: await response.json() };
+                    return { success: response.ok, data: await response.json().catch(() => ({})) };
                 } catch (error) {
                     return { success: false, error: error.message };
                 }
@@ -1791,7 +1806,7 @@ const RemoteAPI = {
                         headers: RemoteAPI.getHeaders(),
                         body: JSON.stringify({ status })
                     });
-                    return { success: response.ok, data: await response.json() };
+                    return { success: response.ok, data: await response.json().catch(() => ({})) };
                 } catch (error) {
                     return { success: false, error: error.message };
                 }

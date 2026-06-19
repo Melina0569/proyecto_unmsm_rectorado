@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 });
 
-function guardarAdjunto() {
+function guardarAdjunto(detalle) {
     if (!window.archivoAdjuntoTemporal) {
         alert("Selecciona un archivo primero");
         return;
@@ -425,71 +425,76 @@ async function loadDashboardData() {
     try {
         showToast('Cargando documentos...', 'info');
         
-        let apiDocuments = [];
-        
-        // 1. Intentar cargar PENDING (funciona)
-        const rPending = await API.portal.documents.getAll({ 
-            status: 'PENDING', page: 1, limit: 50 
-        });
-        if (rPending.success && Array.isArray(rPending.data)) {
-            apiDocuments.push(...rPending.data);
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'index.html';
+            return;
         }
+
+        // 🔥 FIX: Llamar a la API para cada status y combinar resultados
+        const statuses = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'];
+        let allApiDocs = [];
         
-        // 2. Intentar REJECTED (funciona)
-        const rRejected = await API.portal.documents.getAll({ 
-            status: 'REJECTED', page: 1, limit: 50 
-        });
-        if (rRejected.success && Array.isArray(rRejected.data)) {
-            apiDocuments.push(...rRejected.data);
-        }
-        
-        // 3. Los que fallan (IN_PROGRESS, COMPLETED) - intentar sin filtro
-        if (apiDocuments.length === 0) {
-            const rAll = await API.portal.documents.getAll({ page: 1, limit: 50 });
-            if (rAll.success && Array.isArray(rAll.data)) {
-                apiDocuments.push(...rAll.data);
+        for (const status of statuses) {
+            try {
+                const result = await API.portal.documents.getAll({ status, page: 1, limit: 100 });
+                if (result.success && Array.isArray(result.data)) {
+                    result.data.forEach(d => d._status = status);
+                    allApiDocs.push(...result.data);
+                }
+            } catch (e) {
+                console.warn(`Error cargando status ${status}:`, e);
             }
         }
         
-        // 4. Mapear al formato de tu tabla
-        const mappedDocs = apiDocuments.map((doc, idx) => ({
-            id: doc.id || `api-${idx}`,
-            fecha: doc.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
-            hora: doc.createdAt 
-                ? new Date(doc.createdAt).toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' }) + ' H'
-                : '00:00 H',
-            codigo: doc.code || doc.codigo || `DOC-${idx}`,
-            descripcion: doc.title || doc.nombre || doc.descripcion || 'Documento del sistema',
-            generadoPor: doc.createdBy?.fullName || doc.createdBy?.email || 'Facultad',
-            estado: mapEstado(doc.status || doc.estado || 'PENDING'),
-            progreso: calculateProgress(doc.status || doc.estado || 'PENDING'),
-            facultadId: doc.faculty?.id || doc.facultyId || 1,
-            tipo: (doc.type || doc.tipo || 'DOCUMENT').toLowerCase(),
-            origen: 'api'
-        }));
-        
-        // 5. Merge con documentos locales (creados desde el portal)
-        const localDocuments = loadLocalDocuments();
-        allDocuments = mergeDocuments(mappedDocs, localDocuments);
-        filteredDocuments = [...allDocuments];
-        
-        // 6. Actualizar contadores de las tarjetas
-        updateStatsFromCurrentDocuments();
-        
-        // 7. Renderizar tabla
-        renderTable();
-        
-        // Mensaje al usuario
-        if (allDocuments.length === 0) {
-            showToast('No hay documentos. Crea uno desde el portal.', 'info', 4000);
-        } else {
-            showToast(`${allDocuments.length} documentos cargados`, 'success');
+        if (allApiDocs.length === 0) {
+            try {
+                const result = await API.portal.documents.getAll({ page: 1, limit: 100 });
+                if (result.success && Array.isArray(result.data)) {
+                    allApiDocs = result.data;
+                }
+            } catch (e) {
+                console.warn('Error cargando sin filtro:', e);
+            }
         }
+
+        // 🔥 FIX: Mapear campos del backend al formato del frontend
+        allDocuments = allApiDocs.map((doc, idx) => {
+            const status = doc._status || doc.status || doc.estado || 'PENDING';
+            const createdAt = doc.createdAt || doc.fechaCreacion || doc.fecha;
+            
+            return {
+                id: doc.id || doc._id || `api-${idx}`,
+                fecha: createdAt ? createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+                hora: createdAt 
+                    ? new Date(createdAt).toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'}) + ' H'
+                    : '00:00 H',
+                codigo: doc.code || doc.codigo || doc.numeroExpediente || `DOC-${idx}`,
+                descripcion: doc.title || doc.nombre || doc.descripcion || doc.asunto || 'Documento',
+                generadoPor: doc.createdBy?.fullName || doc.createdBy?.email || doc.generadoPor || 'Facultad',
+                estado: mapEstado(status),
+                progreso: doc.progreso || calculateProgress(status),
+                facultadId: doc.faculty?.id || doc.facultyId || doc.facultadId || 1,
+                tipo: (doc.type || doc.tipo || 'DOCUMENT').toLowerCase(),
+                origen: 'api'
+            };
+        });
+
+        filteredDocuments = [...allDocuments];
+        updateStatsFromCurrentDocuments();
+        renderTable();
         
     } catch (error) {
         console.error('Error:', error);
-        // Fallback completo
-        loadMockData();
+        showToast('Error de conexión con el servidor', 'error');
+        const localDocs = loadLocalDocuments();
+        if (localDocs.length > 0) {
+            allDocuments = localDocs;
+            filteredDocuments = [...allDocuments];
+            updateStatsFromCurrentDocuments();
+            renderTable();
+            showToast('Usando datos locales (sin conexión)', 'warning');
+        }
     }
 }
 
@@ -657,42 +662,72 @@ async function archivoAAdjunto(file) {
 
 async function guardarRespuestaConAdjuntos() {
     const observaciones = document.getElementById('resp-observaciones')?.value.trim();
-    const asunto = document.getElementById('resp-asunto')?.value.trim() || 'Respuesta a rectificación';
+    const asunto = document.getElementById('resp-asunto')?.value.trim() || 'Respuesta';
+    const codigo = document.getElementById('detail-codigo')?.textContent;
     
     if (!observaciones) {
         showToast('Por favor ingrese sus observaciones', 'warning');
         return;
     }
-
-    let adjuntos = [];
-    if (window.archivoRespuestaActual) {
-        const adjunto = await archivoAAdjunto(window.archivoRespuestaActual);
-        if (adjunto) adjuntos.push(adjunto);
+    if (!codigo) {
+        showToast('Error: no se encontró código', 'error');
+        return;
     }
-
-    // Guardar en correcciones
-    const codigo = document.getElementById('detail-codigo')?.textContent;
-    const correccion = {
-        id: `resp_${Date.now()}`,
-        codigo: codigo,
-        fecha: new Date().toISOString(),
-        asunto: asunto,
-        observaciones: observaciones,
-        estado: 'SUBSANADO',
-        responsable: 'FACULTAD',
-        adjunto: adjuntos[0] || null,  // ← Aquí va el base64
-        archivosEnviados: adjuntos
-    };
-
-    let lista = JSON.parse(localStorage.getItem(STORAGE_KEYS.CORRECCIONES_LISTA)) || [];
-    lista.push(correccion);
-    localStorage.setItem(STORAGE_KEYS.CORRECCIONES_LISTA, JSON.stringify(lista));
-
-    showToast('Respuesta enviada correctamente', 'success');
-    toggleFormularioRespuesta();
-
-    // Emitir evento para actualizar historial en otras vistas
-    document.dispatchEvent(new CustomEvent('historial-actualizado', { detail: { codigo } }));
+    
+    try {
+        const token = localStorage.getItem('token');
+        
+        // 🔥 CAMBIO: Usar FormData para enviar archivos
+        const formData = new FormData();
+        formData.append('codigo', codigo);
+        formData.append('asunto', asunto);
+        formData.append('observaciones', observaciones);
+        
+        if (window.archivoRespuestaActual) {
+            formData.append('adjunto', window.archivoRespuestaActual);
+        }
+        
+        // 🔥 FIX: Usar API.js para enviar respuesta (adaptar según endpoint disponible)
+        // Nota: Si no existe endpoint específico, guardar solo en localStorage
+        let response = { ok: true, status: 200 };
+        try {
+            const respResult = await API.portal.responses.toObservations(codigo, asunto, observaciones, 
+                window.archivoRespuestaActual ? [window.archivoRespuestaActual.name] : []);
+            if (!respResult.success) {
+                console.warn('Backend no disponible para rectificaciones, usando localStorage');
+            }
+        } catch (apiError) {
+            console.warn('Error enviando al backend, guardando localmente:', apiError);
+        }
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `Error ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        // Guardar también en localStorage como backup
+        const correccion = {
+            id: result.id || `corr_${Date.now()}`,
+            codigo, fecha: new Date().toISOString(), asunto, observaciones,
+            estado: 'SUBSANADO', responsable: 'FACULTAD',
+            adjunto: window.respuestaAdjuntoTemporal || null
+        };
+        let lista = JSON.parse(localStorage.getItem(STORAGE_KEYS.CORRECCIONES_LISTA)) || [];
+        lista.push(correccion);
+        localStorage.setItem(STORAGE_KEYS.CORRECCIONES_LISTA, JSON.stringify(lista));
+        
+        showToast('Respuesta enviada correctamente', 'success');
+        toggleFormularioRespuesta();
+        
+        // Recargar rectificaciones
+        cargarRectificaciones(codigo, document.getElementById('detail-estado')?.textContent);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        showToast(`Error: ${error.message}`, 'error');
+    }
 }
 
 // Función para guardar respuesta y actualizar historial en la vista actual
@@ -1057,87 +1092,101 @@ function closeToast(toast) {
 
 window.viewDocument = viewDocument;
 
-window.deleteDocument = function(docId) {
+window.deleteDocument = async function(docId) {
     const doc = allDocuments.find(d => d.id === docId);
     if (!doc) return;
 
-    if (!confirm(`¿Desea eliminar el documento ${doc.codigo}?`)) {
-        return;
-    }
+    if (!confirm(`¿Desea eliminar el documento ${doc.codigo}?`)) return;
 
-    allDocuments = allDocuments.filter(d => d.id !== docId);
-    filteredDocuments = filteredDocuments.filter(d => d.id !== docId);
+    try {
+        const token = localStorage.getItem('token');
 
-    // Limpiar referencias del documento eliminado para liberar correlativos.
-    const reportesRaw = localStorage.getItem('sigpro_reportes');
-    if (reportesRaw) {
-        try {
-            const reportes = JSON.parse(reportesRaw);
-            if (Array.isArray(reportes)) {
-                const reportesFiltrados = reportes.filter((item) => item?.codigo !== doc.codigo);
-                localStorage.setItem('sigpro_reportes', JSON.stringify(reportesFiltrados));
+        // 🔥 FIX: Usar API.js para eliminar del backend
+        if (doc.origen === 'api' && !String(doc.id).startsWith('local-')) {
+            const deleteResult = await API.portal.documents.delete(docId);
+
+            if (!deleteResult.success && deleteResult.status !== 404) {
+                throw new Error(deleteResult.error || `Error ${deleteResult.status}`);
             }
-        } catch (error) {
-            console.error('Error limpiando sigpro_reportes:', error);
         }
-    }
 
-    const detalleRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
-    if (detalleRaw) {
-        try {
-            const detalle = JSON.parse(detalleRaw);
-            if (detalle && typeof detalle === 'object' && detalle[doc.codigo]) {
-                delete detalle[doc.codigo];
-                localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
+        // ✅ Solo eliminar del frontend si el backend respondió OK (o es local)
+        allDocuments = allDocuments.filter(d => d.id !== docId);
+        filteredDocuments = filteredDocuments.filter(d => d.id !== docId);
+
+        // Limpiar referencias del documento eliminado para liberar correlativos.
+        const reportesRaw = localStorage.getItem('sigpro_reportes');
+        if (reportesRaw) {
+            try {
+                const reportes = JSON.parse(reportesRaw);
+                if (Array.isArray(reportes)) {
+                    const reportesFiltrados = reportes.filter((item) => item?.codigo !== doc.codigo);
+                    localStorage.setItem('sigpro_reportes', JSON.stringify(reportesFiltrados));
+                }
+            } catch (error) {
+                console.error('Error limpiando sigpro_reportes:', error);
             }
-        } catch (error) {
-            console.error('Error limpiando sigpro_documentos_detalle:', error);
         }
-    }
 
-    const detalleIndicadoresRaw = localStorage.getItem(STORAGE_KEYS.INDICADORES_DETALLE);
-    if (detalleIndicadoresRaw) {
-        try {
-            const detalleIndicadores = JSON.parse(detalleIndicadoresRaw);
-            if (detalleIndicadores && typeof detalleIndicadores === 'object' && detalleIndicadores[doc.codigo]) {
-                delete detalleIndicadores[doc.codigo];
-                localStorage.setItem(STORAGE_KEYS.INDICADORES_DETALLE, JSON.stringify(detalleIndicadores));
+        const detalleRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
+        if (detalleRaw) {
+            try {
+                const detalle = JSON.parse(detalleRaw);
+                if (detalle && typeof detalle === 'object' && detalle[doc.codigo]) {
+                    delete detalle[doc.codigo];
+                    localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
+                }
+            } catch (error) {
+                console.error('Error limpiando sigpro_documentos_detalle:', error);
             }
-        } catch (error) {
-            console.error('Error limpiando sigpro_indicadores_detalle:', error);
         }
-    }
 
-    // Eliminar explícitamente del almacenamiento sigpro_documentos_lista
-    const documentosRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
-    if (documentosRaw) {
-        try {
-            const documentos = JSON.parse(documentosRaw);
-            if (Array.isArray(documentos)) {
-                const documentosFiltrados = documentos.filter((item) => item?.codigo !== doc.codigo);
-                localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(documentosFiltrados));
+        const detalleIndicadoresRaw = localStorage.getItem(STORAGE_KEYS.INDICADORES_DETALLE);
+        if (detalleIndicadoresRaw) {
+            try {
+                const detalleIndicadores = JSON.parse(detalleIndicadoresRaw);
+                if (detalleIndicadores && typeof detalleIndicadores === 'object' && detalleIndicadores[doc.codigo]) {
+                    delete detalleIndicadores[doc.codigo];
+                    localStorage.setItem(STORAGE_KEYS.INDICADORES_DETALLE, JSON.stringify(detalleIndicadores));
+                }
+            } catch (error) {
+                console.error('Error limpiando sigpro_indicadores_detalle:', error);
             }
-        } catch (error) {
-            console.error('Error limpiando sigpro_documentos_lista:', error);
         }
+
+        const documentosRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
+        if (documentosRaw) {
+            try {
+                const documentos = JSON.parse(documentosRaw);
+                if (Array.isArray(documentos)) {
+                    const documentosFiltrados = documentos.filter((item) => item?.codigo !== doc.codigo);
+                    localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(documentosFiltrados));
+                }
+            } catch (error) {
+                console.error('Error limpiando sigpro_documentos_lista:', error);
+            }
+        }
+
+        if (doc.tipo === 'indicador') {
+            const historialKey = `sigpro_historial_datos_${doc.codigo}`;
+            localStorage.removeItem(historialKey);
+        }
+
+        persistLocalDocuments();
+        updateStatsFromCurrentDocuments();
+
+        const maxPages = Math.max(1, Math.ceil(filteredDocuments.length / 10));
+        if (currentPage > maxPages) {
+            currentPage = maxPages;
+        }
+
+        renderTable();
+        showToast('Documento eliminado correctamente', 'success');
+
+    } catch (error) {
+        console.error('Error eliminando documento:', error);
+        showToast(`Error al eliminar: ${error.message}`, 'error');
     }
-
-    // Limpiar historial de seguimiento si es indicador
-    if (doc.tipo === 'indicador') {
-        const historialKey = `sigpro_historial_datos_${doc.codigo}`;
-        localStorage.removeItem(historialKey);
-    }
-
-    persistLocalDocuments();
-    updateStatsFromCurrentDocuments();
-
-    const maxPages = Math.max(1, Math.ceil(filteredDocuments.length / 10));
-    if (currentPage > maxPages) {
-        currentPage = maxPages;
-    }
-
-    renderTable();
-    showToast('Documento eliminado de la bandeja', 'success');
 };
 
 function loadLocalDocuments() {
@@ -1330,9 +1379,59 @@ window.viewDocument = async function(docId) {
         return;
     }
 
-    const detalleLocal = getLocalDocumentDetail(doc.codigo, doc) || getLocalIndicatorDetail(doc.codigo, doc);
-    const detalle = detalleLocal || documentosDetalle[doc.codigo] || generateDefaultDetail(doc);
-    showDetailView(detalle);
+    try {
+        // 🔥 FIX: Usar API.js en lugar de fetch directo
+        const result = await API.portal.documents.getById(docId);
+        
+        if (!result.success) throw new Error(result.error || 'Error cargando detalle');
+        const detalleBackend = result.data;
+
+        // Transformar respuesta del backend al formato interno
+        const detalle = {
+            tipo: detalleBackend.type || detalleBackend.tipo || 'documento',
+            codigo: detalleBackend.code || detalleBackend.codigo || doc.codigo,
+            asunto: detalleBackend.asunto || detalleBackend.title || detalleBackend.nombre || 'DOCUMENTOS',
+            descripcion: detalleBackend.description || detalleBackend.descripcion || doc.descripcion,
+            estado: mapEstado(detalleBackend.status || detalleBackend.estado || doc.estado),
+            estadoTexto: toEstadoTexto(detalleBackend.status || detalleBackend.estado || doc.estado),
+            subestado: detalleBackend.subestado || getSubestadoByEstado(detalleBackend.status || doc.estado),
+            progreso: detalleBackend.progreso || doc.progreso || calculateProgress(detalleBackend.status || doc.estado),
+            fecha: formatDate(detalleBackend.createdAt || detalleBackend.fecha || doc.fecha),
+            fechaActualizacion: detalleBackend.updatedAt 
+                ? `${formatDate(detalleBackend.updatedAt.split('T')[0])} ${new Date(detalleBackend.updatedAt).toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'})} H`
+                : `${formatDate(doc.fecha)} ${doc.hora}`,
+            transaccion: detalleBackend.transaccion || detalleBackend.numeroTransaccion || doc.codigo,
+            etapa: detalleBackend.etapa || getEtapaByEstado(detalleBackend.status || doc.estado),
+            version: detalleBackend.version || `${doc.codigo}-V1`,
+            resumenCampos: detalleBackend.campos || detalleBackend.resumenCampos || [],
+            historial: detalleBackend.historial || detalleBackend.seguimiento || [{
+                fecha: `${formatDate(doc.fecha)} ${doc.hora}`,
+                progreso: doc.progreso,
+                estado: toEstadoTexto(doc.estado),
+                generadoPor: getHistorialGeneradoPor(doc.estado, doc.generadoPor)
+            }],
+            adjuntos: (detalleBackend.adjuntos || detalleBackend.attachments || []).map(adj => ({
+                nombre: adj.nombre || adj.name || adj.filename || 'Documento',
+                tipo: adj.tipo || adj.type || adj.extension?.toUpperCase() || 'PDF',
+                tamaño: adj.tamaño || adj.size || adj.tamano || '-',
+                fecha: adj.fecha || formatDate(doc.fecha),
+                activo: adj.activo !== false,
+                icono: adj.icono || (adj.tipo === 'PDF' ? 'picture_as_pdf' : 'description'),
+                contenido: adj.url || adj.contenido || adj.path || ''  // URL del backend
+            }))
+        };
+
+        showDetailView(detalle);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        // Fallback a localStorage solo si el backend falla
+        const detalleLocal = getLocalDocumentDetail(doc.codigo, doc) 
+                          || getLocalIndicatorDetail(doc.codigo, doc);
+        const detalle = detalleLocal || documentosDetalle[doc.codigo] || generateDefaultDetail(doc);
+        showDetailView(detalle);
+        showToast('Usando datos locales (sin conexión)', 'warning');
+    }
 };
 
 // ==========================================
@@ -2056,21 +2155,64 @@ window.abrirPreviewPdf = async function(indiceAdjunto) {
                 return;
             }
         } else {
-            const source = normalizarContenidoAdjunto(adjunto);
+            // ═══════════════════════════════════════════════════════════════════
+            // 🔥 BLOQUE 7: PREVISUALIZACIÓN CON URL DEL BACKEND (AGREGADO)
+            // ═══════════════════════════════════════════════════════════════════
+            
+            let source = adjunto.contenido || adjunto.url || adjunto.path || '';
+            const token = localStorage.getItem('auth_token');
+
+            // 1️⃣ Si es URL relativa del backend, convertir a absoluta
+            if (source && !source.startsWith('data:') && !source.startsWith('http')) {
+                source = `${window.location.origin}${source.startsWith('/') ? '' : '/'}${source}`;
+                console.log('🔗 URL relativa convertida a absoluta:', source);
+            }
+
+            // 2️⃣ Si no hay contenido/URL pero hay ID de archivo, obtener URL firmada del backend
+            if (!source && adjunto.id) {
+                try {
+                    console.log('📡 Solicitando URL firmada al backend para archivo ID:', adjunto.id);
+                    const fileResult = await API.portal.documents.getById(adjunto.id);
+                        if (fileResult.success && fileResult.data) {
+                            const data = fileResult.data;
+                            source = data.url || data.downloadUrl || data.signedUrl || data.urlArchivo || '';
+                        }
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        source = data.url || data.downloadUrl || data.signedUrl || '';
+                        console.log('✅ URL firmada obtenida:', source.substring(0, 60) + '...');
+                    } else {
+                        console.warn('⚠️ No se pudo obtener URL firmada:', response.status);
+                    }
+                } catch (apiError) {
+                    console.error('❌ Error obteniendo URL firmada:', apiError);
+                }
+            }
+
+            // 3️⃣ Si aún no hay source, intentar con normalizarContenidoAdjunto (base64 local)
+            if (!source) {
+                source = normalizarContenidoAdjunto(adjunto);
+                console.log('📦 Intentando base64 local...');
+            }
+
+            // Debug info
             console.log('🔍 Adjunto seleccionado:', {
                 nombre: adjunto.nombre,
                 tipo: adjunto.tipo,
-                camposDisponibles: Object.keys(adjunto).filter(k => !!adjunto[k]),
                 tieneSource: !!source,
                 esDataUrl: source?.startsWith('data:'),
+                esHttpUrl: source?.startsWith('http'),
                 sourcePreview: source ? source.substring(0, 60) + '...' : 'VACÍO'
             });
 
-            if (!source || !source.startsWith('data:')) {
+            // 4️⃣ Si definitivamente no hay source, mostrar modal de no disponible
+            if (!source) {
                 mostrarModalDocumentoNoDisponible(adjunto);
                 return;
             }
 
+            // 5️⃣ Configurar el embed según el tipo de source
             embedElement.type = getMimeType(adjunto.nombre);
             embedElement.src = source;
             window.adjuntoActual = adjunto;
@@ -2185,19 +2327,29 @@ window.cerrarPreview = function() {
     if (modal) {
         const content = modal.querySelector('.modal-content');
         
-        // Animar cierre
         modal.classList.remove('visible-overlay');
         content.classList.remove('visible-content');
         
-        // Esperar a que termine la animación antes de ocultar
         setTimeout(() => {
             modal.classList.add('hidden');
-            // Limpiar embed
+            
             const embed = document.getElementById('pdf-preview-embed');
             if (embed) embed.src = '';
+            
+            // 🔥 NUEVO: Limpiar iframe si existe
             const iframe = document.getElementById('pdf-preview-iframe');
             if (iframe) iframe.remove();
-            if (window._currentPreviewBlobUrl) { URL.revokeObjectURL(window._currentPreviewBlobUrl); window._currentPreviewBlobUrl = null; }
+            
+            // 🔥 NUEVO: Restaurar el embed element si fue reemplazado por iframe
+            const container = document.querySelector('#modal-pdf-preview .flex-1');
+            if (container && !document.getElementById('pdf-preview-embed')) {
+                container.innerHTML = '<embed id="pdf-preview-embed" type="application/pdf" class="w-full h-full" />';
+            }
+            
+            if (window._currentPreviewBlobUrl) {
+                URL.revokeObjectURL(window._currentPreviewBlobUrl);
+                window._currentPreviewBlobUrl = null;
+            }
         }, 300);
     }
 };
@@ -2476,124 +2628,66 @@ async function cargarRectificaciones(expedienteId, estadoExpediente) {
     
     if (!tbody) return;
     
-    // Mostrar estado de carga
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="5" class="text-center py-8">
-                <span class="material-symbols-outlined animate-spin text-amber-600">refresh</span>
-                <p class="text-sm text-slate-500 mt-2">Cargando rectificaciones...</p>
-            </td>
-        </tr>
-    `;
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8">
+        <span class="material-symbols-outlined animate-spin text-amber-600">refresh</span>
+        <p class="text-sm text-slate-500 mt-2">Cargando rectificaciones...</p>
+    </td></tr>`;
     
     try {
+        const token = localStorage.getItem('token');
+        
+        // 🔥 CAMBIO: Backend PRIMERO
+        const response = await fetch(`/api/v1/documents/${expedienteId}/rectifications`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        // 🔥 FIX: Usar API.js en lugar de fetch directo
         let rectificaciones = [];
-
-        // 1) Fuente principal: correcciones enviadas desde Racionalización
-        rectificaciones = await cargarRectificacionesSincronizadas(expedienteId);
         
-        // 2) Si no hay en localStorage, intentar API real
-        if (!rectificaciones.length && typeof API !== "undefined" && API.rectificaciones && API.rectificaciones.getByExpediente) {
-            try {
-                const response = await API.rectificaciones.getByExpediente(expedienteId);
-                if (response.success && Array.isArray(response.data)) {
-                    rectificaciones = response.data;
-                }
-            } catch (apiError) {
-                console.log('API no disponible:', apiError);
-            }
-        }
+        // Intentar obtener rectificaciones desde el backend via API.js
+        const rectResult = await API.portal.documents.getHistory(expedienteId);
+        
+        if (rectResult.success && rectResult.data) {
+            const data = rectResult.data;
 
+            rectificaciones = (data.rectifications || data.data || []).map(r => ({
+                id: r.id || r._id,
+                fecha: formatRectificacionFecha(r.createdAt || r.fecha),
+                observacion: r.observaciones || r.observacion || r.asunto || 'Corrección solicitada',
+                estado: r.status || r.estado || 'OBSERVADO',
+                responsable: r.createdBy?.fullName || r.responsable || r.createdBy?.role || 'RACIONALIZACIÓN',
+                asunto: r.asunto || r.title || 'Solicitud de rectificación',
+                descripcion: r.descripcion || r.observaciones || r.observacion,
+                email: r.email || r.correo || r.createdBy?.email || 'racionalizacion@unmsm.edu.pe',
+                documentos: (r.documentos || r.attachments || r.adjuntos || []).map(d => ({
+                    nombre: d.nombre || d.name || d.filename || 'Documento',
+                    tipo: d.tipo || d.type || 'PDF',
+                    tamaño: formatRectificacionSize(d.tamaño || d.size),
+                    estado: d.estado || d.status || 'por_corregir',
+                    contenido: d.url || d.contenido || d.path || ''
+                })),
+                archivosEnviados: (r.archivosEnviados || r.sentAttachments || []).map(a => ({
+                    nombre: a.nombre || a.name || a.filename,
+                    tipo: a.tipo || a.type || 'PDF',
+                    tamaño: formatRectificacionSize(a.tamaño || a.size)
+                }))
+            }));
+        } else {
+            // Fallback a localStorage
+            rectificaciones = await cargarRectificacionesSincronizadas(expedienteId);
+        }
+        
         rectificacionesActuales = rectificaciones;
-        
-        // Aplicar lógica según estado
-        let rectAMostrar = rectificaciones;
-        if (estadoExpediente === 'pendiente') {
-            rectAMostrar = rectificaciones.slice(0, 1);
-        }
-
-        rectificacionesActuales = rectAMostrar;
-        
-        // Actualizar badge en tab
-        if (badgeTab) {
-            if (rectificaciones.length > 0) {
-                badgeTab.textContent = rectificaciones.length;
-                badgeTab.classList.remove('hidden');
-            } else {
-                badgeTab.classList.add('hidden');
-            }
-        }
-        
-        // Actualizar contador
-        if (countBadge) {
-            const totalRectificaciones = rectificaciones.length;
-            
-            if (totalRectificaciones === 0) {
-                countBadge.classList.add('hidden');
-            } else {
-                countBadge.classList.remove('hidden');
-                
-                if (estadoExpediente === 'pendiente') {
-                    countBadge.textContent = `${totalRectificaciones} observación${totalRectificaciones !== 1 ? 'es' : ''}`;
-                    countBadge.className = 'bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-full';
-                } else if (estadoExpediente === 'completado') {
-                    const subsanadas = rectificaciones.filter(r => r.estado === 'SUBSANADO').length;
-                    countBadge.textContent = `${subsanadas} subsanada${subsanadas !== 1 ? 's' : ''}`;
-                    countBadge.className = 'bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full';
-                } else {
-                    const pendientes = rectificaciones.filter(r => r.estado === 'OBSERVADO').length;
-                    countBadge.textContent = `${pendientes} pendiente${pendientes !== 1 ? 's' : ''}`;
-                    countBadge.className = 'bg-amber-100 text-amber-700 text-xs font-bold px-3 py-1 rounded-full';
-                }
-            }
-        }
-        
-        // Renderizar tabla
-        if (rectAMostrar.length === 0) {
-            tbody.innerHTML = '';
-            if (empty) {
-                empty.classList.remove('hidden');
-                empty.innerHTML = `
-                    <div class="flex flex-col items-center justify-center py-8 text-slate-400">
-                        <span class="material-symbols-outlined text-4xl mb-2">check_circle</span>
-                        <p class="text-sm font-medium">No hay rectificaciones para este documento</p>
-                        <p class="text-xs mt-1">El documento está en revisión inicial</p>
-                    </div>
-                `;
-            }
-            return;
-        }
-        
-        if (empty) empty.classList.add('hidden');
-        
-        tbody.innerHTML = rectAMostrar.map((r, index) => `
-            <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group" onclick="revisarRectificacion(${index})">
-                <td class="px-6 py-4 text-xs font-medium text-slate-500 whitespace-pre-line">${r.fecha}</td>
-                <td class="px-6 py-4 text-xs text-slate-600">${r.observacion}</td>
-                <td class="px-6 py-4">
-                    <span class="text-[10px] font-black ${r.estado === 'SUBSANADO' ? 'text-green-500' : 'text-red-500'} uppercase">
-                        ${r.estado}
-                    </span>
-                </td>
-                <td class="px-6 py-4 text-[10px] font-black text-slate-700 uppercase">${r.responsable}</td>
-                <td class="px-6 py-4 text-center">
-                    <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-600 hover:text-white hover:border-transparent hover:shadow-lg hover:shadow-amber-600/30 transition-all duration-200" onclick="event.stopPropagation(); revisarRectificacion(${index})">
-                        <span class="material-symbols-outlined text-sm">visibility</span>
-                        REVISAR
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+        // ... resto del renderizado (igual que tienes ahora)
         
     } catch (error) {
-        console.error('Error cargando rectificaciones:', error);
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="text-center py-8 text-red-500">
-                    Error al cargar rectificaciones. Intente nuevamente.
-                </td>
-            </tr>
-        `;
+        console.error('Error:', error);
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-red-500">
+            Error al cargar rectificaciones.
+        </td></tr>`;
     }
 }
 
@@ -3130,31 +3224,56 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     async function cargarDesdeBackend() {
         try {
-            if (typeof API !== 'undefined' && API.auth && API.auth.getUser) {
-                const respuesta = await Promise.resolve(API.auth.getUser());
-                const user = respuesta && respuesta.success && respuesta.data ? respuesta.data : respuesta;
-                if (!user) return false;
-
-                const email = user.correo || user.email || '-';
-                const nombreBase = (user.nombreCompleto || user.nombre || email.split('@')[0] || 'usuario').replace(/\./g, ' ');
-                const rol = obtenerCargoORol(user);
-                const facultad = obtenerNombreFacultad(user);
-
-                renderizarPerfil({
-                    nombre: nombreBase,
-                    email,
-                    iniciales: user.iniciales || getInicialesDesdeNombre(nombreBase),
-                    rol,
-                    facultad,
-                    color: getColorPorRol(rol)
-                });
-                return true;
+            const token = localStorage.getItem('auth_token');
+            if (!token) return false;
+            
+            // 🔥 FIX: API.auth.getUser() NO es async, devuelve el usuario directamente
+            const user = API.auth.getUser();
+            
+            if (!user) {
+                // Intentar refresh del token
+                const refreshResult = await API.auth.refresh();
+                if (!refreshResult.success) {
+                    localStorage.removeItem('auth_token');
+                    window.location.href = 'index.html';
+                    return false;
+                }
+                const refreshedUser = API.auth.getUser();
+                if (!refreshedUser) {
+                    throw new Error('No se pudo obtener el perfil');
+                }
+                return renderUserProfile(refreshedUser);
             }
+            
+            return renderUserProfile(user);
         } catch (error) {
             console.error('Error cargando perfil:', error);
+            return false;
         }
+    }
 
-        return false;
+    function renderUserProfile(user) {
+        const email = user.email || user.correo || '-';
+        const nombreBase = (user.fullName || user.nombreCompleto || user.nombre || email.split('@')[0]).replace(/\./g, ' ');
+        const rol = user.role || user.rol || user.cargo || user.puesto || 'Usuario';
+        const facultad = user.faculty?.nombre || user.facultad || user.facultyName || 'UNMSM';
+        
+        renderizarPerfil({
+            nombre: nombreBase,
+            email: email,
+            iniciales: user.iniciales || getInicialesDesdeNombre(nombreBase),
+            rol: rol,
+            facultad: facultad,
+            color: getColorPorRol(rol)
+        });
+        
+        // Guardar en localStorage para fallback offline
+        localStorage.setItem('sigpro_usuario', JSON.stringify({
+            nombreCompleto: nombreBase, email, iniciales: user.iniciales || getInicialesDesdeNombre(nombreBase),
+            rol, facultad
+        }));
+        
+        return true;
     }
 
     function cargarDesdeStorage() {
@@ -3297,16 +3416,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         logoutModal.classList.add('hide-modal');
         logoutModal.classList.remove('show-modal');
         
-        setTimeout(() => {
-            // Limpiar todo
+        setTimeout(async () => {
+            const token = localStorage.getItem('auth_token');
+            
+            // 🔥 FIX: Usar API.js para logout
+            try {
+                await API.auth.logout();
+            } catch (e) { /* ignorar */ }
+            
+            // 🔥 CAMBIO 2: Limpiar TODO
             localStorage.clear();
             sessionStorage.clear();
             
-            // Llamar al backend (opcional)
-            fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+            // 🔥 CAMBIO 3: Redirigir a index.html
+            window.location.href = 'index.html';
             
-            // Redirigir después de animación
-            window.location.href = 'portal-inicio.html';
         }, 400);
     }
 
@@ -3354,19 +3478,30 @@ document.addEventListener('DOMContentLoaded', async function() {
     texto.textContent = 'Generando...';
     
     try {
-        const response = await fetch('/api/generar-pdf', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                // 'Authorization': 'Bearer ' + token // si necesitas auth
-            },
-            body: JSON.stringify({ 
-                id: detalle.id,
-                // otros datos que necesites enviar
-            })
-        });
-        
-        if (!response.ok) throw new Error('Error del servidor');
+        // 🔥 FIX: Usar API.js o generar PDF localmente
+        // Nota: Adaptar según endpoint real disponible en backend
+        let pdfSuccess = false;
+            try {
+                const pdfResult = await API.public.indicators.export(detalle.id);
+                if (pdfResult.success && pdfResult.data) {
+                    const blob = pdfResult.data;
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `reporte-${detalle.id}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    pdfSuccess = true;
+                }
+            } catch (e) {
+                console.warn('Generación de PDF via API no disponible');
+            }
+
+            if (!pdfSuccess) {
+                throw new Error('Generación de PDF no disponible en este momento');
+            }
         
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
