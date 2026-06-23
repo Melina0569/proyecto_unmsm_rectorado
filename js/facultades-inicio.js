@@ -6,10 +6,9 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize all modules
     initThemeToggle();
-    initActionButtons();
-    initSorting();
     initTooltips();
-    loadDashboardData();
+    cargarDashboardUsuario();   // ← Carga contadores del dashboard con animación
+    cargarNotificacionesDashboard();
 });
 
 // ==========================================
@@ -52,552 +51,6 @@ function initThemeToggle() {
         
         showToast(`Modo ${isDark ? 'oscuro' : 'claro'} activado`, 'info');
     });
-}
-
-// ==========================================
-// Data Loading from API
-// ==========================================
-let reportsData = [];
-const STORAGE_KEYS = {
-    DOCUMENTOS_LISTA: 'sigpro_documentos_lista'
-};
-
-function normalizeEstado(estado) {
-    const value = String(estado || '').toLowerCase().trim().replace(/\s+/g, '_');
-    if (value === 'aprobado' || value === 'completado') return 'completado';
-    if (value === 'en_proceso' || value === 'en proceso' || value === 'revision') return 'en_proceso';
-    return 'pendiente';
-}
-
-async function loadDashboardData() {
-    try {
-        showToast('Cargando datos del dashboard...', 'info');
-        
-        // Check if API is available
-        if (typeof API === 'undefined' || !API.documentos || !API.documentos.getAll) {
-            console.warn('API no disponible, cargando datos de ejemplo');
-            throw new Error('API no disponible');
-        }
-        
-        let user = null;
-        try {
-            user = API.auth.getUser();
-        } catch (e) {
-            console.log('No hay usuario autenticado');
-        }
-
-        // Buscar facultadId en MÚLTIPLES fuentes
-        let facultadId = user?.facultadId 
-            || user?.facultyId 
-            || user?.faculty?.id 
-            || user?.facultad?.id 
-            || null;
-
-        // Si no está en el objeto user, buscar en localStorage directamente
-        if (!facultadId) {
-            try {
-                const userRaw = localStorage.getItem('unmsm_user');
-                if (userRaw) {
-                    const userData = JSON.parse(userRaw);
-                    facultadId = userData?.facultadId 
-                        || userData?.facultyId 
-                        || userData?.faculty?.id 
-                        || userData?.facultad?.id
-                        || userData?.facultadId  // con 'l' minúscula
-                        || null;
-                }
-            } catch (e) {
-                console.warn('Error leyendo unmsm_user:', e);
-            }
-        }
-
-        // Si aún no hay, buscar en keys separadas
-        if (!facultadId) {
-            facultadId = localStorage.getItem('unmsm_faculty_id') || null;
-        }
-
-        // DEBUG: Mostrar qué se encontró
-        console.log('🔍 facultadId encontrado:', facultadId);
-        console.log('🔍 Usuario:', user);
-
-        // Si NO hay facultadId, NO lanzar error, continuar sin filtro
-        if (!facultadId) {
-            console.warn('⚠️ No se encontró facultadId. Continuando sin filtro de facultad.');
-            // En lugar de throw, continuar con facultadId = null
-            // El backend puede devolver todos los documentos o requerir el filtro
-        }
-
-        // Load documents from API
-        const resultado = await API.portal.documents.getAll({ facultyId: facultadId });
-        
-        if (!resultado.success) {
-            throw new Error(resultado.error || 'Error al cargar datos');
-        }
-        
-        const documentos = resultado.data || [];
-        
-        // Convert API docs to reports format
-        const apiReports = documentos.map((doc, index) => ({
-            id: doc.id || index + 1,
-            date: doc.fecha || new Date().toISOString().split('T')[0],
-            time: doc.hora || '10:30 H',
-            code: doc.codigo || `DOC-${index + 1}`,
-            description: doc.descripcion || 'Documento generado',
-            generatedBy: doc.generadoPor || 'Sistema',
-            generatedByClass: getGeneratedByClass(doc.generadoPor),
-            status: mapStatus(doc.estado),
-            statusClass: getStatusClass(doc.estado),
-            statusDot: getStatusDot(doc.estado),
-            statusPing: normalizeEstado(doc.estado) !== 'completado'
-        }));
-
-        // Merge with locally created pending documents
-        const localReports = loadLocalReports();
-        reportsData = mergeReports(apiReports, localReports)
-            .slice(0, 10);
-        
-        // If API returned vacío, usar datos ejemplos
-        if (reportsData.length === 0) {
-            console.warn('No hay documentos desde API, usando mock data');
-            loadMockData();
-            return;
-        }
-
-        // Update counters based on merged data
-        updateCounters(reportsData.map(r => ({
-            estado: mapStatusFromBadge(r.status)
-        })));
-        
-        // Render table
-        renderTable(reportsData);
-        
-        showToast('Datos cargados correctamente', 'success');
-        
-    } catch (error) {
-        console.error('Error cargando dashboard:', error);
-        showToast('Usando datos de ejemplo', 'warning');
-        
-        // Load mock data + local reports
-        loadMockData();
-    }
-}
-
-function loadLocalReports() {
-    const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
-    if (!raw) return [];
-
-    try {
-        const list = JSON.parse(raw);
-        if (!Array.isArray(list)) return [];
-
-        const locales = list.map((doc, index) => {
-            const estadoNormalizado = normalizeEstado(doc.estado || 'pendiente');
-            return {
-                id: doc.id || `local-${doc.codigo || index}`,
-                date: doc.fecha || new Date().toISOString().split('T')[0],
-                time: doc.hora || '00:00 H',
-                code: doc.codigo || `DOC-${index + 1}`,
-                description: doc.descripcion || 'Documento generado',
-                generatedBy: doc.generadoPor || 'Facultad',
-                generatedByClass: getGeneratedByClass(doc.generadoPor || 'Facultad'),
-                status: mapStatus(estadoNormalizado),
-                statusClass: getStatusClass(estadoNormalizado),
-                statusDot: getStatusDot(estadoNormalizado),
-                statusPing: estadoNormalizado !== 'completado',
-                origen: 'local'
-            };
-        });
-
-        if (locales.length > 0) {
-            showToast(`Tiene ${locales.length} reporte(s) nuevo(s) en revisión`, 'info', 3500);
-        }
-
-        return locales;
-    } catch (error) {
-        console.error('Error leyendo reportes locales:', error);
-        return [];
-    }
-}
-
-function mergeReports(baseReports, localReports) {
-    const byCode = new Map();
-
-    baseReports.forEach(report => {
-        byCode.set(report.code, report);
-    });
-
-    localReports.forEach(report => {
-        const existing = byCode.get(report.code);
-        byCode.set(report.code, existing ? { ...existing, ...report } : report);
-    });
-
-    return Array.from(byCode.values()).sort((a, b) => {
-        const da = new Date(`${a.date}T00:00:00`).getTime();
-        const db = new Date(`${b.date}T00:00:00`).getTime();
-        return db - da;
-    });
-}
-
-function mapStatusFromBadge(status) {
-    const normalized = String(status || '').toUpperCase();
-    if (normalized === 'EN PROCESO') return 'en_proceso';
-    if (normalized === 'COMPLETADO' || normalized === 'APROBADO') return 'completado';
-    return 'pendiente';
-}
-
-function mapStatus(estado) {
-    const normalized = normalizeEstado(estado);
-    const map = {
-        'pendiente': 'PENDIENTE',
-        'en_proceso': 'EN PROCESO',
-        'completado': 'APROBADO'
-    };
-    return map[normalized] || 'PENDIENTE';
-}
-
-function getGeneratedByClass(generadoPor) {
-    const classes = {
-        'Facultad': 'text-pink-600 dark:text-pink-300 bg-pink-100 dark:bg-pink-900/40 border-pink-200 dark:border-pink-800',
-        'Racionalización': 'text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800',
-        'Sistema': 'text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800'
-    };
-    return classes[generadoPor] || classes['Sistema'];
-}
-
-function getStatusClass(estado) {
-    const normalized = normalizeEstado(estado);
-    const classes = {
-        'pendiente': 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
-        'en_proceso': 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
-        'completado': 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
-    };
-    return classes[normalized] || classes['pendiente'];
-}
-
-function getStatusDot(estado) {
-    const normalized = normalizeEstado(estado);
-    const dots = {
-        'pendiente': 'bg-red-500',
-        'en_proceso': 'bg-amber-500',
-        'completado': 'bg-emerald-500'
-    };
-    return dots[normalized] || 'bg-red-500';
-}
-
-function updateCounters(documentos) {
-    const expedientesPendientes = documentos.filter(d => d.estado === 'pendiente').length;
-    const expedientesEnProceso = documentos.filter(d => d.estado === 'en_proceso').length;
-    const expedientesCompletados = documentos.filter(d => d.estado === 'completado').length;
-
-    setCounterValue('count-pendientes', expedientesPendientes);
-    setCounterValue('count-en-proceso', expedientesEnProceso);
-    setCounterValue('count-completados', expedientesCompletados);
-}
-
-function setCounterValue(elementId, target) {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-
-    const current = parseInt(element.textContent || '0', 10) || 0;
-    const duration = 500;
-    const start = performance.now();
-
-    const step = (now) => {
-        const progress = Math.min((now - start) / duration, 1);
-        const value = Math.round(current + (target - current) * progress);
-        element.textContent = value;
-        element.setAttribute('data-count', String(target));
-
-        if (progress < 1) {
-            requestAnimationFrame(step);
-        }
-    };
-
-    requestAnimationFrame(step);
-}
-
-function loadMockData() {
-    const mockReports = [
-        {
-            id: 1,
-            date: '2026-02-02',
-            time: '10:30 H',
-            code: 'PR-FM-26-01',
-            description: 'Corrección sobre el proceso "Proceso de matrícula"',
-            generatedBy: 'Facultad',
-            generatedByClass: 'text-pink-600 dark:text-pink-300 bg-pink-100 dark:bg-pink-900/40 border-pink-200 dark:border-pink-800',
-            status: 'PENDIENTE',
-            statusClass: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
-            statusDot: 'bg-red-500',
-            statusPing: true
-        },
-        {
-            id: 2,
-            date: '2026-02-02',
-            time: '10:30 H',
-            code: 'FL-FM-26-01',
-            description: 'Corrección sobre el proceso "Proceso de matrícula"',
-            generatedBy: 'Racionalización',
-            generatedByClass: 'text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800',
-            status: 'EN PROCESO',
-            statusClass: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
-            statusDot: 'bg-amber-500',
-            statusPing: true
-        },
-        {
-            id: 3,
-            date: '2026-02-02',
-            time: '10:30 H',
-            code: 'IN-FM-26-01',
-            description: 'Corrección sobre el proceso "Proceso de matrícula"',
-            generatedBy: 'Racionalización',
-            generatedByClass: 'text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800',
-            status: 'COMPLETADO',
-            statusClass: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20',
-            statusDot: 'bg-emerald-500',
-            statusPing: false
-        }
-    ];
-
-    reportsData = mergeReports(mockReports, loadLocalReports()).slice(0, 10);
-    updateCounters(reportsData.map(r => ({ estado: mapStatusFromBadge(r.status) })));
-    renderTable(reportsData);
-}
-
-// ==========================================
-// Table Data Management
-// ==========================================
-
-function renderTable(data) {
-    const tbody = document.getElementById('reports-tbody');
-    tbody.innerHTML = data.map(report => `
-        <tr class="bg-white/60 dark:bg-slate-800/60 hover:bg-white/90 dark:hover:bg-slate-700/80 transition-all duration-300 group shadow-sm hover:shadow-md transform hover:-translate-y-0.5 rounded-lg" data-id="${report.id}">
-            <td class="py-4 px-4 rounded-l-xl border-l-4 border-transparent group-hover:border-accent">
-                <div class="text-sm font-bold text-slate-700 dark:text-slate-200">${formatDate(report.date)}</div>
-                <div class="text-xs text-slate-400">${report.time}</div>
-            </td>
-            <td class="py-4 px-4 font-mono text-sm font-medium text-slate-600 dark:text-slate-300">${report.code}</td>
-            <td class="py-4 px-4 max-w-xs">
-                <p class="text-sm text-slate-600 dark:text-slate-400 truncate" title="${report.description}">${report.description}</p>
-            </td>
-            <td class="py-4 px-4">
-                <span class="text-xs font-bold ${report.generatedByClass} px-3 py-1 rounded-full border uppercase">${report.generatedBy}</span>
-            </td>
-            <td class="py-4 px-4">
-                <span class="flex items-center gap-2 text-xs font-bold ${report.statusClass} px-3 py-1 rounded-full w-fit status-badge">
-                    ${report.statusPing ? `
-                        <span class="relative flex h-2 w-2">
-                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full ${report.statusDot} opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-2 w-2 ${report.statusDot}"></span>
-                        </span>
-                    ` : `
-                        <span class="relative flex h-2 w-2">
-                            <span class="relative inline-flex rounded-full h-2 w-2 ${report.statusDot}"></span>
-                        </span>
-                    `}
-                    ${report.status}
-                </span>
-            </td>
-            <td class="py-4 px-4 text-center rounded-r-xl">
-                <button class="p-2 rounded-lg text-accent hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors view-btn" data-id="${report.id}" title="Revisar">
-                    <span class="material-symbols-outlined text-lg">visibility</span>
-                </button>
-                <button class="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors delete-btn" data-id="${report.id}" title="Eliminar">
-                    <span class="material-symbols-outlined text-lg">delete</span>
-                </button>
-            </td>
-        </tr>
-    `).join('');
-    
-    // Add event listeners to action buttons
-    tbody.querySelectorAll('.view-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = e.currentTarget.dataset.id;
-            viewReport(id);
-        });
-    });
-    
-    tbody.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = e.currentTarget.dataset.id;
-            deleteReport(id);
-        });
-    });
-}
-
-function formatDate(dateString) {
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
-}
-
-// ==========================================
-// Table Actions
-// ==========================================
-function viewReport(id) {
-    const report = reportsData.find(r => r.id === id);
-    if (report) {
-        showToast(`Abriendo expediente ${report.code}...`, 'info');
-        // Redirect to documentos page with query string (use code para garantizar match)
-        setTimeout(() => {
-            window.location.href = `facultades-documentos.html?docCode=${encodeURIComponent(report.code)}`;
-        }, 300);
-    }
-}
-
-function deleteReport(id) {
-    const report = reportsData.find(r => r.id === id);
-    if (report) {
-        showToast(`Eliminando reporte ${report.code}...`, 'warning');
-        // Simulate deletion
-        setTimeout(() => {
-            reportsData = reportsData.filter(r => r.id !== id);
-            renderTable(reportsData);
-            updateCounters(reportsData.map(r => ({ estado: r.status.toLowerCase().replace(' ', '_') })));
-            showToast('Reporte eliminado', 'success');
-        }, 500);
-    }
-}
-
-function deleteReport(id) {
-    const report = reportsData.find(r => r.id === id);
-    if (report) {
-        showToast(`Eliminando reporte ${report.code}...`, 'warning');
-        // Simulate deletion
-        setTimeout(() => {
-            reportsData = reportsData.filter(r => r.id !== id);
-            renderTable(reportsData);
-            updateCounters(reportsData.map(r => ({ estado: r.status.toLowerCase().replace(' ', '_') })));
-            showToast('Reporte eliminado', 'success');
-        }, 500);
-    }
-}
-
-function deleteReport(id) {
-    const index = reportsData.findIndex(r => r.id === id);
-    if (index > -1) {
-        const report = reportsData[index];
-        if (confirm(`¿Estás seguro de eliminar el reporte ${report.code}?`)) {
-            reportsData.splice(index, 1);
-            persistLocalReports(report.code);
-            renderTable(reportsData);
-            showToast(`Reporte ${report.code} eliminado`, 'success');
-        }
-    }
-}
-
-function persistLocalReports(codeToDelete) {
-    const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
-    if (!raw) return;
-
-    try {
-        const list = JSON.parse(raw);
-        if (!Array.isArray(list)) return;
-        const updated = list.filter(item => item.codigo !== codeToDelete);
-        localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(updated));
-    } catch (error) {
-        console.error('Error actualizando reportes locales:', error);
-    }
-}
-
-// ==========================================
-// Sorting Functionality
-// ==========================================
-function initSorting() {
-    const headers = document.querySelectorAll('th[data-sort]');
-    let sortDirection = {};
-    
-    headers.forEach(header => {
-        header.addEventListener('click', () => {
-            const sortKey = header.dataset.sort;
-            sortDirection[sortKey] = !sortDirection[sortKey];
-            
-            const sorted = [...reportsData].sort((a, b) => {
-                let valA = a[sortKey];
-                let valB = b[sortKey];
-                
-                if (sortKey === 'date') {
-                    valA = new Date(a.date);
-                    valB = new Date(b.date);
-                }
-                
-                if (valA < valB) return sortDirection[sortKey] ? -1 : 1;
-                if (valA > valB) return sortDirection[sortKey] ? 1 : -1;
-                return 0;
-            });
-            
-            renderTable(sorted);
-            
-            // Update header indicator
-            headers.forEach(h => {
-                if (h !== header) h.textContent = h.textContent.replace(/[↑↓]/, '↕');
-            });
-            header.textContent = header.textContent.replace('↕', sortDirection[sortKey] ? '↑' : '↓');
-        });
-    });
-}
-
-// ==========================================
-// Action Buttons
-// ==========================================
-function initActionButtons() {
-    const buttons = document.querySelectorAll('.action-button');
-    
-    buttons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const action = e.currentTarget.dataset.action;
-            handleAction(action, e.currentTarget);
-        });
-    });
-    
-    // View all button
-    document.getElementById('view-all-btn')?.addEventListener('click', () => {
-        showToast('Cargando todos los reportes...', 'info');
-        // Simulate loading more data
-        setTimeout(() => {
-            showToast('Aun no disponible', 'warning');
-        }, 1000);
-    });
-}
-
-function handleAction(action, button) {
-    const actions = {
-        'create-indicator': {
-            text: 'Iniciar',
-            loadingText: 'Creando...',
-            message: 'Iniciando creación de ficha de indicador'
-        },
-        'upload-flowchart': {
-            text: 'Subir',
-            loadingText: 'Subiendo...',
-            message: 'Abriendo ficha de flujograma'
-        },
-        'upload-characterization': {
-            text: 'Subir',
-            loadingText: 'Subiendo...',
-            message: 'Abriendo ficha de caracterización'
-        },
-        'upload-report': {
-            text: 'Iniciar',
-            loadingText: 'Subiendo...',
-            message: 'Iniciando creación de hoja de reportes'
-        }
-
-    };
-    
-    const config = actions[action];
-    if (!config) return;
-    
-    // Mostrar loading
-    const originalText = button.textContent;
-    button.innerHTML = `<span class="spinner-inline"></span>${config.loadingText}`;
-    button.disabled = true;
-    
-    showToast(config.message, 'info');
-    
-    setTimeout(() => {
-        button.innerHTML = originalText;
-        button.disabled = false;
-    }, 1500);
 }
 
 // ==========================================
@@ -722,208 +175,364 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 // ==========================================
-// Cargar tarjetas de acciones desde API
+// DASHBOARD: Contadores desde API + Fallback local + Animación
+// ==========================================
+async function cargarDashboardUsuario() {
+    const countPendientes = document.getElementById('count-pendientes');
+    const countEnProceso = document.getElementById('count-en-proceso');
+    const countCompletados = document.getElementById('count-completados');
+
+    let datosFinales = null;
+
+    // 1) Intentar cargar desde el backend
+    try {
+        const resultado = await API.portal.dashboard.get();
+        console.log('🔍 Dashboard API response:', resultado);
+
+        if (resultado.success && resultado.data) {
+            datosFinales = resultado.data;
+            console.log('✅ Dashboard cargado desde API');
+        }
+    } catch (error) {
+        console.warn('⚠️ API dashboard falló:', error.message);
+    }
+
+    // 2) Si el backend falló, calcular desde localStorage
+    if (!datosFinales) {
+        console.log('🔄 Calculando contadores desde localStorage...');
+        datosFinales = calcularContadoresDesdeLocalStorage();
+    }
+
+    // 3) Extraer valores finales
+    const valorPendientes = datosFinales.pendingCount ?? datosFinales.pendientes ?? 0;
+    const valorEnProceso = datosFinales.inProgressCount ?? datosFinales.enProceso ?? 0;
+    const valorCompletados = datosFinales.completedCount ?? datosFinales.completados ?? 0;
+
+    // 4) Animar los contadores
+    if (countPendientes) animarContador(countPendientes, valorPendientes, 1200);
+    if (countEnProceso) animarContador(countEnProceso, valorEnProceso, 1200);
+    if (countCompletados) animarContador(countCompletados, valorCompletados, 1200);
+
+    console.log('📊 Contadores finales:', {
+        pendientes: valorPendientes,
+        enProceso: valorEnProceso,
+        completados: valorCompletados
+    });
+}
+
+// ==========================================
+// ANIMACIÓN: Contador con efecto de números subiendo
+// ==========================================
+function animarContador(elemento, valorFinal, duracion = 1200) {
+    const valorInicial = parseInt(elemento.textContent) || 0;
+    if (valorInicial === valorFinal) return; // No animar si es el mismo valor
+
+    const inicio = performance.now();
+    const diferencia = valorFinal - valorInicial;
+
+    // Función de easing (ease-out-expo para efecto "frenado" al final)
+    function easeOutExpo(t) {
+        return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+    }
+
+    function actualizar(tiempoActual) {
+        const transcurrido = tiempoActual - inicio;
+        const progreso = Math.min(transcurrido / duracion, 1);
+        const easing = easeOutExpo(progreso);
+        
+        const valorActual = Math.round(valorInicial + (diferencia * easing));
+        elemento.textContent = valorActual;
+        elemento.setAttribute('data-count', valorFinal);
+
+        if (progreso < 1) {
+            requestAnimationFrame(actualizar);
+        } else {
+            // Asegurar que termine exactamente en el valor final
+            elemento.textContent = valorFinal;
+            elemento.setAttribute('data-count', valorFinal);
+            
+            // Efecto de "pop" al finalizar
+            elemento.classList.add('scale-110');
+            setTimeout(() => elemento.classList.remove('scale-110'), 200);
+        }
+    }
+
+    requestAnimationFrame(actualizar);
+}
+
+// ==========================================
+// FALLBACK: Calcular contadores desde localStorage
+// ==========================================
+function calcularContadoresDesdeLocalStorage() {
+    let pendientes = 0;
+    let enProceso = 0;
+    let completados = 0;
+
+    // Revisar todas las claves de localStorage que contienen documentos
+    const clavesRevisar = [
+        'sigpro_documentos_lista',
+        'sigpro_reportes',
+        'sigpro_indicadores_detalle',
+        'sigpro_documentos_detalle'
+    ];
+
+    for (const clave of clavesRevisar) {
+        try {
+            const raw = localStorage.getItem(clave);
+            if (!raw) continue;
+
+            const datos = JSON.parse(raw);
+
+            // Si es un array (lista de documentos)
+            if (Array.isArray(datos)) {
+                for (const doc of datos) {
+                    const estado = normalizarEstado(doc.estado || doc.status);
+                    if (estado === 'pendiente') pendientes++;
+                    else if (estado === 'en_proceso') enProceso++;
+                    else if (estado === 'completado') completados++;
+                }
+            }
+
+            // Si es un objeto (detalle por código)
+            else if (datos && typeof datos === 'object') {
+                for (const [codigo, doc] of Object.entries(datos)) {
+                    if (!doc || typeof doc !== 'object') continue;
+                    const estado = normalizarEstado(doc.estado || doc.status);
+                    if (estado === 'pendiente') pendientes++;
+                    else if (estado === 'en_proceso') enProceso++;
+                    else if (estado === 'completado') completados++;
+                }
+            }
+
+        } catch (e) {
+            console.warn(`Error leyendo ${clave}:`, e);
+        }
+    }
+
+    return {
+        pendingCount: pendientes,
+        inProgressCount: enProceso,
+        completedCount: completados
+    };
+}
+
+// ==========================================
+// UTILIDAD: Normalizar estado de documento
+// ==========================================
+function normalizarEstado(estado) {
+    if (!estado) return 'pendiente';
+    
+    const valor = String(estado)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '_');
+    
+    if (valor === 'aprobado' || valor === 'completado' || valor === 'completed' || valor === 'approved') return 'completado';
+    if (valor === 'en_proceso' || valor === 'revision' || valor === 'in_progress' || valor === 'inprogress') return 'en_proceso';
+    if (valor === 'pendiente' || valor === 'pending' || valor === 'rechazado' || valor === 'rejected') return 'pendiente';
+    
+    return 'pendiente';
+}
+
+// ==========================================
+// NOTIFICACIONES DE RACIONALIZACIÓN
 // ==========================================
 
-async function cargarTarjetasAcciones() {
-    const container = document.getElementById('action-cards-container');
+let notificacionesData = [];
+
+async function cargarNotificacionesDashboard() {
+    const tbody = document.getElementById('notifications-tbody');
+    const empty = document.getElementById('notif-empty');
+    const badge = document.getElementById('notif-badge-header');
     
-    if (!container) {
-        console.error('No se encontró el contenedor de tarjetas');
+    if (!tbody) return;
+    
+    tbody.innerHTML = `
+        <tr id="notif-loading">
+            <td colspan="5" class="text-center py-8 text-slate-400">
+                <span class="material-symbols-outlined animate-spin text-2xl">refresh</span>
+                <p class="text-sm mt-2">Cargando notificaciones...</p>
+            </td>
+        </tr>
+    `;
+    if (empty) empty.classList.add('hidden');
+    
+    try {
+        const resultado = await API.portal.notifications.getAll('UNREAD', 10);
+        
+        let notificaciones = [];
+        
+        if (resultado.success && Array.isArray(resultado.data)) {
+            notificaciones = resultado.data;
+        } else {
+            console.warn('Fallback a READ por error en UNREAD');
+            const fallback = await API.portal.notifications.getAll('READ', 50);
+            if (fallback.success && Array.isArray(fallback.data)) {
+                notificaciones = fallback.data.filter(n => 
+                    n.status === 'UNREAD' || n.read === false
+                );
+            }
+        }
+        
+        notificacionesData = notificaciones;
+        
+        const noLeidas = notificaciones.filter(n => n.status === 'UNREAD' || !n.read);
+        if (badge) {
+            if (noLeidas.length > 0) {
+                badge.textContent = noLeidas.length > 9 ? '9+' : noLeidas.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+        
+        const loading = document.getElementById('notif-loading');
+        if (loading) loading.remove();
+        
+        if (notificaciones.length === 0) {
+            tbody.innerHTML = '';
+            if (empty) empty.classList.remove('hidden');
+            return;
+        }
+        
+        renderizarNotificacionesTabla(notificaciones, tbody);
+        
+    } catch (error) {
+        console.error('Error cargando notificaciones:', error);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center py-8 text-amber-500">
+                    <span class="material-symbols-outlined text-2xl">warning</span>
+                    <p class="text-sm mt-2">No se pudieron cargar las notificaciones</p>
+                    <p class="text-xs text-slate-400">Error: ${error.message}</p>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function renderizarNotificacionesTabla(notificaciones, tbody) {
+    tbody.innerHTML = notificaciones.map(n => {
+        const fecha = n.createdAt || n.fecha || new Date().toISOString();
+        const fechaFormateada = formatearFechaNotif(fecha);
+        const tipo = n.type || n.tipo || 'INFO';
+        const mensaje = n.message || n.mensaje || n.title || n.asunto || 'Sin mensaje';
+        const estaLeida = n.status === 'READ' || n.read === true;
+        
+        const tipoConfig = {
+            'CORRECTION': { icono: 'edit_note', color: 'text-amber-600', bg: 'bg-amber-50', label: 'Corrección' },
+            'APPROVAL': { icono: 'check_circle', color: 'text-emerald-600', bg: 'bg-emerald-50', label: 'Aprobación' },
+            'REJECTION': { icono: 'cancel', color: 'text-red-600', bg: 'bg-red-50', label: 'Rechazo' },
+            'INFO': { icono: 'info', color: 'text-blue-600', bg: 'bg-blue-50', label: 'Información' },
+            'WARNING': { icono: 'warning', color: 'text-orange-600', bg: 'bg-orange-50', label: 'Advertencia' }
+        };
+        
+        const config = tipoConfig[tipo] || tipoConfig['INFO'];
+        
+        return `
+            <tr class="bg-white/60 dark:bg-slate-800/60 hover:bg-white/90 dark:hover:bg-slate-700/80 transition-all duration-300 group shadow-sm hover:shadow-md rounded-lg ${estaLeida ? 'opacity-60' : ''}" data-id="${n.id}">
+                <td class="py-4 px-4 rounded-l-xl border-l-4 ${estaLeida ? 'border-transparent' : 'border-amber-500'} group-hover:border-accent">
+                    <div class="text-sm font-bold text-slate-700 dark:text-slate-200">${fechaFormateada.fecha}</div>
+                    <div class="text-xs text-slate-400">${fechaFormateada.hora}</div>
+                </td>
+                <td class="py-4 px-4">
+                    <span class="flex items-center gap-2 text-xs font-bold ${config.color} ${config.bg} px-3 py-1 rounded-full w-fit">
+                        <span class="material-symbols-outlined text-sm">${config.icono}</span>
+                        ${config.label}
+                    </span>
+                </td>
+                <td class="py-4 px-4 max-w-xs">
+                    <p class="text-sm text-slate-600 dark:text-slate-400 truncate" title="${escapeHtml(mensaje)}">${escapeHtml(mensaje)}</p>
+                </td>
+                <td class="py-4 px-4">
+                    <span class="flex items-center gap-2 text-xs font-bold ${estaLeida ? 'text-slate-400 bg-slate-100' : 'text-amber-600 bg-amber-50'} px-3 py-1 rounded-full w-fit">
+                        ${estaLeida 
+                            ? '<span class="material-symbols-outlined text-sm">drafts</span> Leída'
+                            : '<span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span></span> No leída'
+                        }
+                    </span>
+                </td>
+                <td class="py-4 px-4 text-center rounded-r-xl">
+                    ${!estaLeida ? `
+                        <button class="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors" 
+                                onclick="marcarNotificacionLeida('${n.id}')" title="Marcar como leída">
+                            <span class="material-symbols-outlined text-lg">check</span>
+                        </button>
+                    ` : ''}
+                    <button class="p-2 rounded-lg text-accent hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors" 
+                            onclick="verNotificacionDetalle('${n.id}')" title="Ver detalle">
+                        <span class="material-symbols-outlined text-lg">visibility</span>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function formatearFechaNotif(fechaStr) {
+    try {
+        const date = new Date(fechaStr);
+        const dia = String(date.getDate()).padStart(2, '0');
+        const mes = String(date.getMonth() + 1).padStart(2, '0');
+        const anio = date.getFullYear();
+        const hora = String(date.getHours()).padStart(2, '0');
+        const min = String(date.getMinutes()).padStart(2, '0');
+        return {
+            fecha: `${dia}/${mes}/${anio}`,
+            hora: `${hora}:${min} H`
+        };
+    } catch {
+        return { fecha: '-', hora: '-' };
+    }
+}
+
+async function marcarNotificacionLeida(id) {
+    try {
+        await API.portal.notifications.updateStatus(id, 'READ');
+        showToast('Notificación marcada como leída', 'success');
+        cargarNotificacionesDashboard();
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Error al marcar como leída', 'error');
+    }
+}
+
+async function marcarTodasNotifLeidas() {
+    const noLeidas = notificacionesData.filter(n => n.status === 'UNREAD' || !n.read);
+    if (noLeidas.length === 0) {
+        showToast('No hay notificaciones pendientes', 'info');
         return;
     }
     
     try {
-        // Llamar a la API
-        const resultado = await API.dashboardActions.getAll();
-        
-        if (!resultado.success) {
-            console.error('Error cargando acciones:', resultado.error);
-            return;
+        for (const n of noLeidas) {
+            await API.portal.notifications.updateStatus(n.id, 'READ');
         }
-        
-        const acciones = resultado.data;
-        
-        // Ajustar grid según cantidad (3 o 4)
-        container.className = `grid grid-cols-1 md:grid-cols-${acciones.length} gap-6 mb-12`;
-        
-        // Renderizar tarjetas
-        container.innerHTML = acciones.map((accion, index) => `
-            <div class="premium-glass action-card hover-lift-enhanced" data-id="${accion.id}">
-                <div class="action-icon-3d ${accion.color}" style="animation-delay: ${index * 0.5}s;">
-                    <span class="material-symbols-outlined">${accion.icono}</span>
-                </div>
-                <h3>${accion.titulo}</h3>
-                <button class="action-button" data-action="${accion.accion}" data-url="${accion.url}">
-                    ${accion.botonTexto}
-                </button>
-            </div>
-        `).join('');
-        
-        // Agregar event listeners
-        container.querySelectorAll('.action-button').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const action = e.currentTarget.dataset.action;
-                const url = e.currentTarget.dataset.url;
-                manejarAccion(action, url, e.currentTarget);
-            });
-        });
-        
+        showToast(`${noLeidas.length} notificaciones marcadas como leídas`, 'success');
+        cargarNotificacionesDashboard();
     } catch (error) {
         console.error('Error:', error);
-        container.innerHTML = '<p class="text-center text-red-500 col-span-full">Error cargando acciones</p>';
+        showToast('Error al marcar notificaciones', 'error');
     }
 }
 
-// ==========================================
-// Cargar dashboard completo desde API
-// ==========================================
-
-async function cargarDashboard() {
-    try {
-        // Obtener usuario actual para filtrar por facultad si es necesario
-        const user = API.auth.getUser();
-        const facultadId = user?.facultadId || null;
-        
-        // Llamar a la API
-        const resultado = await API.dashboard.getPublicMetrics(facultadId);
-        
-        if (!resultado.success) {
-            console.error('Error cargando dashboard:', resultado.error);
-            return;
-        }
-        
-        const data = resultado.data;
-        
-        // 1. Actualizar tarjetas de estadísticas
-        actualizarTarjetasStats(data.estadisticas);
-        
-        // 2. Actualizar tabla de reportes
-        actualizarTablaReportes(data.ultimosReportes);
-        
-    } catch (error) {
-        console.error('Error:', error);
+function verNotificacionDetalle(id) {
+    const notif = notificacionesData.find(n => n.id === id);
+    if (!notif) return;
+    
+    if (notif.documentId || notif.documentCode || notif.codigoDocumento) {
+        window.location.href = `facultades-documentos.html?docCode=${encodeURIComponent(notif.documentCode || notif.documentId || notif.codigoDocumento)}`;
+    } else {
+        showToast('No hay documento asociado a esta notificación', 'info');
     }
 }
 
-function actualizarTarjetasStats(estadisticas) {
-    // Actualizar los data-count y re-iniciar animación
-    const tarjetas = document.querySelectorAll('.lava-card');
-    
-    const config = [
-        { selector: '.lava-card.orange .number', valor: estadisticas.pendientes },
-        { selector: '.lava-card.blue .number', valor: estadisticas.enProceso },
-        { selector: '.lava-card.emerald .number', valor: estadisticas.completados }
-    ];
-    
-    config.forEach(item => {
-        const el = document.querySelector(item.selector);
-        if (el) {
-            el.setAttribute('data-count', item.valor);
-            el.textContent = '0'; // Reset para animación
-        }
-    });
-    
-    // Reiniciar animación de contadores
-    reiniciarContadores();
-}
-
-function actualizarTablaReportes(reportes) {
-    const tbody = document.getElementById('reports-tbody');
-    if (!tbody) return;
-    
-    // Mapear reportes a formato de tabla
-    const filas = reportes.map(reporte => {
-        const estadoConfig = getEstadoConfig(reporte.estado);
-        
-        return {
-            id: reporte.id,
-            date: reporte.fecha,
-            time: reporte.hora,
-            code: reporte.codigo,
-            description: reporte.descripcion,
-            generatedBy: reporte.generadoPor,
-            generatedByClass: getGeneradoPorClass(reporte.generadoPor),
-            status: reporte.estado,
-            statusClass: estadoConfig.class,
-            statusDot: estadoConfig.dot,
-            statusPing: estadoConfig.ping
-        };
-    });
-    
-    // Renderizar (usa tu función existente o crea una nueva)
-    renderTable(filas);
-}
-
-function getEstadoConfig(estado) {
-    const configs = {
-        'PENDIENTE': {
-            class: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
-            dot: 'bg-red-500',
-            ping: true
-        },
-        'EN PROCESO': {
-            class: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
-            dot: 'bg-amber-500',
-            ping: true
-        },
-        'COMPLETADO': {
-            class: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20',
-            dot: 'bg-emerald-500',
-            ping: false
-        }
-    };
-    
-    return configs[estado] || configs['PENDIENTE'];
-}
-
-function getGeneradoPorClass(generadoPor) {
-    const classes = {
-        'FACULTAD': 'text-pink-600 dark:text-pink-300 bg-pink-100 dark:bg-pink-900/40 border-pink-200 dark:border-pink-800',
-        'RACIONALIZACIÓN': 'text-amber-600 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800'
-    };
-    
-    return classes[generadoPor] || classes['FACULTAD'];
-}
-
-function reiniciarContadores() {
-    // Limpiar observers anteriores si existen
-    if (window.countersObserver) {
-        window.countersObserver.disconnect();
-    }
-    
-    // Crear nuevo observer
-    const counters = document.querySelectorAll('[data-count]');
-    
-    window.countersObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                animateCounter(entry.target);
-                window.countersObserver.unobserve(entry.target);
-            }
-        });
-    }, { threshold: 0.5 });
-    
-    counters.forEach(counter => window.countersObserver.observe(counter));
-}
-
-function animateCounter(element) {
-    const target = parseInt(element.getAttribute('data-count'));
-    const duration = 2000;
-    const step = target / (duration / 16);
-    let current = 0;
-    
-    const updateCount = () => {
-        current += step;
-        if (current < target) {
-            element.textContent = Math.floor(current);
-            requestAnimationFrame(updateCount);
-        } else {
-            element.textContent = target;
-        }
-    };
-    
-    updateCount();
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Inicializar al cargar
@@ -1161,7 +770,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     function abrirModalLogout() {
         logoutModal.classList.remove('hidden');
-        // Trigger reflow para asegurar que la animación se aplique
         void logoutModal.offsetWidth;
         logoutModal.classList.add('show-modal');
     }
@@ -1170,7 +778,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         logoutModal.classList.add('hide-modal');
         logoutModal.classList.remove('show-modal');
         
-        // Esperar a que termine la animación antes de ocultar
         setTimeout(() => {
             if (logoutModal.classList.contains('hide-modal')) {
                 logoutModal.classList.add('hidden');
@@ -1183,54 +790,48 @@ document.addEventListener('DOMContentLoaded', async function() {
         logoutModal.classList.add('hide-modal');
         logoutModal.classList.remove('show-modal');
     
-            setTimeout(async () => {
-                // 1. Llamar al backend PRIMERO (antes de limpiar el token)
-                try {
-                    // Usar la API híbrida que ya maneja el token automáticamente
-                    if (typeof API !== 'undefined' && API.auth && API.auth.logout) {
-                        await API.auth.logout();
-                    } else {
-                        // Fallback manual si API no está disponible
-                        const token = localStorage.getItem('unmsm_token') 
-                            || localStorage.getItem('token') 
-                            || localStorage.getItem('accessToken');
-                        
-                        if (token) {
-                            await fetch('http://localhost:8080/v1/auth/logout', {
-                                method: 'POST',
-                                headers: {
-                                    'Accept': 'application/json',
-                                    'Authorization': `Bearer ${token}`
-                                }
-                            });
-                        }
+        setTimeout(async () => {
+            try {
+                if (typeof API !== 'undefined' && API.auth && API.auth.logout) {
+                    await API.auth.logout();
+                } else {
+                    const token = localStorage.getItem('unmsm_token') 
+                        || localStorage.getItem('token') 
+                        || localStorage.getItem('accessToken');
+                    
+                    if (token) {
+                        await fetch('http://localhost:8080/v1/auth/logout', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
                     }
-                } catch (error) {
-                    console.log('Logout backend (silencioso):', error.message);
                 }
+            } catch (error) {
+                console.log('Logout backend (silencioso):', error.message);
+            }
 
-                // 2. Limpiar TODO el almacenamiento local
-                localStorage.clear();
-                sessionStorage.clear();
+            localStorage.clear();
+            sessionStorage.clear();
 
-                // 3. Redirigir reemplazando el historial (no deja rastro de la sesión)
-                window.location.replace('index.html');
-            }, 400);
-        }
+            window.location.replace('index.html');
+        }, 400);
+    }
 
     if (logoutBtn && logoutModal) {
         logoutBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             
-            // CERRAR DROPDOWN PRIMERO
             if (profileDropdown) {
                 profileDropdown.classList.remove('show-profile', 'hide-profile');
                 profileDropdown.classList.add('hidden');
             }
             
             abrirModalLogout();
-            });
+        });
         
         logoutCancel.addEventListener('click', cerrarModalLogout);
         logoutConfirm.addEventListener('click', ejecutarLogout);
@@ -1253,10 +854,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!modalFicha) return;
 
         modalFicha.classList.add('hidden');
-        document.body.style.overflow = ''; // Restaurar scroll
+        document.body.style.overflow = '';
     }
 
-    // Cerrar con Escape solo si el modal está visible
     document.addEventListener('keydown', (e) => {
         const modalFicha = document.getElementById('modal-ficha');
         if (!modalFicha) return;
@@ -1267,6 +867,3 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
 
 });
-
-
-

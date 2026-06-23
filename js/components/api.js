@@ -1946,14 +1946,43 @@ const RemoteAPI = {
 
             async create(indicatorData) {
                 try {
+                    // 🔥 FIX: Mapear campos del formulario al schema exacto del backend
+                    const payload = {
+                        macroProcess: indicatorData.macroProcess || indicatorData.macroProceso || indicatorData.macro_proceso || '',
+                        process: indicatorData.process || indicatorData.proceso || '',
+                        responsibleUnit: indicatorData.responsibleUnit || indicatorData.unidadResponsable || indicatorData.responsible_unit || '',
+                        processType: (indicatorData.processType || indicatorData.tipoProceso || 'ESTRATEGICO').toUpperCase(),
+                        processObjective: indicatorData.processObjective || indicatorData.objetivoProceso || '',
+                        indicatorName: indicatorData.indicatorName || indicatorData.nombreIndicador || '',
+                        frequency: (indicatorData.frequency || indicatorData.frecuencia || 'MENSUAL').toUpperCase(),
+                        variables: indicatorData.variables || '',
+                        dataSource: indicatorData.dataSource || indicatorData.fuente || '',
+                        formula: indicatorData.formula || indicatorData.formulaDefinicion || '',
+                        target: Number(indicatorData.target || indicatorData.meta || 0),
+                        unit: indicatorData.unit || indicatorData.unidad || '%'
+                    };
+
                     const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/indicators`, {
                         method: 'POST',
                         headers: RemoteAPI.getHeaders(),
-                        body: JSON.stringify(indicatorData)
+                        body: JSON.stringify(payload)
                     });
-                    return { success: response.ok, data: await response.json() };
+
+                    let data = null;
+                    try {
+                        data = await response.json();
+                    } catch (e) {
+                        data = { message: 'Respuesta no JSON' };
+                    }
+
+                    return { 
+                        success: response.ok, 
+                        data: data,
+                        status: response.status,
+                        statusText: response.statusText
+                    };
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    return { success: false, error: error.message, status: 0 };
                 }
             },
 
@@ -2128,12 +2157,31 @@ const RemoteAPI = {
                     const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/dashboard`, {
                         headers: RemoteAPI.getHeaders()
                     });
-                    return { success: response.ok, data: await response.json() };
+                    
+                    // 🔧 FIX: Si el status no es 2xx, marcar como fallo
+                    if (!response.ok) {
+                        const text = await response.text();
+                        let errorData = null;
+                        try { errorData = JSON.parse(text); } catch { errorData = { raw: text.substring(0, 200) }; }
+                        return { 
+                            success: false, 
+                            error: errorData?.message || `HTTP ${response.status}`,
+                            status: response.status,
+                            data: null
+                        };
+                    }
+                    
+                    const data = await response.json();
+                    return { success: true, data, status: response.status };
+                    
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    return { success: false, error: error.message, status: 0, data: null };
                 }
             }
         }
+
+
+
     },
 
     // ========== PÚBLICO - Sin autenticación ==========

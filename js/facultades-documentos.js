@@ -320,72 +320,117 @@ function applyQueryDocId() {
 
     console.log(`🔎 Buscando documento con docId="${docId}" o docCode="${docCode}"`);
 
-    // Espera que los datos se carguen antes de mostrar detalle
+    // Función para buscar y abrir el documento
+    const buscarYAbrir = () => {
+        let existing = null;
+        
+        if (docId) {
+            existing = allDocuments.find(d => d.id === docId || String(d.id) === String(docId));
+        }
+        if (!existing && docCode) {
+            existing = allDocuments.find(d => d.codigo === docCode || d.code === docCode);
+        }
+
+        if (existing) {
+            console.log(`📂 Abriendo documento: ${existing.codigo} (id=${existing.id})`);
+            viewDocument(existing.id);
+            return true;
+        }
+        return false;
+    };
+
+    // Si los datos ya están cargados, abrir inmediatamente
+    if (allDocuments.length > 0) {
+        if (!buscarYAbrir()) {
+            showToast('No se encontró ese expediente en el listado', 'error');
+        }
+        return;
+    }
+
+    // Si los datos aún no cargan, esperar con polling inteligente
+    let intentos = 0;
+    const maxIntentos = 40; // 40 * 150ms = 6 segundos máximo
     const checkReady = setInterval(() => {
-        console.log(`⏳ Esperando... allDocuments.length = ${allDocuments.length}`);
+        intentos++;
+        console.log(`⏳ Esperando datos... intento ${intentos}, allDocuments.length = ${allDocuments.length}`);
         
         if (allDocuments.length > 0) {
             clearInterval(checkReady);
-            console.log(`✅ Datos listos. Buscando en ${allDocuments.length} documentos...`);
-
-            let existing = null;
-            if (docId) {
-                existing = allDocuments.find(d => d.id === docId || String(d.id) === String(docId));
+            if (!buscarYAbrir()) {
+                // Si no está en allDocuments, buscar en localStorage directamente
+                buscarEnLocalStorageYAbrir(docCode, docId);
             }
-            if (!existing && docCode) {
-                existing = allDocuments.find(d => d.codigo === docCode || d.code === docCode);
-            }
-
-            // ✅ NUEVO: Si no está en allDocuments, buscar en localStorage
-            if (!existing && docCode) {
-                try {
-                    const docsRaw = localStorage.getItem('sigpro_documentos_lista');
-                    if (docsRaw) {
-                        const docs = JSON.parse(docsRaw);
-                        const localDoc = docs.find(d => d.codigo === docCode);
-                        if (localDoc) {
-                            // Convertir formato local al formato de allDocuments
-                            existing = {
-                                id: localDoc.id || `local-${docCode}`,
-                                fecha: localDoc.fecha || new Date().toISOString().split('T')[0],
-                                hora: localDoc.hora || '00:00 H',
-                                codigo: localDoc.codigo,
-                                descripcion: localDoc.descripcion || 'Documento local',
-                                generadoPor: localDoc.generadoPor || 'Facultad',
-                                estado: localDoc.estado || 'pendiente',
-                                progreso: localDoc.progreso || 5,
-                                facultadId: localDoc.facultadId || 1,
-                                tipo: localDoc.tipo || 'documento',
-                                origen: 'local'
-                            };
-                            // Agregar a allDocuments para futuras referencias
-                            allDocuments.push(existing);
-                            filteredDocuments = [...allDocuments];
-                        }
-                    }
-                } catch (e) {
-                    console.warn('Error buscando en localStorage:', e);
-                }
-            }
-
-            if (!existing) {
-                showToast('No se encontró ese expediente en el listado', 'error');
-                return;
-            }
-
-            // Si se encontró por código, pasar id real
-            const targetId = existing.id;
-            console.log(`📂 Abriendo documento: ${existing.codigo} (id=${targetId})`);
-            viewDocument(targetId);
+        } else if (intentos >= maxIntentos) {
+            clearInterval(checkReady);
+            console.error('❌ Timeout: Los datos no se cargaron después de 6 segundos');
+            // Intentar una última vez con localStorage
+            buscarEnLocalStorageYAbrir(docCode, docId);
         }
     }, 150);
+}
 
-    setTimeout(() => {
-        clearInterval(checkReady);
-        if (allDocuments.length === 0) {
-            console.error('❌ Timeout: allDocuments nunca se llenó');
+// ========== NUEVA FUNCIÓN: Buscar en localStorage y abrir ==========
+function buscarEnLocalStorageYAbrir(docCode, docId) {
+    console.log('🔍 Buscando en localStorage como último recurso...');
+    
+    try {
+        // Buscar en sigpro_documentos_lista
+        const docsRaw = localStorage.getItem('sigpro_documentos_lista');
+        const reportesRaw = localStorage.getItem('sigpro_reportes');
+        
+        let localDoc = null;
+        
+        if (docsRaw) {
+            const docs = JSON.parse(docsRaw);
+            if (Array.isArray(docs)) {
+                localDoc = docs.find(d => 
+                    (docCode && d.codigo === docCode) || 
+                    (docId && (d.id === docId || String(d.id) === String(docId)))
+                );
+            }
         }
-    }, 5000);
+        
+        if (!localDoc && reportesRaw) {
+            const reportes = JSON.parse(reportesRaw);
+            if (Array.isArray(reportes)) {
+                localDoc = reportes.find(r => 
+                    (docCode && r.codigo === docCode) || 
+                    (docId && r.id === docId)
+                );
+            }
+        }
+
+        if (localDoc) {
+            // Convertir al formato de allDocuments
+            const docFormateado = {
+                id: localDoc.id || `local-${localDoc.codigo || Date.now()}`,
+                fecha: localDoc.fecha || new Date().toISOString().split('T')[0],
+                hora: localDoc.hora || '00:00 H',
+                codigo: localDoc.codigo || `DOC-${Date.now()}`,
+                descripcion: localDoc.descripcion || localDoc.nombre || 'Documento local',
+                generadoPor: localDoc.generadoPor || 'Facultad',
+                estado: mapEstado(localDoc.estado || 'pendiente'),
+                progreso: localDoc.progreso || 5,
+                facultadId: localDoc.facultadId || 1,
+                tipo: localDoc.tipo || 'documento',
+                origen: 'local'
+            };
+            
+            // Agregar a allDocuments para futuras referencias
+            allDocuments.push(docFormateado);
+            filteredDocuments = [...allDocuments];
+            
+            console.log(`📂 Abriendo documento local: ${docFormateado.codigo}`);
+            viewDocument(docFormateado.id);
+            return;
+        }
+        
+        showToast('No se encontró ese expediente', 'error');
+        
+    } catch (e) {
+        console.error('Error buscando en localStorage:', e);
+        showToast('No se encontró ese expediente', 'error');
+    }
 }
 
 // ==========================================
@@ -431,35 +476,40 @@ async function loadDashboardData() {
             return;
         }
 
-        // 🔥 FIX: Llamar a la API para cada status y combinar resultados
+        // ========== PASO 1: Intentar cargar desde API ==========
+        let apiDocs = [];
         const statuses = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'];
-        let allApiDocs = [];
         
         for (const status of statuses) {
             try {
                 const result = await API.portal.documents.getAll({ status, page: 1, limit: 100 });
-                if (result.success && Array.isArray(result.data)) {
+                if (result.success && Array.isArray(result.data) && result.data.length > 0) {
                     result.data.forEach(d => d._status = status);
-                    allApiDocs.push(...result.data);
+                    apiDocs.push(...result.data);
                 }
             } catch (e) {
-                console.warn(`Error cargando status ${status}:`, e);
+                console.warn(`⚠️ Error cargando status ${status}:`, e.message);
             }
         }
         
-        if (allApiDocs.length === 0) {
+        // Fallback: intentar sin filtro de status
+        if (apiDocs.length === 0) {
             try {
                 const result = await API.portal.documents.getAll({ page: 1, limit: 100 });
                 if (result.success && Array.isArray(result.data)) {
-                    allApiDocs = result.data;
+                    apiDocs = result.data;
                 }
             } catch (e) {
-                console.warn('Error cargando sin filtro:', e);
+                console.warn('⚠️ Error cargando sin filtro:', e.message);
             }
         }
 
-        // 🔥 FIX: Mapear campos del backend al formato del frontend
-        allDocuments = allApiDocs.map((doc, idx) => {
+        // ========== PASO 2: Cargar documentos locales SIEMPRE ==========
+        const localDocs = loadLocalDocuments();
+        console.log(`📦 Documentos locales encontrados: ${localDocs.length}`);
+
+        // ========== PASO 3: Normalizar documentos API ==========
+        const apiDocsNormalizados = apiDocs.map((doc, idx) => {
             const status = doc._status || doc.status || doc.estado || 'PENDING';
             const createdAt = doc.createdAt || doc.fechaCreacion || doc.fecha;
             
@@ -480,20 +530,56 @@ async function loadDashboardData() {
             };
         });
 
+        // ========== PASO 4: Mergear API + locales (locales tienen prioridad si son más recientes) ==========
+        const porCodigo = new Map();
+        
+        // Agregar API docs primero
+        apiDocsNormalizados.forEach(doc => porCodigo.set(doc.codigo, doc));
+        
+        // Mergear locales (sobrescriben si existen, o se agregan si no)
+        localDocs.forEach(local => {
+            const existente = porCodigo.get(local.codigo);
+            if (!existente) {
+                porCodigo.set(local.codigo, local);
+            } else {
+                // Si el local tiene apiSync=false o es más reciente, preferir local
+                porCodigo.set(local.codigo, { ...existente, ...local, origen: 'hibrido' });
+            }
+        });
+
+        allDocuments = Array.from(porCodigo.values()).sort((a, b) => {
+            return new Date(b.fecha + 'T' + b.hora.replace(' H', '')) - 
+                   new Date(a.fecha + 'T' + a.hora.replace(' H', ''));
+        });
+
+        console.log(`✅ Total documentos cargados: ${allDocuments.length} (API: ${apiDocsNormalizados.length}, Locales: ${localDocs.length})`);
+
         filteredDocuments = [...allDocuments];
         updateStatsFromCurrentDocuments();
         renderTable();
         
+        // Si la API falló pero hay locales, mostrar advertencia suave
+        if (apiDocs.length === 0 && localDocs.length > 0) {
+            showToast('Usando documentos locales (servidor no disponible)', 'warning', 4000);
+        } else if (allDocuments.length > 0) {
+            showToast(`${allDocuments.length} documentos cargados`, 'success', 2000);
+        }
+        
     } catch (error) {
-        console.error('Error:', error);
-        showToast('Error de conexión con el servidor', 'error');
+        console.error('❌ Error crítico en loadDashboardData:', error);
+        
+        // ========== FALLBACK TOTAL: Solo localStorage ==========
         const localDocs = loadLocalDocuments();
         if (localDocs.length > 0) {
             allDocuments = localDocs;
             filteredDocuments = [...allDocuments];
             updateStatsFromCurrentDocuments();
             renderTable();
-            showToast('Usando datos locales (sin conexión)', 'warning');
+            showToast('Usando datos locales (sin conexión)', 'warning', 4000);
+        } else {
+            // Último recurso: mock data
+            loadMockData();
+            showToast('Usando datos de demostración', 'warning', 4000);
         }
     }
 }
@@ -1198,7 +1284,7 @@ function loadLocalDocuments() {
         if (!Array.isArray(list)) return [];
 
         return list.map((doc, index) => {
-            const estado = normalizeEstadoKey(doc.estado || 'pendiente');
+            const estado = normalizeEstadoKey(doc.estado || 'pendiente'); // ← usa normalizeEstadoKey
             const progreso = typeof doc.progreso === 'number' ? doc.progreso : getDefaultProgressByEstado(estado);
 
             return {
@@ -1753,7 +1839,15 @@ function showDetailView(detalle) {
         if (campos.length > 0) {
             const tipoDetalle = normalizar(detalle.tipo || detalle.asunto || '');
             const valor = (patterns, fallback = '-') => {
-                const item = campos.find(c => patterns.some(p => p.test(normalizar(c.label))));
+                const item = campos.find(c => {
+                    const label = normalizar(c.label || '');
+                    return patterns.some(p => {
+                        // Si el patrón es regex, testear
+                        if (p instanceof RegExp) return p.test(label);
+                        // Si es string, buscar inclusión parcial
+                        return label.includes(p);
+                    });
+                });
                 return item?.value || fallback;
             };
 
@@ -1799,16 +1893,18 @@ function showDetailView(detalle) {
             } else {
             const nombreCampo = [/nombre\s*del\s*indicador/i, /nombre\s+indicador/i];
             const nombreLabel = /indicador/.test(normalizar(detalle.asunto)) ? 'NOMBRE DEL INDICADOR' : 'NOMBRE DEL DOCUMENTO';
-            const metaValor = valor([/meta/], '-');
-            const metaNumero = parseFloat(String(metaValor).replace(',', '.').replace(/[^\d.-]/g, '')) || 0;
-            const metaEstado = metaNumero < 75
-                ? { texto: 'Riesgo', clase: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/50' }
-                : metaNumero < 90
-                    ? { texto: 'Aceptable', clase: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800/50' }
-                    : { texto: 'Optimo', clase: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800/50' };
-            const variablesValor = valor([/variables/], '-');
-            const formulaValor = valor([/formula/, /f[óo]rmula/], '-');
-            const frecuenciaValor = valor([/frecuencia/], '-');
+            const metaValor = valor([/meta/i, 'meta'], '-');
+        const metaNumero = parseFloat(String(metaValor).replace(',', '.').replace(/[^\d.-]/g, '')) || 0;
+
+        const metaEstado = metaNumero < 75
+            ? { texto: 'Riesgo', clase: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/50' }
+            : metaNumero < 90
+                ? { texto: 'Aceptable', clase: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800/50' }
+                : { texto: 'Óptimo', clase: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800/50' };
+
+        const variablesValor = valor([/variable/i, 'variables'], '-');
+        const formulaValor = valor([/formula/i, /f[óo]rmula/i, 'formula'], '-');
+        const frecuenciaValor = valor([/frecuencia/i, 'frecuencia'], '-');
 
             const campoBase = (label, value, extraClass = '') => `
                 <div class="flex flex-col gap-1 border-l-4 border-primary/20 pl-4 py-1 ${extraClass}">
@@ -1824,81 +1920,145 @@ function showDetailView(detalle) {
             })();
 
             const nombreIndicadorValor = detalle.nombreIndicador
-                || valor(nombreCampo, '-')
-                || detalle.descripcion
-                || '-';
+            || valor([/nombre.*indicador/i, 'nombre indicador', 'indicador'], '-')
+            || detalle.descripcion
+            || '-';
 
             const infoBox = (label, value, extraClass = '') => `
-                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm min-h-[94px] ${extraClass}">
-                    <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">${label}</p>
-                    <p class="mt-2 text-sm font-semibold leading-6 text-slate-800 whitespace-pre-line break-words">${escapeHtml(value || '-')}</p>
+                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${extraClass}">
+                    <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 mb-1">${label}</p>
+                    <p class="text-sm font-semibold leading-6 text-slate-800 break-words">${escapeHtml(value || '-')}</p>
                 </div>
             `;
 
+            // Función helper para badges de estado
+            const estadoBadge = (texto, claseColor) => `
+                <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider ${claseColor}">
+                    <span class="w-1.5 h-1.5 rounded-full bg-current opacity-60"></span>
+                    ${texto}
+                </span>
+            `;
+
             contenido.innerHTML = `
-                <div class="lg:col-span-3">
-                    <div class="mx-auto w-full max-w-[1060px] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
-                        <div class="relative overflow-hidden bg-gradient-to-r from-slate-900 via-[#134d66] to-emerald-600 px-6 py-6 text-white md:px-8 md:py-7">
-                            <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(circle at top right, rgba(255,255,255,0.34) 0, transparent 38%), radial-gradient(circle at bottom left, rgba(255,255,255,0.16) 0, transparent 28%);"></div>
-                            <div class="relative flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                                <div class="max-w-3xl">
-                                    <p class="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-white/90">
-                                        <span class="material-symbols-outlined text-[16px]">monitoring</span>
-                                        Ficha técnica del indicador
-                                    </p>
-                                    <h3 class="mt-4 text-3xl md:text-4xl font-black leading-tight tracking-tight">${escapeHtml(nombreIndicadorValor)}</h3>
-                                    <p class="mt-2 max-w-2xl text-sm md:text-[15px] leading-6 text-white/80">${escapeHtml(valor([/objetivo/], 'Documento formal del indicador generado desde SIGPRO.'))}</p>
-                                </div>
-                                <div class="rounded-2xl border border-white/15 bg-white/10 px-4 py-4 backdrop-blur-sm md:text-right">
-                                    <p class="text-[11px] font-black uppercase tracking-[0.22em] text-white/70">Código</p>
-                                    <p class="mt-1 text-2xl font-black tracking-tight">${escapeHtml(String(detalle.codigo || detalle.version || '--'))}</p>
-                                    <div class="mt-3 flex flex-wrap gap-2 md:justify-end">
-                                        <span class="rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em]">Versión ${escapeHtml(String(detalle.version || '-'))}</span>
-                                        <span class="rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em]">${escapeHtml(String(detalle.fecha || '--'))}</span>
+            <div class="lg:col-span-3">
+                <div class="mx-auto w-full max-w-[1100px] overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_8px_40px_rgba(15,23,42,0.08)]">
+                    
+                    <!-- HEADER INSTITUCIONAL -->
+                    <div class="relative overflow-hidden bg-gradient-to-br from-[#0f172a] via-[#1e3a5f] to-[#0f766e] px-8 py-8 text-white">
+                        <!-- Patrón decorativo sutil -->
+                        <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+                        
+                        <div class="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+                            <!-- Lado izquierdo: Título y descripción -->
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20">
+                                        <span class="material-symbols-outlined text-[18px] text-emerald-300">monitoring</span>
                                     </div>
+                                    <span class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-300/90">Ficha Técnica del Indicador</span>
                                 </div>
+                                
+                                <h2 class="text-2xl md:text-3xl font-black leading-tight tracking-tight mb-3">${escapeHtml(nombreIndicadorValor)}</h2>
+                                <p class="text-sm text-white/70 max-w-xl leading-relaxed">${escapeHtml(valor([/objetivo/], 'Documento formal del indicador generado desde el Sistema de Gestión de Procesos.'))}</p>
                             </div>
-                        </div>
-
-                        <div class="bg-slate-50 px-6 py-7 md:px-8 md:py-8 space-y-6">
-                            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                                ${infoBox('Código', detalle.codigo || detalle.version || '-')}
-                                ${infoBox('Versión', detalle.version || '-')}
-                                ${infoBox('Tipo de proceso', valor([/tipo\s*de\s*proceso/, /tipo\s*proceso/], '-'))}
-                                ${infoBox('Macro proceso', valor([/macro\s*proceso/], '-'))}
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                                ${infoBox('Proceso', valor([/^proceso$/], '-'))}
-                                ${infoBox('Frecuencia', frecuenciaValor || '-')}
-                                ${infoBox('Fuente', valor([/fuente/], '-'))}
-                                ${infoBox('Oficina o unidad responsable', valor([/unidad\s*responsable/, /oficina\s*o\s*unidad\s*responsable/, /responsable/], '-'))}
-                            </div>
-
-                            <div class="rounded-2xl border border-emerald-200 bg-white p-5 md:p-6 shadow-sm">
-                                <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                                    <div>
-                                        <p class="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">Datos técnicos del indicador</p>
-                                        <h4 class="mt-1 text-lg font-black text-slate-900">Resumen operativo</h4>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">Meta</span>
-                                        <span class="text-2xl font-black text-emerald-700">${escapeHtml(metaTexto)}</span>
-                                        <span class="rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ${metaEstado.clase}">${metaEstado.texto}</span>
-                                    </div>
+                            
+                            <!-- Lado derecho: Código y metadata -->
+                            <div class="flex flex-col items-start md:items-end gap-3 md:min-w-[200px]">
+                                <div class="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm px-5 py-4">
+                                    <p class="text-[10px] font-black uppercase tracking-[0.22em] text-white/60 mb-1">Código del Documento</p>
+                                    <p class="text-xl font-black tracking-tight font-mono">${escapeHtml(String(detalle.codigo || '--'))}</p>
                                 </div>
-
-                                <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                    ${infoBox(nombreLabel, nombreIndicadorValor, 'lg:col-span-2')}
-                                    ${infoBox('Objetivo del proceso', valor([/objetivo/], '-'))}
-                                    ${infoBox('Variables', variablesValor)}
-                                    ${infoBox('Fórmula del indicador', formulaValor, 'lg:col-span-2')}
+                                <div class="flex flex-wrap gap-2 md:justify-end">
+                                    <span class="rounded-full bg-white/10 border border-white/15 px-3 py-1.5 text-[11px] font-bold text-white/80">Versión ${escapeHtml(String(detalle.version || '1.0'))}</span>
+                                    <span class="rounded-full bg-white/10 border border-white/15 px-3 py-1.5 text-[11px] font-bold text-white/80">${escapeHtml(String(detalle.fecha || '--'))}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- CONTENIDO PRINCIPAL -->
+                    <div class="bg-slate-50/50 px-8 py-8 space-y-6">
+                        
+                        <!-- SECCIÓN 1: IDENTIFICACIÓN -->
+                        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <div class="flex items-center gap-2 mb-5 pb-3 border-b border-slate-100">
+                                <span class="material-symbols-outlined text-slate-400 text-lg">badge</span>
+                                <h4 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Identificación del Proceso</h4>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                                ${infoBox('Código', detalle.codigo || detalle.version || '-')}
+                                ${infoBox('Versión', detalle.version || '-')}
+                                ${infoBox('Tipo de Proceso', valor([/tipo\s*de\s*proceso/, /tipo\s*proceso/], '-'))}
+                                ${infoBox('Macro Proceso', valor([/macro\s*proceso/], '-'))}
+                                ${infoBox('Proceso', valor([/^proceso$/], '-'))}
+                                ${infoBox('Frecuencia', frecuenciaValor || '-')}
+                                ${infoBox('Fuente', valor([/fuente/], '-'))}
+                                ${infoBox('Unidad Responsable', valor([/unidad\s*responsable/, /oficina\s*o\s*unidad\s*responsable/, /responsable/], '-'))}
+                            </div>
+                        </div>
+
+                        <!-- SECCIÓN 2: DATOS TÉCNICOS (con highlight de meta) -->
+                        <div class="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/50 to-white p-6 shadow-sm">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5 pb-3 border-b border-emerald-100">
+                                <div class="flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-emerald-500 text-lg">analytics</span>
+                                    <h4 class="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Datos Técnicos del Indicador</h4>
+                                </div>
+                                <div class="flex items-center gap-3 bg-white rounded-xl px-4 py-2 border border-emerald-100 shadow-sm">
+                                    <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Meta</span>
+                                    <span class="text-2xl font-black text-emerald-600 leading-none">${escapeHtml(metaTexto)}</span>
+                                    ${estadoBadge(metaEstado.texto, metaEstado.clase)}
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                ${infoBox('Nombre del Indicador', nombreIndicadorValor, 'lg:col-span-2')}
+                                ${infoBox('Objetivo del Proceso', valor([/objetivo/], '-'))}
+                                ${infoBox('Variables', variablesValor)}
+                                ${infoBox('Fórmula del Indicador', formulaValor, 'lg:col-span-2 font-mono text-slate-600')}
+                            </div>
+                        </div>
+
+                        <!-- SECCIÓN 3: VARIABLES DETALLADAS (si son extensas) -->
+                        ${variablesValor && variablesValor !== '-' ? `
+                        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                                <span class="material-symbols-outlined text-slate-400 text-lg">functions</span>
+                                <h4 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Variables del Indicador</h4>
+                            </div>
+                            <div class="bg-slate-50 rounded-xl p-5 border border-slate-100">
+                                <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-line">${escapeHtml(variablesValor)}</p>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- SECCIÓN 4: FÓRMULA DESTACADA -->
+                        ${formulaValor && formulaValor !== '-' ? `
+                        <div class="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/50 to-white p-6 shadow-sm">
+                            <div class="flex items-center gap-2 mb-4 pb-3 border-b border-blue-100">
+                                <span class="material-symbols-outlined text-blue-500 text-lg">calculate</span>
+                                <h4 class="text-xs font-black uppercase tracking-[0.2em] text-blue-700">Fórmula de Cálculo</h4>
+                            </div>
+                            <div class="bg-white rounded-xl p-6 border border-blue-100 text-center">
+                                <p class="text-lg md:text-xl font-mono font-bold text-slate-800 leading-relaxed">${escapeHtml(formulaValor)}</p>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- FOOTER DEL DOCUMENTO -->
+                        <div class="flex items-center justify-between pt-4 border-t border-slate-200">
+                            <div class="flex items-center gap-2 text-[11px] text-slate-400">
+                                <span class="material-symbols-outlined text-sm">shield</span>
+                                <span class="font-medium">Documento generado por SIGPRO - UNMSM</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 font-mono">
+                                ${escapeHtml(String(detalle.transaccion || 'TRANS-000'))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            `;
+            </div>
+        `;
         }
         }
         if (campos.length === 0) {
@@ -2073,7 +2233,7 @@ function normalizarContenidoAdjunto(adjunto) {
         }
     }
     
-    // 🔥 FIX 8: Si el contenido es base64 puro sin prefijo, normalizarlo
+    // Si el contenido es base64 puro sin prefijo, normalizarlo
     if (source && !source.startsWith('data:') && source.length > 100) {
         const cleaned = source.replace(/\s/g, '');
         // Validar que sea base64 válido (con o sin padding)
@@ -2115,38 +2275,72 @@ window.abrirPreviewPdf = async function(indiceAdjunto) {
     try {
         const modal = document.getElementById('modal-pdf-preview');
         const content = modal?.querySelector('.modal-content');
-        const embedElement = document.getElementById('pdf-preview-embed');
+        
+        // 🔥 OBTENER EL CONTENEDOR PRINCIPAL
+        const container = document.getElementById('pdf-preview-container');
+        if (!container) {
+            console.error('❌ No se encontró #pdf-preview-container');
+            showToast('Error interno del visor', 'error');
+            return;
+        }
 
+        // Actualizar información del header del modal
         document.getElementById('pdf-preview-nombre').textContent = adjunto.nombre || 'Documento sin título';
         document.getElementById('pdf-preview-info').textContent = `${adjunto.tipo || 'PDF'} • ${adjunto.tamaño || '-'} • ${adjunto.fecha || '-'}`;
+
+        // 🔥 LIMPIAR COMPLETAMENTE el contenedor antes de insertar nuevo contenido
+        container.innerHTML = '';
+
+        // 🔥 REVOCAR blob URL anterior si existe (evita fugas de memoria)
+        if (window._currentPreviewBlobUrl) {
+            URL.revokeObjectURL(window._currentPreviewBlobUrl);
+            window._currentPreviewBlobUrl = null;
+        }
 
         if (esTecnico) {
             try {
                 if (typeof window.generateTechnicalPdfBlob === 'function') {
+                    // Generar PDF técnico como blob
                     const blob = await window.generateTechnicalPdfBlob(window.currentDetalle || {});
-                    if (window._currentPreviewBlobUrl) {
-                        URL.revokeObjectURL(window._currentPreviewBlobUrl);
-                    }
+                    
                     const blobUrl = URL.createObjectURL(blob);
                     window._currentPreviewBlobUrl = blobUrl;
 
-                    embedElement.type = 'application/pdf';
-                    embedElement.src = blobUrl;
+                    // Crear embed nuevo para el blob PDF
+                    const embed = document.createElement('embed');
+                    embed.type = 'application/pdf';
+                    embed.src = blobUrl;
+                    embed.className = 'w-full h-full';
+                    container.appendChild(embed);
+                    
                     window.adjuntoActual = Object.assign({}, adjunto, { _blob: blob, _blobUrl: blobUrl });
                 } else {
-                    // Fallback: render the already-rendered ficha técnica HTML inside an iframe
-                    const panelHtml = (document.getElementById('viewer-contenido') || { innerHTML: '' }).innerHTML || '';
-                    const cssLinks = `
-                        <link rel="stylesheet" href="css/main.css">
-                        <link rel="stylesheet" href="css/views.css">
+                    // IFRAME para ficha técnica HTML (fallback cuando no hay generador de PDF)
+                    const panelHtml = document.getElementById('viewer-contenido')?.innerHTML || '';
+                    
+                    const iframeDoc = `
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset="utf-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1">
+                            <script src="https://cdn.tailwindcss.com"><\/script>
+                            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+                            <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+                            <style>
+                                body{font-family:'Inter',sans-serif;background:#f8fafc;}
+                                .material-symbols-outlined{font-family:'Material Symbols Outlined',sans-serif;}
+                            </style>
+                        </head>
+                        <body class="p-8">${panelHtml}</body>
+                        </html>
                     `;
-                    const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${cssLinks}</head><body style="background:#f6f6f8;padding:18px;font-family:Inter, Arial, sans-serif;">${panelHtml}</body></html>`;
-
-                    // Replace embed with iframe for HTML preview
-                    const container = embedElement.parentElement || embedElement.parentNode;
-                    if (container) {
-                        container.innerHTML = `<iframe id="pdf-preview-iframe" class="w-full h-full" srcdoc='${html.replace(/'/g, "\\'")}'></iframe>`;
-                    }
+                    
+                    const iframe = document.createElement('iframe');
+                    iframe.className = 'w-full h-full border-0';
+                    iframe.srcdoc = iframeDoc;
+                    container.appendChild(iframe);
+                    
                     window.adjuntoActual = adjunto;
                 }
             } catch (err) {
@@ -2155,69 +2349,28 @@ window.abrirPreviewPdf = async function(indiceAdjunto) {
                 return;
             }
         } else {
-            // ═══════════════════════════════════════════════════════════════════
-            // 🔥 BLOQUE 7: PREVISUALIZACIÓN CON URL DEL BACKEND (AGREGADO)
-            // ═══════════════════════════════════════════════════════════════════
-            
+            // Archivo normal: crear embed dinámico
             let source = adjunto.contenido || adjunto.url || adjunto.path || '';
-            const token = localStorage.getItem('auth_token');
-
-            // 1️⃣ Si es URL relativa del backend, convertir a absoluta
-            if (source && !source.startsWith('data:') && !source.startsWith('http')) {
-                source = `${window.location.origin}${source.startsWith('/') ? '' : '/'}${source}`;
-                console.log('🔗 URL relativa convertida a absoluta:', source);
-            }
-
-            // 2️⃣ Si no hay contenido/URL pero hay ID de archivo, obtener URL firmada del backend
-            if (!source && adjunto.id) {
-                try {
-                    console.log('📡 Solicitando URL firmada al backend para archivo ID:', adjunto.id);
-                    const fileResult = await API.portal.documents.getById(adjunto.id);
-                        if (fileResult.success && fileResult.data) {
-                            const data = fileResult.data;
-                            source = data.url || data.downloadUrl || data.signedUrl || data.urlArchivo || '';
-                        }
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        source = data.url || data.downloadUrl || data.signedUrl || '';
-                        console.log('✅ URL firmada obtenida:', source.substring(0, 60) + '...');
-                    } else {
-                        console.warn('⚠️ No se pudo obtener URL firmada:', response.status);
-                    }
-                } catch (apiError) {
-                    console.error('❌ Error obteniendo URL firmada:', apiError);
-                }
-            }
-
-            // 3️⃣ Si aún no hay source, intentar con normalizarContenidoAdjunto (base64 local)
+            
             if (!source) {
                 source = normalizarContenidoAdjunto(adjunto);
-                console.log('📦 Intentando base64 local...');
             }
-
-            // Debug info
-            console.log('🔍 Adjunto seleccionado:', {
-                nombre: adjunto.nombre,
-                tipo: adjunto.tipo,
-                tieneSource: !!source,
-                esDataUrl: source?.startsWith('data:'),
-                esHttpUrl: source?.startsWith('http'),
-                sourcePreview: source ? source.substring(0, 60) + '...' : 'VACÍO'
-            });
-
-            // 4️⃣ Si definitivamente no hay source, mostrar modal de no disponible
+            
             if (!source) {
                 mostrarModalDocumentoNoDisponible(adjunto);
                 return;
             }
 
-            // 5️⃣ Configurar el embed según el tipo de source
-            embedElement.type = getMimeType(adjunto.nombre);
-            embedElement.src = source;
+            const embed = document.createElement('embed');
+            embed.type = getMimeType(adjunto.nombre);
+            embed.src = source;
+            embed.className = 'w-full h-full';
+            container.appendChild(embed);
+            
             window.adjuntoActual = adjunto;
         }
 
+        // Mostrar modal con animación
         modal.classList.remove('hidden');
         void modal.offsetWidth;
         requestAnimationFrame(() => {
@@ -2239,7 +2392,7 @@ function mostrarModalDocumentoNoDisponible(adjunto) {
         modal = document.createElement('div');
         modal.id = 'modal-doc-info';
         modal.className = 'hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm';
-        // Validación mejorada para mensajes claros
+        
         let motivo = '';
         if (adjunto && adjunto.tamaño && adjunto.tamaño.toString().toLowerCase().includes('mb') && parseFloat(adjunto.tamaño) > 4.5) {
             motivo = 'El archivo es muy grande para ser mostrado directamente en el navegador.';
@@ -2324,34 +2477,42 @@ window.solicitarDocumento = function() {
 
 window.cerrarPreview = function() {
     const modal = document.getElementById('modal-pdf-preview');
-    if (modal) {
-        const content = modal.querySelector('.modal-content');
+    if (!modal) return;
+
+    const content = modal.querySelector('.modal-content');
+    
+    // Iniciar animación de cierre
+    modal.classList.remove('visible-overlay');
+    if (content) content.classList.remove('visible-content');
+
+    setTimeout(() => {
+        modal.classList.add('hidden');
+
+        // ==========================================
+        // 🔥 FIX PRINCIPAL: Limpiar el contenedor correcto
+        // ==========================================
+        const container = document.getElementById('pdf-preview-container');
+        if (container) {
+            // Limpiar TODO el contenido dinámico (embeds, iframes, etc.)
+            // Esto elimina cualquier elemento creado dinámicamente por abrirPreviewPdf
+            container.innerHTML = '';
+        }
+
+        // ==========================================
+        // 🔥 FIX: Revocar blob URL si existe (siempre, sin condicionales que lo omitan)
+        // ==========================================
+        if (window._currentPreviewBlobUrl) {
+            URL.revokeObjectURL(window._currentPreviewBlobUrl);
+            window._currentPreviewBlobUrl = null;
+        }
         
-        modal.classList.remove('visible-overlay');
-        content.classList.remove('visible-content');
-        
-        setTimeout(() => {
-            modal.classList.add('hidden');
-            
-            const embed = document.getElementById('pdf-preview-embed');
-            if (embed) embed.src = '';
-            
-            // 🔥 NUEVO: Limpiar iframe si existe
-            const iframe = document.getElementById('pdf-preview-iframe');
-            if (iframe) iframe.remove();
-            
-            // 🔥 NUEVO: Restaurar el embed element si fue reemplazado por iframe
-            const container = document.querySelector('#modal-pdf-preview .flex-1');
-            if (container && !document.getElementById('pdf-preview-embed')) {
-                container.innerHTML = '<embed id="pdf-preview-embed" type="application/pdf" class="w-full h-full" />';
-            }
-            
-            if (window._currentPreviewBlobUrl) {
-                URL.revokeObjectURL(window._currentPreviewBlobUrl);
-                window._currentPreviewBlobUrl = null;
-            }
-        }, 300);
-    }
+        // ==========================================
+        // 🔥 LIMPIEZA ADICIONAL: Limpiar referencias
+        // ==========================================
+        window.adjuntoActual = null;
+
+        console.log('✅ Preview cerrado y recursos liberados');
+    }, 300);
 };
 
 window.descargarPdfPreview = function() {
@@ -2361,14 +2522,36 @@ window.descargarPdfPreview = function() {
     }
     
     const adjunto = window.adjuntoActual;
+    
+    // ==========================================
+    // 🔥 PRIORIDAD 1: Si es un blob generado (ficha técnica), usar el blob directo
+    // ==========================================
+    if (adjunto._blob) {
+        const url = URL.createObjectURL(adjunto._blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = adjunto.nombre || 'documento.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Limpiar el objeto URL temporal de descarga (no el del preview)
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        
+        showToast('Descarga iniciada', 'success');
+        return;
+    }
+    
+    // ==========================================
+    // 🔥 PRIORIDAD 2: Si tiene contenido base64/URL, usar normalizarContenidoAdjunto
+    // ==========================================
     const source = normalizarContenidoAdjunto(adjunto);
     if (!source) {
-        showToast('El documento no está disponible', 'error');
+        showToast('El documento no está disponible para descarga', 'error');
         return;
     }
     
     try {
-        // Crear un link temporal para descargar
         const link = document.createElement('a');
         link.href = source;
         link.download = adjunto.nombre || 'documento.pdf';

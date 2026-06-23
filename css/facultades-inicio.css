@@ -950,3 +950,13 @@ footer .tracking-widest {
     transform: translateY(0);
 }
 
+/* Efecto de escala para el pop final de la animación */
+.number {
+    transition: transform 0.2s ease-out;
+    display: inline-block;
+}
+
+.number.scale-110 {
+    transform: scale(1.15);
+}
+

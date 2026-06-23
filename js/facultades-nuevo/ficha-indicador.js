@@ -990,7 +990,10 @@ function applyAutoFillByIndicatorValue(optionValue) {
 
 function saveIndicadorToLocalStorage(payload, savedOrigin) {
     const now = new Date();
-    const codigo = payload.codigo;
+    const codigo = payload.codigo || (payload.indicatorName ? 
+    `IND-${resolveFacultyCode()}-${new Date().getFullYear()}-001` : 
+    `IND-${Date.now()}`
+    );
 
     const documentoPendiente = {
         id: payload.id || Date.now().toString(),
@@ -1114,63 +1117,99 @@ function initFormHandler() {
         `;
 
         try {
-            const codigo = data.codigo || await generateIndicatorCode();
             const tipoProcesoInput = form.querySelector(INDICADOR_CONFIG.selectors.tipoProcesoSelect);
             const macroProcesoInput = form.querySelector(INDICADOR_CONFIG.selectors.macroProcesoSelect);
 
+            // ============================================================
+            // 🔥 PAYLOAD PARA EL BACKEND (schema exacto de /portal/indicators)
+            // ============================================================
             const payload = {
-                ...data,
-                codigo,
+                macroProcess: getSelectedOptionText(macroProcesoInput) || data.macroProceso || '',
+                process: getSelectedOptionText(macroProcesoInput) || data.proceso || data.macroProceso || '',
+                responsibleUnit: data.unidadResponsable || '',
+                processType: (data.tipoProceso || 'ESTRATEGICO').toUpperCase(),
+                processObjective: data.objetivoProceso || '',
+                indicatorName: data.nombreIndicador || '',
+                frequency: (data.frecuencia || 'MENSUAL').toUpperCase(),
+                variables: data.variables || '',
+                dataSource: data.fuente || '',
+                formula: data.formulaDefinicion || '',
+                target: Number(data.meta || 0),
+                unit: data.unidad || '%'
+            };
+
+            // ============================================================
+            // DATOS EXTRAS para localStorage (no se envían al backend)
+            // ============================================================
+            const codigoLocal = data.codigo || await generateIndicatorCode();
+            const extrasParaLocal = {
+                codigo: codigoLocal,
                 tipoProcesoLabel: getSelectedOptionText(tipoProcesoInput),
                 macroProcesoNombre: getSelectedOptionText(macroProcesoInput) || obtenerNombreMacroProceso(data.macroProceso),
                 facultadId: resolveFacultyId(),
                 generadoPor: currentUser?.correo || 'Facultad',
-                estado: 'pendiente'
+                estado: 'pendiente',
+                version: data.version || '1.0'
             };
 
             let result = null;
             let savedOrigin = 'local';
+            let codigoFinal = codigoLocal;
 
-            if (canUseApiUpload()) {
-                const apiFormData = new FormData();
-                apiFormData.append('data', JSON.stringify({
-                    ...payload,
-                    tipo: 'indicador'
-                }));
-
-                result = await API.documentos.upload(apiFormData);
+            // ============================================================
+            // 🔥 PASO 1: Intentar crear vía API
+            // ============================================================
+            if (typeof API !== 'undefined' && API.portal && API.portal.indicators && typeof API.portal.indicators.create === 'function') {
+                console.log('📤 POST /portal/indicators:', payload);
+                result = await API.portal.indicators.create(payload);
+                console.log('📥 Respuesta:', result);
 
                 if (result && result.success) {
-                    savedOrigin = getApiMode() === 'remote' ? 'remote' : 'local-api';
+                    savedOrigin = 'remote';
+                    // El backend devuelve código auto-generado
+                    codigoFinal = result.data?.code || result.data?.codigo || codigoLocal;
+                    showToast(`Ficha creada en servidor: ${codigoFinal}`, 'success');
+                } else {
+                    console.warn('⚠️ API respondió error:', result?.status, result?.error);
                 }
-            }
-
-            if (!result || !result.success) {
-                saveIndicadorToLocalStorage(payload, savedOrigin);
-                result = { success: true, data: { id: codigo } };
-                showToast('Sin conexion a API. Se guardo localmente en este equipo.', 'warning', 4000);
             } else {
-                saveIndicadorToLocalStorage(payload, savedOrigin);
+                console.warn('⚠️ API.portal.indicators.create no disponible');
             }
 
-            showToast(`Ficha ${codigo} creada exitosamente`, 'success');
+            // ============================================================
+            // PASO 2: Si falló API, guardar local
+            // ============================================================
+            if (!result || !result.success) {
+                saveIndicadorToLocalStorage({ ...payload, ...extrasParaLocal }, savedOrigin);
+                result = { success: true, data: { id: codigoLocal, code: codigoLocal } };
+                showToast('Sin conexión a API. Guardado localmente.', 'warning', 4000);
+            } else {
+                // Guardar también local como backup/cache
+                saveIndicadorToLocalStorage({ ...payload, ...extrasParaLocal, codigo: codigoFinal }, savedOrigin);
+            }
 
+            showToast(`Ficha ${codigoFinal} creada exitosamente`, 'success');
+
+            // ============================================================
+            // PASO 3: Mostrar botón "Ver Expedientes" o redirigir
+            // ============================================================
             if (btnExpedientes) {
                 setTimeout(() => {
                     btnFinalizar.style.display = 'none';
                     btnExpedientes.classList.remove('hidden');
-                    btnExpedientes.href = `facultades-documentos.html?docCode=${encodeURIComponent(codigo)}`;
+                    btnExpedientes.href = `facultades-documentos.html?docCode=${encodeURIComponent(codigoFinal)}`;
                     btnExpedientes.onclick = (ev) => {
                         ev.preventDefault();
-                        goToDocumentos(codigo);
+                        goToDocumentos(codigoFinal);
                     };
                 }, INDICADOR_CONFIG.SHOW_DOCUMENTOS_BUTTON_DELAY_MS);
             } else {
-                goToDocumentos(codigo);
+                goToDocumentos(codigoFinal);
             }
+
         } catch (error) {
-            console.error('Error:', error);
-            showToast('Error al guardar. Intente nuevamente.', 'error');
+            console.error('❌ Error:', error);
+            showToast(`Error al guardar: ${error.message}`, 'error');
             btnFinalizar.disabled = false;
             btnFinalizar.innerHTML = originalText;
         }
