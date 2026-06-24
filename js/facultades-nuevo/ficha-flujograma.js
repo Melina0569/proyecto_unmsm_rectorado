@@ -809,23 +809,50 @@ function initFormHandler() {
             await cacheAdjuntosIndexedDb(data.codigo, adjuntos);
 
             let result = null;
-            if (canUseApiUpload()) {
-                const apiFormData = new FormData();
-                apiFormData.append('data', JSON.stringify({
-                    ...payload,
-                    tipo: 'flujograma'
-                }));
-                if (archivo) {
-                    apiFormData.append('archivo0', archivo);
+
+            // 🔥 NUEVO: Intentar subir a la API de flujogramas primero
+            if (typeof API !== 'undefined' && API.portal && API.portal.flows && typeof API.portal.flows.upload === 'function') {
+                try {
+                    // Obtener valores de los selects para la API
+                    const tipoProceso = data.tipoProceso || '';
+                    const macroProcesoNombre = obtenerNombreMacroProceso(data.macroProceso);
+                    
+                    // Mapear tipo de proceso al nombre que espera la API
+                    const tipoProcesoLabel = {
+                        'estrategico': 'Estratégico',
+                        'misional': 'Misional', 
+                        'de-apoyo': 'De Apoyo'
+                    }[tipoProceso] || 'Estratégico';
+                    
+                    // Llamar al endpoint correcto: /portal/flows
+                    result = await API.portal.flows.upload(
+                        archivo,                    // pdfFile (objeto File)
+                        tipoProcesoLabel,           // macroProcess (query param)
+                        macroProcesoNombre,         // process (query param)
+                        data.proceso || ''          // activityName (query param)
+                    );
+                    
+                    console.log('📤 Respuesta API flows:', result);
+                    
+                } catch (apiError) {
+                    console.error('❌ Error API flows:', apiError);
+                    result = { success: false, error: apiError.message };
                 }
-                result = await API.documentos.upload(apiFormData);
             }
 
+            // Manejar resultado: éxito o fallback local
             if (!result || !result.success) {
+                // Fallback: guardar localmente
                 guardarFlujogramaLocal(payload);
-                showToast('Sin conexion a API. Se guardo localmente en este equipo.', 'warning', 4000);
+                showToast('Sin conexión a API. Se guardó localmente en este equipo.', 'warning', 4000);
             } else {
+                // ✅ ÉXITO: La API devolvió { id, code }
+                payload.id = result.data?.id || payload.id;
+                payload.codigo = result.data?.code || payload.codigo;
+                payload.origen = 'api';
+                
                 guardarFlujogramaLocal(payload);
+                showToast(`Flujograma ${result.data?.code || payload.codigo} subido a la API correctamente`, 'success', 3000);
             }
 
             showToast(`Ficha ${data.codigo} creada exitosamente`, 'success');

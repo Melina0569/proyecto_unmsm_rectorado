@@ -1859,7 +1859,7 @@ const RemoteAPI = {
 
             async getById(id) {
                 try {
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/access-requests/${id}`, {
+                    const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/documents/${id}`, {
                         headers: RemoteAPI.getHeaders()
                     });
                     return { success: response.ok, data: await response.json() };
@@ -2076,6 +2076,7 @@ const RemoteAPI = {
             async upload(pdfFile, macroProcess, process, activityName) {
                 try {
                     const formData = new FormData();
+                    // Asegurar que el campo se llame exactamente 'pdf' como espera el backend
                     formData.append('pdf', pdfFile);
 
                     const params = new URLSearchParams({
@@ -2084,17 +2085,55 @@ const RemoteAPI = {
                         activityName
                     });
 
+                    // Obtener token de TODAS las claves posibles (consistente con el resto de tu API)
+                    const token = localStorage.getItem('token') 
+                        || localStorage.getItem('unmsm_token') 
+                        || localStorage.getItem('accessToken');
+
                     const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/flows?${params.toString()}`, {
                         method: 'POST',
+                        // 🔥 CRÍTICO: NO incluir 'Content-Type' cuando usas FormData
+                        // El navegador lo establece automáticamente con el boundary correcto
                         headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('unmsm_token')}`
+                            'Accept': 'application/json',
+                            'Authorization': token ? `Bearer ${token}` : ''
                         },
                         body: formData
                     });
 
-                    return { success: response.ok, data: await response.json() };
+                    // Manejar respuesta
+                    let data = null;
+                    const contentType = response.headers.get('content-type') || '';
+                    
+                    if (contentType.includes('application/json')) {
+                        data = await response.json();
+                    } else {
+                        const text = await response.text();
+                        data = { raw: text.substring(0, 500) };
+                    }
+
+                    if (!response.ok) {
+                        return { 
+                            success: false, 
+                            error: data?.message || `HTTP ${response.status}: ${response.statusText}`,
+                            status: response.status,
+                            data 
+                        };
+                    }
+
+                    return { 
+                        success: true, 
+                        data,           // { id, code }
+                        status: response.status 
+                    };
+
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    return { 
+                        success: false, 
+                        error: error.message,
+                        isNetworkError: true,
+                        status: 0 
+                    };
                 }
             }
         },
@@ -2104,24 +2143,59 @@ const RemoteAPI = {
             async upload(pdfFile, macroProcess, process) {
                 try {
                     const formData = new FormData();
-                    formData.append('pdf', pdfFile);
+                    formData.append('pdf', pdfFile);  // ← campo debe llamarse 'pdf'
 
                     const params = new URLSearchParams({
                         macroProcess,
                         process
                     });
 
+                    const token = localStorage.getItem('token') 
+                        || localStorage.getItem('unmsm_token') 
+                        || localStorage.getItem('accessToken');
+
                     const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/characterizations?${params.toString()}`, {
                         method: 'POST',
                         headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('unmsm_token')}`
+                            'Accept': 'application/json',
+                            'Authorization': token ? `Bearer ${token}` : ''
+                            // ❌ NO 'Content-Type' — el navegador lo pone automáticamente
                         },
                         body: formData
                     });
 
-                    return { success: response.ok, data: await response.json() };
+                    let data = null;
+                    const contentType = response.headers.get('content-type') || '';
+                    
+                    if (contentType.includes('application/json')) {
+                        data = await response.json();
+                    } else {
+                        const text = await response.text();
+                        data = { raw: text.substring(0, 500) };
+                    }
+
+                    // ✅ El backend devuelve 201 Created
+                    if (!response.ok && response.status !== 201) {
+                        return { 
+                            success: false, 
+                            error: data?.message || `HTTP ${response.status}`,
+                            status: response.status,
+                            data 
+                        };
+                    }
+
+                    return { 
+                        success: true, 
+                        data,  // { id, code, message }
+                        status: response.status 
+                    };
+
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    return { 
+                        success: false, 
+                        error: error.message,
+                        status: 0 
+                    };
                 }
             }
         },

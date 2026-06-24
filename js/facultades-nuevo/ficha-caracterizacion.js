@@ -129,8 +129,9 @@ function getApiMode() {
 
 function canUseApiUpload() {
     return typeof API !== 'undefined'
-        && API.documentos
-        && typeof API.documentos.upload === 'function';
+        && API.portal
+        && API.portal.characterizations
+        && typeof API.portal.characterizations.upload === 'function';
 }
 
 function getRequiredEmptyFields(form, data) {
@@ -190,7 +191,7 @@ function saveFichaToLocalStorage(payload) {
     const docs = safeParseJson(docsRaw, []);
 
     const docPendiente = {
-        id: Date.now().toString(),
+        id: payload.id || payload.codigo || Date.now().toString(),
         fecha: now.toISOString().split('T')[0],
         hora: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
         codigo,
@@ -765,40 +766,50 @@ function initFormHandler() {
 
             if (canUseApiUpload()) {
                 try {
-                    const apiFormData = new FormData();
-                    apiFormData.append('data', JSON.stringify({
-                        ...payload,
-                        facultadId: resolveFacultyId(),
-                        generadoPor: 'Facultad',
-                        tipo: 'caracterizacion'
-                    }));
+                    // Obtener valores de los selects para los query params
+                    const tipoProcesoInput = form.querySelector(FICHA_CONFIG.selectors.tipoProcesoSelect);
+                    const macroProcesoInput = form.querySelector(FICHA_CONFIG.selectors.macroProcesoSelect);
+                    
+                    // El backend espera: macroProcess (nombre del tipo) y process (nombre del macro proceso)
+                    const macroProcess = tipoProcesoLabel || 'Estratégico';
+                    const process = macroProcesoLabel || 'Gestión estratégica';
 
-                    selectedFiles.forEach((file, index) => {
-                        apiFormData.append(`archivo${index}`, file);
-                    });
+                    // Tomar el PRIMER archivo PDF seleccionado (el backend solo acepta 1 PDF)
+                    const pdfFile = selectedFiles.find(f => f.name.toLowerCase().endsWith('.pdf')) || selectedFiles[0];
+                    
+                    if (!pdfFile) {
+                        throw new Error('No se seleccionó ningún archivo PDF');
+                    }
 
-                    result = await API.documentos.upload(apiFormData);
+                    // ✅ USAR EL ENDPOINT CORRECTO DEL BACKEND
+                    result = await API.portal.characterizations.upload(pdfFile, macroProcess, process);
 
                     if (result && result.success) {
-                        savedOrigin = getApiMode() === 'remote' ? 'remote' : 'local-api';
+                        savedOrigin = 'remote';
+                        // ✅ GUARDAR EL CÓDIGO DEL BACKEND
+                        const backendCode = result.data?.code || result.data?.id;
+                        payload.codigo = backendCode;           // "CAR-2024-1782320546390"
+                        payload.id = backendCode;                // Usar el mismo para API calls
+                        payload.backendId = backendCode;         // Referencia original
+                        
+                        showToast(`Ficha subida: ${backendCode}`, 'success', 3000);
                     }
                 } catch (apiError) {
-                    console.warn('No se pudo guardar en API, se usará fallback local:', apiError);
+                    console.warn('No se pudo guardar en API remota, usando fallback local:', apiError);
                     result = null;
                 }
             }
 
             if (!result || !result.success) {
-                persistCaracterizacionLocal(payload, savedOrigin);
-
-                result = {
-                    success: true,
-                    data: { id: codigo }
-                };
-
-                showToast('Sin conexion a API. Se guardo localmente en este equipo.', 'warning', 4000);
+                // Fallback: guardar solo local
+                persistCaracterizacionLocal(payload, 'local');
+                result = { success: true, data: { id: payload.codigo, code: payload.codigo } };
+                showToast('Sin conexión a API. Se guardó localmente.', 'warning', 4000);
             } else {
-                persistCaracterizacionLocal(payload, savedOrigin);
+                // ✅ API exitosa: guardar localmente también con el código del servidor
+                payload.codigo = result.data?.code || payload.codigo;
+                payload.id = result.data?.id || result.data?.code;
+                persistCaracterizacionLocal(payload, 'remote');
             }
 
             showToast('Ficha de caracterización creada exitosamente', 'success');

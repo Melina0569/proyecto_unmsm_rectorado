@@ -1466,11 +1466,18 @@ window.viewDocument = async function(docId) {
     }
 
     try {
-        // 🔥 FIX: Usar API.js en lugar de fetch directo
-        const result = await API.portal.documents.getById(docId);
+        // ✅ INTENTAR PRIMERO CON EL CÓDIGO (que es lo que conoce el backend)
+        const searchId = doc.codigo || doc.id;
         
-        if (!result.success) throw new Error(result.error || 'Error cargando detalle');
-        const detalleBackend = result.data;
+        const result = await API.portal.documents.getById(searchId);
+        
+        if (!result.success) {
+            // Si falla con código, intentar con ID
+            const resultById = await API.portal.documents.getById(doc.id);
+            if (resultById.success) {
+                // Usar resultado alternativo
+            }
+        }
 
         // Transformar respuesta del backend al formato interno
         const detalle = {
