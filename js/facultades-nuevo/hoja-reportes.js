@@ -952,7 +952,7 @@ function initFormHandler() {
                 progreso: 5,
                 facultadId: reportData.facultadId || 1,
                 tipo: 'reporte',
-                origen: apiSuccess ? 'api' : 'local-fallback'
+                origen: apiSuccess ? 'hibrido' : 'local-fallback'
             };
 
             const idx = docs.findIndex(item => item.codigo === codigo);

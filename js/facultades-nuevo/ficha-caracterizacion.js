@@ -191,17 +191,19 @@ function saveFichaToLocalStorage(payload) {
     const docs = safeParseJson(docsRaw, []);
 
     const docPendiente = {
-        id: payload.id || payload.codigo || Date.now().toString(),
+        id: payload.backendId || payload.codigo || Date.now().toString(),  // ← Usar backendId si existe
+        backendId: payload.backendId || null,  // ← Guardar explícitamente
         fecha: now.toISOString().split('T')[0],
         hora: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
-        codigo,
-        descripcion: payload.nombreProceso || payload.macroProcesoNombre || `Caracterizacion ${codigo}`,
+        codigo: payload.codigo,
+        descripcion: payload.nombreProceso || payload.macroProcesoNombre || `Caracterizacion ${payload.codigo}`,
         generadoPor: payload.generadoPor || 'Facultad',
         estado: 'pendiente',
         progreso: 5,
         facultadId: payload.facultadId || 1,
         tipo: 'caracterizacion',
-        origen: payload.origen || 'local'
+        // 🔥 FIX: Solo 'remote' si REALMENTE tenemos backendId
+        origen: payload.backendId ? 'hibrido' : 'local'
     };
 
     const idx = docs.findIndex(item => item.codigo === codigo);
@@ -786,11 +788,13 @@ function initFormHandler() {
 
                     if (result && result.success) {
                         savedOrigin = 'remote';
-                        // ✅ GUARDAR EL CÓDIGO DEL BACKEND
+                        // ✅ GUARDAR EL CÓDIGO DEL BACKEND (UUID o CAR-YYYY-...)
                         const backendCode = result.data?.code || result.data?.id;
                         payload.codigo = backendCode;           // "CAR-2024-1782320546390"
                         payload.id = backendCode;                // Usar el mismo para API calls
-                        payload.backendId = backendCode;         // Referencia original
+                        payload.backendId = backendCode;         // ← CLAVE: Guardar como backendId para delete
+                        
+                        console.log('✅ Ficha subida con backendId:', backendCode);
                         
                         showToast(`Ficha subida: ${backendCode}`, 'success', 3000);
                     }
@@ -807,9 +811,12 @@ function initFormHandler() {
                 showToast('Sin conexión a API. Se guardó localmente.', 'warning', 4000);
             } else {
                 // ✅ API exitosa: guardar localmente también con el código del servidor
-                payload.codigo = result.data?.code || payload.codigo;
-                payload.id = result.data?.id || result.data?.code;
-                persistCaracterizacionLocal(payload, 'remote');
+                    payload.codigo = result.data?.code || payload.codigo;
+                    payload.id = result.data?.id || result.data?.code;
+                    // 🔥 FIX: Mantener origen 'local' para que aparezca el botón Eliminar
+                    // El backendId se guarda separado para operaciones API
+                    payload.backendId = result.data?.id || result.data?.code || null;
+                    persistCaracterizacionLocal(payload, 'local');
             }
 
             showToast('Ficha de caracterización creada exitosamente', 'success');

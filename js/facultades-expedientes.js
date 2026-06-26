@@ -46,6 +46,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('filtro-tipo')?.addEventListener('change', filtrarExpedientes);
 });
 
+// ============================================
+// ANTI-BACK BUTTON: Prevenir volver con sesión cerrada
+// ============================================
+
+// Cuando el navegador restaura la página desde bfcache (botón Atrás)
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+        // La página viene del caché, verificar sesión
+        const hasToken = !!(
+            localStorage.getItem('token') ||
+            localStorage.getItem('unmsm_token') ||
+            localStorage.getItem('auth_token') ||
+            localStorage.getItem('accessToken')
+        );
+        
+        if (!hasToken) {
+            // Sin sesión = redirigir al login
+            window.location.replace('portal-inicio-facultades.html');
+        } else {
+            // Con sesión = recargar para estado fresco
+            window.location.reload();
+        }
+    }
+});
+
+// ============================================
+// PROTECCIÓN: Verificar sesión al cargar
+// ============================================
+
+(function checkSessionOnLoad() {
+    // Verificar si hay token de autenticación
+    const hasToken = !!(
+        localStorage.getItem('token') ||
+        localStorage.getItem('unmsm_token') ||
+        localStorage.getItem('auth_token') ||
+        localStorage.getItem('accessToken')
+    );
+    
+    // Si no hay token, redirigir al login inmediatamente
+    if (!hasToken) {
+        window.location.replace('portal-inicio-facultades.html');
+        return; // Detener ejecución del resto del script
+    }
+})();
+
 // ==========================================
 // TEMA
 // ==========================================
@@ -176,7 +221,7 @@ function initLogoutModal() {
                 Promise.resolve(API.auth.logout()).catch(() => {});
             }
 
-            window.location.href = 'portal-inicio.html';
+            window.location.replace('portal-inicio-facultades.html');
         }, 400);
     }
 

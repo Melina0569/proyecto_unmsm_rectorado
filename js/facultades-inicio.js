@@ -11,6 +11,68 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarNotificacionesDashboard();
 });
 
+// ============================================
+// ANTI-BACK BUTTON: Prevenir volver con sesión cerrada
+// ============================================
+
+// Cuando el navegador restaura la página desde bfcache (botón Atrás)
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+        // La página viene del caché, verificar sesión
+        const hasToken = !!(
+            localStorage.getItem('token') ||
+            localStorage.getItem('unmsm_token') ||
+            localStorage.getItem('auth_token') ||
+            localStorage.getItem('accessToken')
+        );
+        
+        if (!hasToken) {
+            // Sin sesión = redirigir al login
+            window.location.replace('portal-inicio-facultades.html');
+        } else {
+            // Con sesión = recargar para estado fresco
+            window.location.reload();
+        }
+    }
+});
+
+// Verificar sesión inmediatamente
+(function() {
+    const token = localStorage.getItem('token') || localStorage.getItem('unmsm_token');
+    if (!token) {
+        window.location.replace('portal-inicio-facultades.html');
+        return;
+    }
+})();
+
+window.addEventListener('pageshow', function(e) {
+    if (e.persisted) {
+        const token = localStorage.getItem('token') || localStorage.getItem('unmsm_token');
+        if (!token) window.location.replace('portal-inicio-facultades.html');
+    }
+});
+
+
+// ============================================
+// PROTECCIÓN: Verificar sesión al cargar
+// ============================================
+
+(function checkSessionOnLoad() {
+    // Verificar si hay token de autenticación
+    const hasToken = !!(
+        localStorage.getItem('token') ||
+        localStorage.getItem('unmsm_token') ||
+        localStorage.getItem('auth_token') ||
+        localStorage.getItem('accessToken')
+    );
+    
+    // Si no hay token, redirigir al login inmediatamente
+    if (!hasToken) {
+        window.location.replace('portal-inicio-facultades.html');
+        return; // Detener ejecución del resto del script
+    }
+})();
+
 // ==========================================
 // Función global para redirección
 // ==========================================
@@ -816,7 +878,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             localStorage.clear();
             sessionStorage.clear();
 
-            window.location.replace('index.html');
+            window.location.replace('portal-inicio-facultades.html');
         }, 400);
     }
 

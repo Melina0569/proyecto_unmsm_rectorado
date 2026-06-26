@@ -1916,13 +1916,38 @@ const RemoteAPI = {
 
             async delete(id) {
                 try {
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/documents/${id}`, {
+                    const token = localStorage.getItem('token') 
+                        || localStorage.getItem('unmsm_token') 
+                        || localStorage.getItem('accessToken');
+                    
+                    const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/documents/${encodeURIComponent(id)}`, {
                         method: 'DELETE',
-                        headers: RemoteAPI.getHeaders()
+                        headers: {
+                            'Accept': '*/*',
+                            'Authorization': token ? `Bearer ${token}` : ''
+                        }
                     });
-                    return { success: response.ok || response.status === 204, data: await response.json().catch(() => ({})) };
+                    
+                    // 204 No Content = éxito, no hay body que parsear
+                    if (response.status === 204 || response.ok) {
+                        return { success: true, status: response.status };
+                    }
+                    
+                    // Si hay error, intentar leer body
+                    let errorData = null;
+                    try {
+                        errorData = await response.json();
+                    } catch {
+                        errorData = { message: `HTTP ${response.status}` };
+                    }
+                    
+                    return { 
+                        success: false, 
+                        error: errorData?.message || `Error ${response.status}`,
+                        status: response.status 
+                    };
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    return { success: false, error: error.message, status: 0 };
                 }
             }
         },

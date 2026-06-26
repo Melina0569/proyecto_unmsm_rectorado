@@ -995,8 +995,12 @@ function saveIndicadorToLocalStorage(payload, savedOrigin) {
     `IND-${Date.now()}`
     );
 
+    // ← NUEVO: Usar backendId si existe, sino generar ID local
+    const idFinal = payload.backendId || payload.id || Date.now().toString();
+
     const documentoPendiente = {
-        id: payload.id || Date.now().toString(),
+        id: idFinal,  // ← MODIFICADO: Usar backendId si existe
+        backendId: payload.backendId || null,  // ← NUEVO: Guardar explícitamente
         fecha: now.toISOString().split('T')[0],
         hora: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
         createdAt: now.toISOString(),
@@ -1024,14 +1028,45 @@ function saveIndicadorToLocalStorage(payload, savedOrigin) {
 
     const detalleDocumentosRaw = localStorage.getItem(INDICADOR_STORAGE_KEYS.DOCUMENTOS_DETALLE);
     const detalleDocumentos = detalleDocumentosRaw ? JSON.parse(detalleDocumentosRaw) : {};
+    
     detalleDocumentos[codigo] = {
         tipo: 'indicador',
         codigo,
-        titulo: payload.nombreIndicador || `Indicador ${codigo}`,
-        version: payload.version || '',
+        titulo: payload.indicatorName || payload.nombreIndicador || `Indicador ${codigo}`,
+        version: payload.version || '1.0', 
         operacion: 'GESTION DE INDICADORES',
         fechaRegistro: now.toISOString(),
-        fichaData: payload,
+        // 🔥 GUARDAR AMBOS: payload del backend + datos originales del formulario
+        fichaData: {
+            // Datos del backend (mapeados)
+            macroProcess: payload.macroProcess,
+            process: payload.process,
+            responsibleUnit: payload.responsibleUnit,
+            processType: payload.processType,
+            processObjective: payload.processObjective,
+            indicatorName: payload.indicatorName,
+            frequency: payload.frequency,
+            variables: payload.variables,
+            dataSource: payload.dataSource,
+            formula: payload.formula,
+            target: payload.target,
+            unit: payload.unit,
+            // Datos originales del formulario (nombres en español)
+            tipoProceso: payload.tipoProceso || payload.processType,
+            tipoProcesoLabel: payload.tipoProcesoLabel || '',
+            macroProceso: payload.macroProceso || payload.macroProcess,
+            macroProcesoNombre: payload.macroProcesoNombre || payload.macroProcess || '',
+            unidadResponsable: payload.unidadResponsable || payload.responsibleUnit,
+            objetivoProceso: payload.objetivoProceso || payload.processObjective,
+            nombreIndicador: payload.nombreIndicador || payload.indicatorName,
+            frecuencia: payload.frecuencia || payload.frequency,
+            variables: payload.variables,
+            formulaDefinicion: payload.formulaDefinicion || payload.formula,
+            fuente: payload.fuente || payload.dataSource,
+            meta: payload.meta || payload.target,
+            version: payload.version || '1.0',
+            codigo: codigo
+        },
         indicadorData: payload,
         resumenCampos: [
             { label: 'Version', value: payload.version || '-' },
@@ -1132,8 +1167,8 @@ function initFormHandler() {
                 indicatorName: data.nombreIndicador || '',
                 frequency: (data.frecuencia || 'MENSUAL').toUpperCase(),
                 variables: data.variables || '',
-                dataSource: data.fuente || '',
-                formula: data.formulaDefinicion || '',
+                dataSource: data.fuente || '',           // ← Asegurar que no esté vacío
+                formula: data.formulaDefinicion || '',    // ← Asegurar que no esté vacío
                 target: Number(data.meta || 0),
                 unit: data.unidad || '%'
             };
@@ -1155,6 +1190,7 @@ function initFormHandler() {
             let result = null;
             let savedOrigin = 'local';
             let codigoFinal = codigoLocal;
+            let backendId = null;  // ← NUEVO: Para guardar UUID del servidor
 
             // ============================================================
             // 🔥 PASO 1: Intentar crear vía API
@@ -1168,7 +1204,14 @@ function initFormHandler() {
                     savedOrigin = 'remote';
                     // El backend devuelve código auto-generado
                     codigoFinal = result.data?.code || result.data?.codigo || codigoLocal;
+                    // ← NUEVO: Guardar UUID real del backend
+                    backendId = result.data?.id || result.data?.uuid || null;
                     showToast(`Ficha creada en servidor: ${codigoFinal}`, 'success');
+                    
+                    // ← NUEVO: Si el backend devolvió UUID, actualizarlo en el payload para localStorage
+                    if (backendId) {
+                        console.log('✅ Backend UUID recibido:', backendId);
+                    }
                 } else {
                     console.warn('⚠️ API respondió error:', result?.status, result?.error);
                 }
@@ -1180,12 +1223,28 @@ function initFormHandler() {
             // PASO 2: Si falló API, guardar local
             // ============================================================
             if (!result || !result.success) {
-                saveIndicadorToLocalStorage({ ...payload, ...extrasParaLocal }, savedOrigin);
+                saveIndicadorToLocalStorage({ ...payload, ...extrasParaLocal, backendId }, 'local');
                 result = { success: true, data: { id: codigoLocal, code: codigoLocal } };
                 showToast('Sin conexión a API. Guardado localmente.', 'warning', 4000);
             } else {
-                // Guardar también local como backup/cache
-                saveIndicadorToLocalStorage({ ...payload, ...extrasParaLocal, codigo: codigoFinal }, savedOrigin);
+                // ← NUEVO: Guardar también local como backup/cache, incluyendo backendId
+                // Si es éxito del backend, guardar también local como backup
+                saveIndicadorToLocalStorage({ 
+                    ...payload, 
+                    ...extrasParaLocal, 
+                    backendId, 
+                    codigo: codigoFinal,
+                    // 🔥 Incluir también los datos originales del formulario para el detalle
+                    version: data.version,
+                    unidadResponsable: data.unidadResponsable,
+                    objetivoProceso: data.objetivoProceso,
+                    nombreIndicador: data.nombreIndicador,
+                    frecuencia: data.frecuencia,
+                    variables: data.variables,
+                    formulaDefinicion: data.formulaDefinicion,
+                    fuente: data.fuente,
+                    meta: data.meta
+                }, savedOrigin);
             }
 
             showToast(`Ficha ${codigoFinal} creada exitosamente`, 'success');

@@ -37,6 +37,74 @@ const STORAGE_KEYS = {
     CORRECCIONES_LISTA: 'sigpro_correcciones_solicitudes'
 };
 
+// ============================================
+// ANTI-BACK BUTTON: Prevenir volver con sesión cerrada
+// ============================================
+
+// Cuando el navegador restaura la página desde bfcache (botón Atrás)
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+        // La página viene del caché, verificar sesión
+        const hasToken = !!(
+            localStorage.getItem('token') ||
+            localStorage.getItem('unmsm_token') ||
+            localStorage.getItem('auth_token') ||
+            localStorage.getItem('accessToken')
+        );
+        
+        if (!hasToken) {
+            // Sin sesión = redirigir al login
+            window.location.replace('portal-inicio-facultades.html');
+        } else {
+            // Con sesión = recargar para estado fresco
+            window.location.reload();
+        }
+    }
+});
+
+// ============================================
+// PROTECCIÓN: Verificar sesión al cargar
+// ============================================
+
+(function checkSessionOnLoad() {
+    // Verificar si hay token de autenticación
+    const hasToken = !!(
+        localStorage.getItem('token') ||
+        localStorage.getItem('unmsm_token') ||
+        localStorage.getItem('auth_token') ||
+        localStorage.getItem('accessToken')
+    );
+    
+    // Si no hay token, redirigir al login inmediatamente
+    if (!hasToken) {
+        window.location.replace('portal-inicio-facultades.html');
+        return; // Detener ejecución del resto del script
+    }
+})();
+
+
+// ==========================================
+// UTILIDADES GLOBALES
+// ==========================================
+
+/**
+ * Valida si un string es un ID válido del backend
+ * Acepta UUIDs estándar o códigos generados por el backend (CAR-, FLU-, IND-, etc.)
+ */
+function isBackendId(str) {
+    if (!str || typeof str !== 'string') return false;
+    // UUID estándar
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)) return true;
+    // Código de caracterización: CAR-YYYY-XXXXXXXXXX
+    if (/^CAR-\d{4}-\d+$/i.test(str)) return true;
+    // Código de flujograma: FLU-XXXX-YYYY-NNN
+    if (/^FLU-[A-Z]+-\d{4}-\d+$/i.test(str)) return true;
+    // Otros códigos del backend
+    if (/^(IND|REP|DOC|FLU|CAR)-[A-Z0-9-]+$/i.test(str)) return true;
+    return false;
+}
+
+
 // ==========================================
 // INDEXEDDB PARA ADJUNTOS GRANDES (compartido con racio-expedientes)
 // ==========================================
@@ -308,8 +376,6 @@ function guardarAdjunto(detalle) {
             `;
         }
     }
-    
-    return resumen;
 }
 
 function applyQueryDocId() {
@@ -472,7 +538,7 @@ async function loadDashboardData() {
         
         const token = localStorage.getItem('token');
         if (!token) {
-            window.location.href = 'index.html';
+            window.location.replace('portal-inicio-facultades.html');
             return;
         }
 
@@ -513,8 +579,12 @@ async function loadDashboardData() {
             const status = doc._status || doc.status || doc.estado || 'PENDING';
             const createdAt = doc.createdAt || doc.fechaCreacion || doc.fecha;
             
+            // ✅ PRESERVAR UUID del backend
+            const backendId = doc.id || doc._id || doc.uuid || null;
+            
             return {
-                id: doc.id || doc._id || `api-${idx}`,
+                id: backendId || `api-${idx}`,  // ← UUID real del backend
+                backendId: backendId,  // ← Guardar explícitamente
                 fecha: createdAt ? createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
                 hora: createdAt 
                     ? new Date(createdAt).toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'}) + ' H'
@@ -526,7 +596,7 @@ async function loadDashboardData() {
                 progreso: doc.progreso || calculateProgress(status),
                 facultadId: doc.faculty?.id || doc.facultyId || doc.facultadId || 1,
                 tipo: (doc.type || doc.tipo || 'DOCUMENT').toLowerCase(),
-                origen: 'api'
+                origen: backendId ? 'api' : 'local'  // ← 'api' si tiene ID del backend (UUID o CAR-...)
             };
         });
 
@@ -542,8 +612,17 @@ async function loadDashboardData() {
             if (!existente) {
                 porCodigo.set(local.codigo, local);
             } else {
-                // Si el local tiene apiSync=false o es más reciente, preferir local
-                porCodigo.set(local.codigo, { ...existente, ...local, origen: 'hibrido' });
+                // Merge: priorizar datos locales pero preservar backendId del API
+                const merged = { 
+                    ...existente, 
+                    ...local, 
+                    // 🔥 FIX: Preservar backendId del API (UUID o código CAR/FLU/IND)
+                    backendId: local.backendId || existente.backendId || null,
+                    // Preservar id del API si es válido, sino usar el del local
+                    id: (isBackendId(existente.id) ? existente.id : local.id) || local.id || existente.id,
+                    origen: (local.backendId || existente.backendId) ? 'hibrido' : 'local'
+                };
+                porCodigo.set(local.codigo, merged);
             }
         });
 
@@ -920,7 +999,7 @@ function renderTable() {
                         <span class="material-symbols-outlined text-sm">visibility</span>
                         REVISAR
                     </button>
-                    ${doc.origen === 'local' ? `
+                    ${doc.estado === 'pendiente' ? `
                         <button class="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-[11px] font-bold uppercase bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all"
                                 onclick="deleteDocument('${doc.id}')"
                                 title="Eliminar documento">
@@ -1180,99 +1259,137 @@ window.viewDocument = viewDocument;
 
 window.deleteDocument = async function(docId) {
     const doc = allDocuments.find(d => d.id === docId);
-    if (!doc) return;
+    if (!doc) {
+        showToast('Documento no encontrado', 'error');
+        return;
+    }
 
-    if (!confirm(`¿Desea eliminar el documento ${doc.codigo}?`)) return;
+    // Solo PENDING puede eliminarse
+    const estadoNormalizado = normalizeEstadoKey(doc.estado);
+    if (estadoNormalizado !== 'pendiente') {
+        showToast(
+            `No se puede eliminar: el documento está "${formatEstado(doc.estado)}". Solo PENDIENTES pueden eliminarse.`,
+            'warning', 4000
+        );
+        return;
+    }
+
+    if (!confirm(`¿Desea eliminar el documento ${doc.codigo}?\n\nEsta acción no se puede deshacer.`)) return;
 
     try {
-        const token = localStorage.getItem('token');
+        // 🔥 FIX: Validar IDs del backend (UUID o códigos CAR/FLU/IND/etc.)
+        const isBackendId = (str) => {
+            if (!str || typeof str !== 'string') return false;
+            // UUID estándar
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)) return true;
+            // Código de caracterización: CAR-YYYY-XXXXXXXXXX
+            if (/^CAR-\d{4}-\d+$/i.test(str)) return true;
+            // Código de flujograma: FLU-XXXX-YYYY-NNN
+            if (/^FLU-[A-Z]+-\d{4}-\d+$/i.test(str)) return true;
+            // Otros códigos del backend
+            if (/^(IND|REP|DOC|FLU|CAR)-[A-Z0-9-]+$/i.test(str)) return true;
+            return false;
+        };
+        
+        const tieneBackendIdReal = isBackendId(doc.backendId);
+        const tieneIdReal = isBackendId(doc.id);
+        
+        // Solo llamar al backend si TENEMOS un UUID válido (backendId o id)
+        let idParaApi = null;
+        if (tieneBackendIdReal) {
+            idParaApi = doc.backendId;
+        } else if (tieneIdReal) {
+            idParaApi = doc.id;
+        }
+        
+        const debeLlamarApi = !!idParaApi;
 
-        // 🔥 FIX: Usar API.js para eliminar del backend
-        if (doc.origen === 'api' && !String(doc.id).startsWith('local-')) {
-            const deleteResult = await API.portal.documents.delete(docId);
+        console.log(`🗑️ Eliminar: codigo=${doc.codigo}, backendId=${doc.backendId}, id=${doc.id}, idParaApi=${idParaApi}, llamarApi=${debeLlamarApi}`);
 
+        if (debeLlamarApi) {
+            showToast('Eliminando documento...', 'info');
+            
+            const deleteResult = await API.portal.documents.delete(idParaApi);
+            console.log('📥 Respuesta delete:', deleteResult);
+            
+            // 204 = éxito, 404 = ya no existe, ambos OK
             if (!deleteResult.success && deleteResult.status !== 404) {
                 throw new Error(deleteResult.error || `Error ${deleteResult.status}`);
             }
-        }
-
-        // ✅ Solo eliminar del frontend si el backend respondió OK (o es local)
-        allDocuments = allDocuments.filter(d => d.id !== docId);
-        filteredDocuments = filteredDocuments.filter(d => d.id !== docId);
-
-        // Limpiar referencias del documento eliminado para liberar correlativos.
-        const reportesRaw = localStorage.getItem('sigpro_reportes');
-        if (reportesRaw) {
-            try {
-                const reportes = JSON.parse(reportesRaw);
-                if (Array.isArray(reportes)) {
-                    const reportesFiltrados = reportes.filter((item) => item?.codigo !== doc.codigo);
-                    localStorage.setItem('sigpro_reportes', JSON.stringify(reportesFiltrados));
-                }
-            } catch (error) {
-                console.error('Error limpiando sigpro_reportes:', error);
+            
+            if (deleteResult.status === 404) {
+                console.warn(`⚠️ Backend 404, documento ya no existe: ${idParaApi}`);
             }
+        } else {
+            console.log(`📄 Documento sin UUID válido, eliminando solo local: ${doc.codigo}`);
         }
 
-        const detalleRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
-        if (detalleRaw) {
-            try {
-                const detalle = JSON.parse(detalleRaw);
-                if (detalle && typeof detalle === 'object' && detalle[doc.codigo]) {
-                    delete detalle[doc.codigo];
-                    localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
-                }
-            } catch (error) {
-                console.error('Error limpiando sigpro_documentos_detalle:', error);
-            }
-        }
-
-        const detalleIndicadoresRaw = localStorage.getItem(STORAGE_KEYS.INDICADORES_DETALLE);
-        if (detalleIndicadoresRaw) {
-            try {
-                const detalleIndicadores = JSON.parse(detalleIndicadoresRaw);
-                if (detalleIndicadores && typeof detalleIndicadores === 'object' && detalleIndicadores[doc.codigo]) {
-                    delete detalleIndicadores[doc.codigo];
-                    localStorage.setItem(STORAGE_KEYS.INDICADORES_DETALLE, JSON.stringify(detalleIndicadores));
-                }
-            } catch (error) {
-                console.error('Error limpiando sigpro_indicadores_detalle:', error);
-            }
-        }
-
-        const documentosRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
-        if (documentosRaw) {
-            try {
-                const documentos = JSON.parse(documentosRaw);
-                if (Array.isArray(documentos)) {
-                    const documentosFiltrados = documentos.filter((item) => item?.codigo !== doc.codigo);
-                    localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(documentosFiltrados));
-                }
-            } catch (error) {
-                console.error('Error limpiando sigpro_documentos_lista:', error);
-            }
-        }
-
-        if (doc.tipo === 'indicador') {
-            const historialKey = `sigpro_historial_datos_${doc.codigo}`;
-            localStorage.removeItem(historialKey);
-        }
-
-        persistLocalDocuments();
-        updateStatsFromCurrentDocuments();
-
-        const maxPages = Math.max(1, Math.ceil(filteredDocuments.length / 10));
-        if (currentPage > maxPages) {
-            currentPage = maxPages;
-        }
-
-        renderTable();
+        // Limpiar del frontend
+        eliminarDelFrontend(doc);
         showToast('Documento eliminado correctamente', 'success');
 
     } catch (error) {
-        console.error('Error eliminando documento:', error);
+        console.error('❌ Error:', error);
         showToast(`Error al eliminar: ${error.message}`, 'error');
     }
+};
+
+// Función auxiliar para limpiar del frontend
+function eliminarDelFrontend(doc) {
+    const docId = doc.id;
+    const codigo = doc.codigo;
+
+    // Remover de arrays en memoria
+    allDocuments = allDocuments.filter(d => d.id !== docId);
+    filteredDocuments = filteredDocuments.filter(d => d.id !== docId);
+
+    // Limpiar localStorage
+    const keysToClean = [
+        { key: 'sigpro_reportes', filterBy: 'codigo' },
+        { key: STORAGE_KEYS.DOCUMENTOS_DETALLE, isObject: true, objectKey: codigo },
+        { key: STORAGE_KEYS.INDICADORES_DETALLE, isObject: true, objectKey: codigo },
+        { key: STORAGE_KEYS.DOCUMENTOS_LISTA, filterBy: 'codigo' }
+    ];
+
+    keysToClean.forEach(({ key, filterBy, isObject, objectKey }) => {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return;
+            
+            if (isObject) {
+                const data = JSON.parse(raw);
+                if (data && typeof data === 'object' && data[objectKey]) {
+                    delete data[objectKey];
+                    localStorage.setItem(key, JSON.stringify(data));
+                }
+            } else {
+                const list = JSON.parse(raw);
+                if (Array.isArray(list)) {
+                    const filtered = list.filter(item => item?.[filterBy] !== codigo);
+                    localStorage.setItem(key, JSON.stringify(filtered));
+                }
+            }
+        } catch (e) {
+            console.error(`Error limpiando ${key}:`, e);
+        }
+    });
+
+    // Limpiar historial si es indicador
+    if (doc.tipo === 'indicador') {
+        localStorage.removeItem(`sigpro_historial_datos_${codigo}`);
+    }
+
+    // Persistir documentos locales restantes
+    persistLocalDocuments();
+    updateStatsFromCurrentDocuments();
+
+    // Ajustar paginación
+    const maxPages = Math.max(1, Math.ceil(filteredDocuments.length / 10));
+    if (currentPage > maxPages) {
+        currentPage = maxPages;
+    }
+
+    renderTable();
 };
 
 function loadLocalDocuments() {
@@ -1284,11 +1401,12 @@ function loadLocalDocuments() {
         if (!Array.isArray(list)) return [];
 
         return list.map((doc, index) => {
-            const estado = normalizeEstadoKey(doc.estado || 'pendiente'); // ← usa normalizeEstadoKey
+            const estado = normalizeEstadoKey(doc.estado || 'pendiente');
             const progreso = typeof doc.progreso === 'number' ? doc.progreso : getDefaultProgressByEstado(estado);
 
             return {
-                id: doc.id || `local-${doc.codigo || index}`,
+                id: doc.backendId || doc.apiId || doc.id || `local-${doc.codigo || index}`,
+                backendId: doc.backendId || doc.apiId || null,
                 fecha: doc.fecha || new Date().toISOString().split('T')[0],
                 hora: doc.hora || '00:00 H',
                 codigo: doc.codigo || `DOC-${index}`,
@@ -1298,7 +1416,7 @@ function loadLocalDocuments() {
                 progreso,
                 facultadId: doc.facultadId || 1,
                 tipo: doc.tipo || 'documento',
-                origen: 'local'
+                origen: doc.origen || 'local'
             };
         });
     } catch (error) {
@@ -1465,21 +1583,76 @@ window.viewDocument = async function(docId) {
         return;
     }
 
+    let detalleBackend = null;
+
     try {
-        // ✅ INTENTAR PRIMERO CON EL CÓDIGO (que es lo que conoce el backend)
-        const searchId = doc.codigo || doc.id;
+        // ✅ NUEVO: Lógica mejorada para seleccionar el ID correcto
+        // Prioridad: 1) backendId (UUID real), 2) id si es UUID, 3) código
         
-        const result = await API.portal.documents.getById(searchId);
+        const isBackendId = (str) => {
+            if (!str || typeof str !== 'string') return false;
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)) return true;
+            if (/^CAR-\d{4}-\d+$/i.test(str)) return true;
+            if (/^FLU-[A-Z]+-\d{4}-\d+$/i.test(str)) return true;
+            if (/^(IND|REP|DOC|FLU|CAR)-[A-Z0-9-]+$/i.test(str)) return true;
+            return false;
+        };
         
-        if (!result.success) {
-            // Si falla con código, intentar con ID
-            const resultById = await API.portal.documents.getById(doc.id);
-            if (resultById.success) {
-                // Usar resultado alternativo
+        let searchId = doc.backendId; // ← NUEVO: Intentar primero con backendId
+        let idType = 'backendId';
+        
+        if (!searchId) {
+            searchId = doc.id;
+            idType = 'id';
+        }
+        
+        // Si el ID no parece UUID, usar código como fallback
+        if (!isBackendId(searchId)) {
+            console.log(`⚠️ ${idType} ${searchId} no es UUID, probando alternativas...`);
+            // Intentar con código si existe
+            if (doc.codigo) {
+                searchId = doc.codigo;
+                idType = 'codigo';
             }
         }
 
+        console.log(`🔍 getById: usando ${idType}=${searchId} (backendId=${doc.backendId}, id=${doc.id}, codigo=${doc.codigo})`);
+
+        let result = await API.portal.documents.getById(searchId);
+
+        // Si falla y tenemos backendId diferente, intentar
+        if (!result.success && doc.backendId && doc.backendId !== searchId) {
+            console.log(`⚠️ Falló con ${searchId}, probando backendId: ${doc.backendId}`);
+            result = await API.portal.documents.getById(doc.backendId);
+        }
+        
+        // Si aún falla y tenemos código diferente, intentar
+        if (!result.success && doc.codigo && doc.codigo !== searchId) {
+            console.log(`⚠️ Falló, probando código: ${doc.codigo}`);
+            result = await API.portal.documents.getById(doc.codigo);
+        }
+
+        if (!result.success || !result.data) {
+            console.warn('Backend no disponible, usando localStorage');
+            throw new Error('Backend no devolvió datos');
+        }
+
+        // 🔥 EL BACKEND SOLO DEVUELVE id, code, status — NO los campos de la ficha
+        // Por eso, SIEMPRE mezclamos con datos de localStorage si existen
+        const localDetail = getLocalDocumentDetail(doc.codigo, doc);
+        if (localDetail && localDetail.resumenCampos && localDetail.resumenCampos.length > 0) {
+            console.log('✅ Mezclando con datos locales de la ficha');
+            // El backend dio metadata básica, pero los campos vienen de localStorage
+        }
+        
+        detalleBackend = result.data;
+        console.log('✅ Datos del backend recibidos');
+
         // Transformar respuesta del backend al formato interno
+
+        const localFallback = getLocalDocumentDetail(doc.codigo, doc) || {};
+        const localResumen = localFallback.resumenCampos || [];
+
         const detalle = {
             tipo: detalleBackend.type || detalleBackend.tipo || 'documento',
             codigo: detalleBackend.code || detalleBackend.codigo || doc.codigo,
@@ -1510,7 +1683,7 @@ window.viewDocument = async function(docId) {
                 fecha: adj.fecha || formatDate(doc.fecha),
                 activo: adj.activo !== false,
                 icono: adj.icono || (adj.tipo === 'PDF' ? 'picture_as_pdf' : 'description'),
-                contenido: adj.url || adj.contenido || adj.path || ''  // URL del backend
+                contenido: adj.url || adj.contenido || adj.path || ''
             }))
         };
 
@@ -1571,17 +1744,17 @@ function getLocalDocumentDetail(codigo, doc) {
         if ((!resumen || resumen.length === 0) && normalizar(tipo) === 'indicador' && item?.fichaData) {
             const ficha = item.fichaData;
             resumen = [
-                { label: 'Tipo de Proceso', value: ficha.tipoProcesoLabel || ficha.tipoProceso || '-' },
-                { label: 'Macro Proceso', value: ficha.macroProcesoNombre || ficha.macroProceso || '-' },
-                { label: 'Proceso', value: ficha.macroProcesoNombre || ficha.macroProceso || '-' },
-                { label: 'Oficina o Unidad Responsable', value: ficha.unidadResponsable || '-' },
-                { label: 'Objetivo del Proceso', value: ficha.objetivoProceso || '-' },
-                { label: 'Nombre del Indicador', value: ficha.nombreIndicador || '-' },
-                { label: 'Frecuencia', value: ficha.frecuencia || '-' },
+                { label: 'Tipo de Proceso', value: ficha.tipoProcesoLabel || ficha.tipoProceso || ficha.processType || '-' },
+                { label: 'Macro Proceso', value: ficha.macroProcesoNombre || ficha.macroProceso || ficha.macroProcess || '-' },
+                { label: 'Proceso', value: ficha.macroProcesoNombre || ficha.proceso || ficha.process || '-' },
+                { label: 'Oficina o Unidad Responsable', value: ficha.unidadResponsable || ficha.responsibleUnit || '-' },
+                { label: 'Objetivo del Proceso', value: ficha.objetivoProceso || ficha.processObjective || '-' },
+                { label: 'Nombre del Indicador', value: ficha.nombreIndicador || ficha.indicatorName || '-' },
+                { label: 'Frecuencia', value: ficha.frecuencia || ficha.frequency || '-' },
                 { label: 'Variables', value: ficha.variables || '-' },
-                { label: 'Formula del Indicador', value: ficha.formulaDefinicion || '-' },
-                { label: 'Fuente', value: ficha.fuente || '-' },
-                { label: 'Meta', value: ficha.meta || '-' }
+                { label: 'Formula del Indicador', value: ficha.formulaDefinicion || ficha.formula || '-' },
+                { label: 'Fuente', value: ficha.fuente || ficha.dataSource || '-' },
+                { label: 'Meta', value: ficha.meta || ficha.target || '-' }
             ];
         }
 
@@ -1846,17 +2019,17 @@ function showDetailView(detalle) {
         if (campos.length > 0) {
             const tipoDetalle = normalizar(detalle.tipo || detalle.asunto || '');
             const valor = (patterns, fallback = '-') => {
-                const item = campos.find(c => {
-                    const label = normalizar(c.label || '');
-                    return patterns.some(p => {
-                        // Si el patrón es regex, testear
-                        if (p instanceof RegExp) return p.test(label);
-                        // Si es string, buscar inclusión parcial
-                        return label.includes(p);
-                    });
-                });
-                return item?.value || fallback;
-            };
+    const item = campos.find(c => {
+        const label = normalizar(c.label || '');
+        return patterns.some(p => {
+            if (p instanceof RegExp) return p.test(label);
+            return label.includes(p);
+        });
+    });
+    return item?.value || fallback;
+
+    
+};
 
             // Para documentos distintos de indicador, mostrar solo los campos realmente llenados.
             if (!/indicador/.test(tipoDetalle)) {
@@ -1927,8 +2100,10 @@ function showDetailView(detalle) {
             })();
 
             const nombreIndicadorValor = detalle.nombreIndicador
-            || valor([/nombre.*indicador/i, 'nombre indicador', 'indicador'], '-')
+            || detalle.indicatorName
+            || valor([/nombre.*indicador/i, 'nombre indicador', 'indicador'], null)
             || detalle.descripcion
+            || (detalle.resumenCampos?.find(c => /nombre.*indicador/i.test(normalizar(c.label)))?.value)
             || '-';
 
             const infoBox = (label, value, extraClass = '') => `
@@ -2186,6 +2361,7 @@ function showDetailView(detalle) {
     }
     
     window.scrollTo(0, 0);
+    
     showToast('Documento cargado correctamente', 'success');
 }
 
@@ -2575,6 +2751,9 @@ window.descargarPdfPreview = function() {
 
 // Función global para volver al dashboard
 window.showDashboard = function() {
+    // Reemplazar estado para que "Atrás" salga de la app, no vuelva al detalle
+    history.replaceState({ view: 'dashboard' }, '', window.location.href);
+    
     document.getElementById('detail-view').classList.add('hidden');
     document.getElementById('dashboard-view').classList.remove('hidden');
     window.scrollTo(0, 0);
@@ -2826,19 +3005,37 @@ async function cargarRectificaciones(expedienteId, estadoExpediente) {
     try {
         const token = localStorage.getItem('token');
         
-        // 🔥 CAMBIO: Backend PRIMERO
-        const response = await fetch(`/api/v1/documents/${expedienteId}/rectifications`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        // ✅ NUEVO: Buscar el documento y obtener el mejor ID para API
+        const docObj = allDocuments.find(d => d.codigo === expedienteId || d.id === expedienteId);
         
-        // 🔥 FIX: Usar API.js en lugar de fetch directo
-        let rectificaciones = [];
+        // ← NUEVO: Determinar el ID correcto para la API
+        const isBackendId = (str) => {
+            if (!str || typeof str !== 'string') return false;
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)) return true;
+            if (/^CAR-\d{4}-\d+$/i.test(str)) return true;
+            if (/^FLU-[A-Z]+-\d{4}-\d+$/i.test(str)) return true;
+            if (/^(IND|REP|DOC|FLU|CAR)-[A-Z0-9-]+$/i.test(str)) return true;
+            return false;
+        };
         
-        // Intentar obtener rectificaciones desde el backend via API.js
-        const rectResult = await API.portal.documents.getHistory(expedienteId);
+        let idReal = docObj?.backendId; // ← PRIORIDAD 1: backendId (UUID real)
+        let idSource = 'backendId';
+        
+        if (!idReal) {
+            idReal = docObj?.id;
+            idSource = 'id';
+        }
+        
+        // Si no es UUID válido, usar código como fallback
+        if (!isBackendId(idReal)) {
+            console.warn(`⚠️ ${idSource}=${idReal} no es UUID, usando código como fallback`);
+            idReal = docObj?.codigo || expedienteId;
+            idSource = 'codigo';
+        }
+        
+        console.log(`📋 getHistory: ID=${idReal} (source=${idSource}, backendId=${docObj?.backendId}, id=${docObj?.id}, código=${expedienteId})`);
+
+        const rectResult = await API.portal.documents.getHistory(idReal);
         
         if (rectResult.success && rectResult.data) {
             const data = rectResult.data;
@@ -3619,7 +3816,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             sessionStorage.clear();
             
             // 🔥 CAMBIO 3: Redirigir a index.html
-            window.location.href = 'index.html';
+            window.location.replace('index.html');
             
         }, 400);
     }
@@ -3653,7 +3850,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         });
     }
-
     //=========PDF DETALLE=========//
     const btnDescargarPdf = document.getElementById('btn-descargar-pdf');
     if (btnDescargarPdf) {
@@ -3662,23 +3858,25 @@ document.addEventListener('DOMContentLoaded', async function() {
         const icono = document.getElementById('icon-pdf');
         const texto = document.getElementById('texto-pdf');
     
-    // Estado de carga
-    btn.disabled = true;
-    icono.textContent = 'hourglass_top';
-    texto.textContent = 'Generando...';
+        // Estado de carga
+        btn.disabled = true;
+        icono.textContent = 'hourglass_top';
+        texto.textContent = 'Generando...';
     
-    try {
-        // 🔥 FIX: Usar API.js o generar PDF localmente
-        // Nota: Adaptar según endpoint real disponible en backend
-        let pdfSuccess = false;
+        try {
+            // ✅ FIX: Usar window.currentDetalle que se guarda en showDetailView()
+            const currentDetalle = window.currentDetalle || {};
+            const docId = currentDetalle.codigo || currentDetalle.id || 'unknown';
+            
+            let pdfSuccess = false;
             try {
-                const pdfResult = await API.public.indicators.export(detalle.id);
+                const pdfResult = await API.public.indicators.export(docId);
                 if (pdfResult.success && pdfResult.data) {
                     const blob = pdfResult.data;
                     const url = window.URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
-                    link.download = `reporte-${detalle.id}.pdf`;
+                    link.download = `reporte-${docId}.pdf`;
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
@@ -3693,30 +3891,15 @@ document.addEventListener('DOMContentLoaded', async function() {
                 throw new Error('Generación de PDF no disponible en este momento');
             }
         
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        
-        // Crear enlace temporal
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `reporte-${detalle.id}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        
-        // Limpieza
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-        
-    } catch (error) {
-        console.error('Error:', error);
-        alert('No se pudo generar el PDF. Intente nuevamente.');
-        
-    } finally {
-        // Restaurar botón
-        btn.disabled = false;
-        icono.textContent = 'picture_as_pdf';
-        texto.textContent = 'Descargar PDF';
-    }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('No se pudo generar el PDF. Intente nuevamente.');
+        } finally {
+            // Restaurar botón
+            btn.disabled = false;
+            icono.textContent = 'picture_as_pdf';
+            texto.textContent = 'Descargar PDF';
+        }
         });
     }
 

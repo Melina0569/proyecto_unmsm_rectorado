@@ -847,9 +847,10 @@ function initFormHandler() {
                 showToast('Sin conexión a API. Se guardó localmente en este equipo.', 'warning', 4000);
             } else {
                 // ✅ ÉXITO: La API devolvió { id, code }
+                payload.backendId = result.data?.id || null;
                 payload.id = result.data?.id || payload.id;
                 payload.codigo = result.data?.code || payload.codigo;
-                payload.origen = 'api';
+                payload.origen = result.success ? 'hibrido' : 'local';
                 
                 guardarFlujogramaLocal(payload);
                 showToast(`Flujograma ${result.data?.code || payload.codigo} subido a la API correctamente`, 'success', 3000);
