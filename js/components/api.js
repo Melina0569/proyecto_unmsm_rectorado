@@ -1953,6 +1953,7 @@ const RemoteAPI = {
         },
 
         // ========== PORTAL - INDICADORES ==========
+        // En api.js → RemoteAPI.portal.indicators
         indicators: {
             async getTracking(id, year) {
                 const params = new URLSearchParams({ year }).toString();
@@ -1960,54 +1961,25 @@ const RemoteAPI = {
                     const response = await fetch(
                         `${CONFIG.REMOTE_BASE}/portal/indicators/${id}/tracking?${params}`,
                         {
-                            headers: RemoteAPI.getHeaders()
+                            headers: RemoteAPI.getHeaders()  // ← Token automático
                         }
                     );
-                    return { success: response.ok, data: await response.json() };
-                } catch (error) {
-                    return { success: false, error: error.message };
-                }
-            },
-
-            async create(indicatorData) {
-                try {
-                    // 🔥 FIX: Mapear campos del formulario al schema exacto del backend
-                    const payload = {
-                        macroProcess: indicatorData.macroProcess || indicatorData.macroProceso || indicatorData.macro_proceso || '',
-                        process: indicatorData.process || indicatorData.proceso || '',
-                        responsibleUnit: indicatorData.responsibleUnit || indicatorData.unidadResponsable || indicatorData.responsible_unit || '',
-                        processType: (indicatorData.processType || indicatorData.tipoProceso || 'ESTRATEGICO').toUpperCase(),
-                        processObjective: indicatorData.processObjective || indicatorData.objetivoProceso || '',
-                        indicatorName: indicatorData.indicatorName || indicatorData.nombreIndicador || '',
-                        frequency: (indicatorData.frequency || indicatorData.frecuencia || 'MENSUAL').toUpperCase(),
-                        variables: indicatorData.variables || '',
-                        dataSource: indicatorData.dataSource || indicatorData.fuente || '',
-                        formula: indicatorData.formula || indicatorData.formulaDefinicion || '',
-                        target: Number(indicatorData.target || indicatorData.meta || 0),
-                        unit: indicatorData.unit || indicatorData.unidad || '%'
-                    };
-
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/indicators`, {
-                        method: 'POST',
-                        headers: RemoteAPI.getHeaders(),
-                        body: JSON.stringify(payload)
-                    });
-
-                    let data = null;
-                    try {
-                        data = await response.json();
-                    } catch (e) {
-                        data = { message: 'Respuesta no JSON' };
+                    
+                    if (!response.ok) {
+                        const text = await response.text();
+                        return { 
+                            success: false, 
+                            error: `HTTP ${response.status}: ${text.substring(0, 100)}`,
+                            status: response.status,
+                            data: []
+                        };
                     }
-
-                    return { 
-                        success: response.ok, 
-                        data: data,
-                        status: response.status,
-                        statusText: response.statusText
-                    };
+                    
+                    const data = await response.json();
+                    return { success: true, data, status: response.status };
+                    
                 } catch (error) {
-                    return { success: false, error: error.message, status: 0 };
+                    return { success: false, error: error.message, status: 0, data: [] };
                 }
             },
 
@@ -2018,7 +1990,7 @@ const RemoteAPI = {
                         headers: RemoteAPI.getHeaders(),
                         body: JSON.stringify(trackingData)
                     });
-                    return { success: response.ok, data: await response.json() };
+                    return { success: response.ok, data: await response.json().catch(() => ({})) };
                 } catch (error) {
                     return { success: false, error: error.message };
                 }

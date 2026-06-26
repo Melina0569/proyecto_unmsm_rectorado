@@ -266,21 +266,26 @@ function cargarExpedienteDesdeStorage() {
 function cargarExpediente(codigo) {
     if (codigo) {
         expedienteActual = obtenerIndicadorGuardadoPorCodigo(codigo);
+        
+        // ============================================================
+        // 🔥 NUEVO: Extraer el ID real del indicador para la API
+        // ============================================================
         if (expedienteActual) {
+            // El ID puede estar en diferentes campos según venga de la API o localStorage
+            indicadorId = expedienteActual.id 
+                || expedienteActual.indicatorId 
+                || expedienteActual.indicadorId 
+                || expedienteActual.uuid
+                || codigo; // Fallback al código si no hay ID
+            
+            console.log('🆔 Indicador ID para API:', indicadorId);
+            
             mostrarInfoTecnica(expedienteActual);
             cargarDatosSeguimiento();
             return;
         }
 
         mostrarExpedienteVacio(codigo);
-        return;
-    }
-
-    expedienteActual = obtenerPrimerIndicadorGuardado();
-
-    if (expedienteActual) {
-        mostrarInfoTecnica(expedienteActual);
-        cargarDatosSeguimiento();
         return;
     }
 
@@ -446,7 +451,50 @@ async function cargarDatosSeguimiento() {
     const guardado = localStorage.getItem(key);
     const historialLocal = normalizarHistorialSinSuperposicion(parsearHistorialLocal(guardado));
 
-    // Si el expediente viene del storage local, priorizar historial local para evitar superposición con API.
+    // ============================================================
+    // 🔥 NUEVO: Intentar cargar desde API REAL primero
+    // ============================================================
+    try {
+        // El indicadorId puede ser el código si es un UUID, o necesitamos buscarlo
+        const indicatorId = indicadorId || codigo;
+        
+        console.log('🔍 Cargando seguimiento desde API para indicador:', indicatorId);
+        
+        const response = await API.portal.indicators.getTracking(indicatorId, 2026);
+        
+        if (response.success && Array.isArray(response.data)) {
+            console.log('✅ Seguimiento cargado desde API:', response.data.length, 'registros');
+            
+            // Mapear datos del backend al formato que usa tu frontend
+            datosSeguimiento = response.data.map(item => ({
+                fecha: item.period || item.periodo || item.fecha || item.month || '',
+                devengado: Number(item.devengado || item.executed || 0),
+                pim: Number(item.pim || item.programmed || item.budget || 0),
+                resultado: Number(item.resultado || item.value || item.valor || item.percentage || 0),
+                metaPeriodo: Number(item.meta || item.target || item.metaPeriodo || window.metaGlobal || 0),
+                analisis: item.analisis || item.analysis || item.comment || '',
+                acciones: item.acciones || item.actions || item.measures || '',
+                timestamp: item.createdAt || item.updatedAt || new Date().toISOString()
+            }));
+            
+            // Guardar en localStorage como caché
+            localStorage.setItem(key, JSON.stringify(datosSeguimiento));
+            
+            renderizarTabla();
+            actualizarGraficos();
+            return;
+        } else {
+            console.warn('⚠️ API respondió pero sin datos:', response.error || 'Array vacío');
+        }
+    } catch (error) {
+        console.log('⚠️ API no disponible, usando localStorage:', error.message);
+    }
+
+    // ============================================================
+    // Fallback: Si API falla, usar localStorage (tu código original)
+    // ============================================================
+    
+    // Si el expediente viene del storage local, priorizar historial local
     if (expedienteActual?.__fromStorageLocal) {
         datosSeguimiento = historialLocal;
         if (guardado) {
@@ -457,6 +505,7 @@ async function cargarDatosSeguimiento() {
         return;
     }
     
+    // Intentar API.indicators.getPanel como segundo fallback
     try {
         if (typeof API !== 'undefined' && API.indicators) {
             const response = await API.indicators.getPanel(codigo);
@@ -476,9 +525,10 @@ async function cargarDatosSeguimiento() {
             }
         }
     } catch (error) {
-        console.log('API no disponible, usando localStorage');
+        console.log('API getPanel no disponible');
     }
     
+    // Último fallback: localStorage puro
     if (guardado) {
         datosSeguimiento = historialLocal;
         localStorage.setItem(key, JSON.stringify(historialLocal));
@@ -498,29 +548,48 @@ async function guardarDatosSeguimiento() {
     datosSeguimiento = normalizarHistorialSinSuperposicion(datosSeguimiento);
     localStorage.setItem(key, JSON.stringify(datosSeguimiento));
     
-    try {
-        if (typeof API !== 'undefined' && API.indicators) {
-            const historialAPI = datosSeguimiento.map(d => ({
-                fecha: d.fecha,
-                valor: d.resultado,
-                devengado: d.devengado,
-                pim: d.pim,
-                meta: d.metaPeriodo,
-                analisis: d.analisis,
-                acciones: d.acciones
-            }));
-            
-            await simulateAPIsave(`indicadores/${codigo}/historial`, {
-                codigo: codigo,
-                historial: historialAPI,
-                lastUpdate: new Date().toISOString()
-            });
-        }
-    } catch (error) {
-        console.error('Error sincronizando con API:', error);
-    }
+    // ============================================================
+    // 🔥 NUEVO: Sincronizar con API también
+    // ============================================================
+    await guardarTrackingEnAPI();
     
     showToast('Datos guardados correctamente', 'success');
+}
+
+// ==========================================
+// GUARDAR EN API (NUEVO)
+// ==========================================
+
+async function guardarTrackingEnAPI() {
+    if (!indicadorId || datosSeguimiento.length === 0) return;
+    
+    try {
+        // Preparar datos para el backend
+        const trackingData = datosSeguimiento.map(d => ({
+            period: d.fecha,
+            devengado: d.devengado,
+            pim: d.pim,
+            resultado: d.resultado,
+            meta: d.metaPeriodo,
+            analisis: d.analisis,
+            acciones: d.acciones
+        }));
+        
+        // Enviar el último dato (la API suele aceptar uno por uno)
+        const ultimoDato = trackingData[trackingData.length - 1];
+        
+        console.log('📤 Enviando tracking a API:', ultimoDato);
+        
+        const response = await API.portal.indicators.addTracking(indicadorId, ultimoDato);
+        
+        if (response.success) {
+            console.log('✅ Tracking guardado en API');
+        } else {
+            console.warn('⚠️ No se pudo guardar en API:', response.error);
+        }
+    } catch (error) {
+        console.error('❌ Error guardando tracking en API:', error);
+    }
 }
 
 // ==========================================
