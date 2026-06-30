@@ -7,12 +7,188 @@ const STORAGE_KEYS = {
     EXPEDIENTE_ACTUAL: 'sigpro_expediente_actual',
     DOCUMENTOS_DETALLE: 'sigpro_documentos_detalle',
     DOCUMENTOS_LISTA: 'sigpro_documentos_lista',
-    REPORTE_CUADRO: 'sigpro_reporte_cuadros'
+    REPORTE_CUADRO: 'sigpro_reporte_cuadros',
+    REPORTE_API_ID: 'sigpro_reporte_api_id'
 };
 
+// ==========================================
+// CONFIGURACIÓN API
+// ==========================================
+const API_CONFIG = {
+    BASE_URL: 'http://localhost:8080/v1',  // Ajusta según tu entorno
+    ENDPOINTS: {
+        ASSIGNMENTS: (reportId) => `/portal/reports/${reportId}/assignments`
+    }
+};
+
+let apiReportId = null;
 let reporteActual = null;
 let codigoActual = null;
 let cuadroComplementario = [];
+
+// ==========================================
+// API HELPERS - Token dinámico (NO expuesto en código)
+// ==========================================
+
+/**
+ * Obtiene el token de autenticación de localStorage dinámicamente.
+ * No se expone el token en el código fuente.
+ */
+function getAuthToken() {
+    return localStorage.getItem('token')
+        || localStorage.getItem('unmsm_token')
+        || localStorage.getItem('accessToken')
+        || localStorage.getItem('unmsm_access_token')
+        || sessionStorage.getItem('accessToken')
+        || sessionStorage.getItem('unmsm_token')
+        || null;
+}
+
+/**
+ * Headers base para peticiones JSON
+ */
+function getJsonHeaders() {
+    const token = getAuthToken();
+    const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
+/**
+ * Envía una asignación al backend
+ */
+async function enviarAsignacionAPI(reportId, assignmentData) {
+    if (!reportId) {
+        return { success: false, localOnly: true, error: 'Sin ID de reporte API' };
+    }
+
+    const token = getAuthToken();
+    if (!token) {
+        return { success: false, localOnly: true, error: 'Sin token de autenticación' };
+    }
+
+    const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ASSIGNMENTS(reportId)}`;
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: getJsonHeaders(),
+            body: JSON.stringify(assignmentData)
+        });
+
+        let data = null;
+        const contentType = response.headers.get('content-type') || '';
+
+        if (contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            const text = await response.text();
+            data = { raw: text.substring(0, 500) };
+        }
+
+        if (!response.ok) {
+            return {
+                success: false,
+                status: response.status,
+                error: data?.message || `HTTP ${response.status}`,
+                data
+            };
+        }
+
+        return {
+            success: true,
+            status: response.status,
+            data  // { totalExecuted, totalAssignments, averageExecution, totalAssigned, averagePerAssignment }
+        };
+
+    } catch (error) {
+        return {
+            success: false,
+            isNetworkError: true,
+            error: error.message,
+            status: 0
+        };
+    }
+}
+
+/**
+ * Sincroniza TODAS las filas del cuadro con la API
+ */
+async function sincronizarCuadroConAPI() {
+    if (!apiReportId) {
+        showToast('No se puede sincronizar: falta ID del reporte en el servidor', 'warning');
+        return false;
+    }
+
+    const filasValidas = cuadroComplementario.filter((fila) => {
+        const tieneDatos = (fila?.concepto || '').trim()
+            || (fila?.descripcionGasto || '').trim()
+            || Number(fila?.montoAsignado) > 0
+            || Number(fila?.montoEjecutado) > 0;
+        return Boolean(tieneDatos);
+    });
+
+    if (filasValidas.length === 0) {
+        showToast('No hay filas con datos para sincronizar', 'info');
+        return true;
+    }
+
+    showToast(`Sincronizando ${filasValidas.length} asignación(es)...`, 'info');
+
+    let ultimaRespuesta = null;
+    let errores = 0;
+
+    for (const fila of filasValidas) {
+        const payload = {
+            assignmentDate: fila.fechaAsignacion || new Date().toISOString().split('T')[0],
+            concept: fila.concepto || 'SIN_CONCEPTO',
+            description: fila.descripcionGasto || '',
+            assignedAmount: Number(fila.montoAsignado) || 0,
+            executedAmount: Number(fila.montoEjecutado) || 0,
+            observations: fila.observacion || ''
+        };
+
+        const resultado = await enviarAsignacionAPI(apiReportId, payload);
+
+        if (resultado.success) {
+            ultimaRespuesta = resultado.data;
+        } else {
+            errores++;
+        }
+    }
+
+    if (ultimaRespuesta) {
+        actualizarResumenDesdeAPI(ultimaRespuesta);
+        showToast(
+            errores > 0
+                ? `Sincronizado parcialmente. ${errores} error(es).`
+                : '¡Cuadro sincronizado con el servidor!',
+            errores > 0 ? 'warning' : 'success'
+        );
+        return errores === 0;
+    }
+
+    showToast('No se pudo sincronizar con el servidor. Guardado localmente.', 'warning');
+    return false;
+}
+
+/**
+ * Actualiza el resumen con datos del servidor
+ */
+function actualizarResumenDesdeAPI(apiData) {
+    if (!apiData) return;
+
+    setText('resumen-veces-asignaron', String(apiData.totalAssignments || 0));
+    setText('resumen-total-asignado', formatearMoneda(apiData.totalAssigned || 0));
+    setText('resumen-total-ejecutado', formatearMoneda(apiData.totalExecuted || 0));
+    setText('resumen-promedio-asignacion', formatearMoneda(apiData.averagePerAssignment || 0));
+    setText('resumen-promedio-ejecucion', formatearMoneda(apiData.averageExecution || 0));
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
@@ -51,6 +227,11 @@ function cargarReporte() {
 
     codigoActual = codigoDesdeURL || actual?.codigo || null;
 
+    // ← NUEVO: Intentar obtener el apiId del reporte
+    const apiIdMapRaw = localStorage.getItem(STORAGE_KEYS.REPORTE_API_ID);
+    const apiIdMap = apiIdMapRaw ? JSON.parse(apiIdMapRaw) : {};
+    apiReportId = apiIdMap[codigoActual] || actual?.apiId || null;
+
     const detalleMapRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
     const detalleMap = detalleMapRaw ? JSON.parse(detalleMapRaw) : {};
 
@@ -77,8 +258,14 @@ function construirModeloReporte(codigo, detalle) {
     const docs = docsRaw ? JSON.parse(docsRaw) : [];
     const doc = docs.find((item) => item.codigo === codigo) || {};
 
+    // ← NUEVO: Extraer apiId si existe
+    const apiIdMapRaw = localStorage.getItem(STORAGE_KEYS.REPORTE_API_ID);
+    const apiIdMap = apiIdMapRaw ? JSON.parse(apiIdMapRaw) : {};
+    const apiId = apiIdMap[codigo] || doc.apiId || reporteData.apiId || null;
+
     return {
         codigo,
+        apiId,  // ← Guardar referencia al ID de API
         semestre: reporteData.semestre || valorResumen(resumen, 'semestre') || '-',
         fechaAprobacion: doc.fechaAprobacion || doc.fechaActualizacion || doc.fecha || '-',
         fechaElaboracion: reporteData.fechaElaboracion || valorResumen(resumen, 'fecha de elaboracion') || '-',
@@ -214,7 +401,8 @@ function crearFilaVacia() {
         porcentajeEjecucion: '',
         observacion: '',
         descripcionExpandida: false,
-        observacionExpandida: false
+        observacionExpandida: false,
+        synced: false  // ← NUEVO: indica si está sincronizado con API
     };
 }
 
@@ -223,8 +411,13 @@ function renderizarCuadro() {
     if (!tbody) return;
 
     tbody.innerHTML = cuadroComplementario.map((fila, index) => `
-        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-            <td class="px-4 py-3 text-center font-semibold text-slate-500">${index + 1}</td>
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${fila.synced ? 'border-l-4 border-emerald-500' : 'border-l-4 border-amber-400'}">
+            <td class="px-4 py-3 text-center font-semibold text-slate-500">
+                ${index + 1}
+                ${fila.synced
+                    ? '<span class="material-symbols-outlined text-emerald-500 text-sm" title="Sincronizado con servidor">cloud_done</span>'
+                    : '<span class="material-symbols-outlined text-amber-400 text-sm" title="Solo local">cloud_off</span>'}
+            </td>
             <td class="px-4 py-3">
                 <input type="date" value="${escapeHtml(fila.fechaAsignacion)}" oninput="actualizarFilaCuadro(${index}, 'fechaAsignacion', this.value)"
                     class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none" />
@@ -236,7 +429,7 @@ function renderizarCuadro() {
             </td>
             <td class="px-4 py-3">
                 <div class="space-y-2">
-                    <textarea rows="${fila.descripcionExpandida ? 6 : 2}" value="${escapeHtml(fila.descripcionGasto)}" oninput="actualizarFilaCuadro(${index}, 'descripcionGasto', this.value)"
+                    <textarea rows="${fila.descripcionExpandida ? 6 : 2}" oninput="actualizarFilaCuadro(${index}, 'descripcionGasto', this.value)"
                         class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none resize-y"
                         placeholder="Detalle de gasto o acción">${escapeHtml(fila.descripcionGasto)}</textarea>
                     <button type="button" onclick="toggleExpandirCampo(${index}, 'descripcionExpandida')"
@@ -262,7 +455,7 @@ function renderizarCuadro() {
             </td>
             <td class="px-4 py-3">
                 <div class="space-y-2">
-                    <textarea rows="${fila.observacionExpandida ? 6 : 2}" value="${escapeHtml(fila.observacion)}" oninput="actualizarFilaCuadro(${index}, 'observacion', this.value)"
+                    <textarea rows="${fila.observacionExpandida ? 6 : 2}" oninput="actualizarFilaCuadro(${index}, 'observacion', this.value)"
                         class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none resize-y"
                         placeholder="Observación">${escapeHtml(fila.observacion)}</textarea>
                     <button type="button" onclick="toggleExpandirCampo(${index}, 'observacionExpandida')"
@@ -286,6 +479,7 @@ function renderizarCuadro() {
 function actualizarFilaCuadro(index, campo, valor) {
     if (!cuadroComplementario[index]) return;
     cuadroComplementario[index][campo] = valor;
+    cuadroComplementario[index].synced = false;  // ← Marcar como no sincronizado al editar
 
     if (campo === 'montoAsignado' || campo === 'montoEjecutado') {
         cuadroComplementario[index].porcentajeEjecucion = formatearPorcentajeFila(cuadroComplementario[index]);
@@ -315,12 +509,44 @@ function eliminarFilaCuadro(index) {
     renderizarCuadro();
 }
 
-function guardarCuadroComplementario() {
+async function guardarCuadroComplementario() {
+    // 1. Guardar localmente primero (siempre funciona)
     const mapRaw = localStorage.getItem(STORAGE_KEYS.REPORTE_CUADRO);
     const map = mapRaw ? JSON.parse(mapRaw) : {};
     map[codigoActual] = cuadroComplementario;
     localStorage.setItem(STORAGE_KEYS.REPORTE_CUADRO, JSON.stringify(map));
-    showToast('Cuadro complementario guardado', 'success');
+
+    // 2. Intentar sincronizar con API
+    if (apiReportId) {
+        const btnGuardar = document.getElementById('btn-guardar-cuadro');
+        const textoOriginal = btnGuardar?.innerHTML;
+
+        if (btnGuardar) {
+            btnGuardar.disabled = true;
+            btnGuardar.innerHTML = `<span class="material-symbols-outlined animate-spin">refresh</span> Sincronizando...`;
+        }
+
+        try {
+            const exito = await sincronizarCuadroConAPI();
+            if (exito) {
+                // Marcar todas las filas como sincronizadas
+                cuadroComplementario.forEach(fila => { fila.synced = true; });
+                map[codigoActual] = cuadroComplementario;
+                localStorage.setItem(STORAGE_KEYS.REPORTE_CUADRO, JSON.stringify(map));
+                renderizarCuadro();  // Re-renderizar para mostrar iconos synced
+            }
+        } finally {
+            if (btnGuardar) {
+                btnGuardar.disabled = false;
+                btnGuardar.innerHTML = textoOriginal || `
+                    <span class="material-symbols-outlined">save</span>
+                    Guardar cuadro
+                `;
+            }
+        }
+    } else {
+        showToast('Cuadro guardado localmente (sin sincronización API)', 'warning');
+    }
 }
 
 function formatearPorcentajeFila(fila) {

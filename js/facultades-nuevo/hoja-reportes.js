@@ -840,67 +840,74 @@ function initFormHandler() {
 
             apiResult = await API.portal.reports.create(reportPayload);
 
+            // ✅ BLOQUE ÚNICO DE MANEJO DE ERRORES
             if (!apiResult.success) {
-    if (apiResult.status === 401) {
-        showToast('Sesión expirada. Redirigiendo...', 'error');
-        setTimeout(() => {
-            window.location.href = 'portal-inicio-facultades.html';
-        }, 2000);
-        return;
-    }
-    console.warn('API falló, usando fallback local:', apiResult.error);
-    showToast('API no disponible. Guardando localmente...', 'warning', 3000);
-}
-        if (!apiResult.success) {
-            // Errores de autenticación
-            if (apiResult.status === 401) {
-                showToast('Sesión expirada. Redirigiendo al login...', 'error');
-                setTimeout(() => {
-                    window.location.href = 'portal-inicio-facultades.html';
-                }, 2000);
-                return;
-            }
-            
-            // Error 403 - Forbidden: El servidor rechazó la petición
-            if (apiResult.status === 403) {
-                console.error('🔴 Error 403 Forbidden:', apiResult.data);
+                // Error 401 - Sesión expirada
+                if (apiResult.status === 401) {
+                    showToast('Sesión expirada. Redirigiendo al login...', 'error');
+                    setTimeout(() => {
+                        window.location.href = 'portal-inicio-facultades.html';
+                    }, 2000);
+                    btnFinalizar.disabled = false;
+                    btnFinalizar.innerHTML = originalText;
+                    return;
+                }
+                
+                // Error 403 - Forbidden
+                if (apiResult.status === 403) {
+                    console.error('🔴 Error 403 Forbidden:', apiResult.data);
+                    showToast(
+                        `Error 403: Acceso denegado. ${apiResult.data?.message || 'Verifica permisos o token.'}`, 
+                        'error', 
+                        5000
+                    );
+                    btnFinalizar.disabled = false;
+                    btnFinalizar.innerHTML = originalText;
+                    return;
+                }
+                
+                // Error 404 - Endpoint no encontrado
+                if (apiResult.status === 404) {
+                    showToast('Error 404: El endpoint /portal/reports no existe en el servidor', 'error', 5000);
+                    btnFinalizar.disabled = false;
+                    btnFinalizar.innerHTML = originalText;
+                    return;
+                }
+                
+                // Error de red
+                if (apiResult.isNetworkError) {
+                    showToast('Error de red: No se pudo conectar con el servidor', 'error', 5000);
+                    btnFinalizar.disabled = false;
+                    btnFinalizar.innerHTML = originalText;
+                    return;
+                }
+                
+                // Otros errores del servidor
                 showToast(
-                    `Error 403: Acceso denegado. ${apiResult.data?.message || 'Verifica permisos o token.'}`, 
+                    `Error ${apiResult.status || ''}: ${apiResult.error || 'Desconocido'}`, 
                     'error', 
                     5000
                 );
-                // NO guardar localmente en 403, informar al usuario claramente
-                btnFinalizar.disabled = false;
-                btnFinalizar.innerHTML = originalText;
-                return;  // ← Detener aquí, no continuar con fallback
-            }
-            
-            // Error 404 - Endpoint no encontrado
-            if (apiResult.status === 404) {
-                showToast('Error 404: El endpoint /portal/reports no existe en el servidor', 'error', 5000);
                 btnFinalizar.disabled = false;
                 btnFinalizar.innerHTML = originalText;
                 return;
             }
-            
-            // Error de red (servidor no responde)
-            if (apiResult.isNetworkError) {
-                showToast('Error de red: No se pudo conectar con ' + CONFIG.REMOTE_BASE, 'error', 5000);
-                btnFinalizar.disabled = false;
-                btnFinalizar.innerHTML = originalText;
-                return;
+
+            // ✅ ÉXITO: Extraer y guardar apiId
+            apiSuccess = true;
+            console.log('✅ Reporte creado en API:', apiResult.data);
+
+            if (apiResult.data?.id) {
+                const apiId = apiResult.data.id;
+                
+                // Guardar mapeo código → apiId en localStorage
+                const apiIdMapRaw = localStorage.getItem('sigpro_reporte_api_id') || '{}';
+                const apiIdMap = JSON.parse(apiIdMapRaw);
+                apiIdMap[reportPayload.code] = apiId;
+                localStorage.setItem('sigpro_reporte_api_id', JSON.stringify(apiIdMap));
+                
+                console.log('✅ apiId guardado:', apiId, 'para código:', reportPayload.code);
             }
-            
-            // Otros errores del servidor
-            showToast(
-                `Error ${apiResult.status || ''}: ${apiResult.error || 'Desconocido'}`, 
-                'error', 
-                5000
-            );
-            btnFinalizar.disabled = false;
-            btnFinalizar.innerHTML = originalText;
-            return;
-        }
 
         
         apiSuccess = true;

@@ -739,23 +739,45 @@ function initFormulaPreview() {
 
 function parsearFormulaConFracciones(formula) {
     const safeFormula = escapeHtml(formula);
-    const fraccionRegex = /(\([^\)]+\)|[A-Za-z0-9_]+)\s*\/\s*(\([^\)]+\)|[A-Za-z0-9_]+)/g;
-
-    let resultado = safeFormula.replace(fraccionRegex, (match, numerador, denominador) => {
-        return renderizarFraccion(numerador.trim(), denominador.trim());
-    });
-
-    if (resultado === safeFormula && !formula.includes('/')) {
-        return `<span class="text-base font-semibold text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 px-3 py-2 rounded-lg shadow border border-blue-200 dark:border-blue-800">${resultado}</span>`;
-    }
-
-    return `
-        <div class="bg-white dark:bg-slate-900 px-4 py-3 rounded-lg shadow border border-blue-200 dark:border-blue-800">
-            <div class="flex items-center gap-2 text-base font-semibold text-blue-600 dark:text-blue-400">
-                ${resultado}
+    
+    // Limpiar espacios extra
+    const clean = safeFormula.replace(/\s+/g, ' ').trim();
+    
+    // Patrón: (N / D) * 100%  o  N / D * 100  o  (N / D) * 100
+    const fraccionConMultiplicacion = clean.match(/^\(?\s*([^/]+?)\s*\/\s*([^/)]+?)\s*\)?\s*\*\s*(\d+%?)$/);
+    
+    if (fraccionConMultiplicacion) {
+        const numerador = fraccionConMultiplicacion[1].trim();
+        const denominador = fraccionConMultiplicacion[2].trim();
+        const multiplicador = fraccionConMultiplicacion[3].trim();
+        
+        return `
+            <div class="bg-white dark:bg-slate-900 px-4 py-3 rounded-lg shadow border border-blue-200 dark:border-blue-800">
+                <div class="flex items-center justify-center gap-3 text-base font-semibold text-blue-600 dark:text-blue-400">
+                    <span class="text-slate-500 dark:text-slate-400">(</span>
+                    ${renderizarFraccion(numerador, denominador)}
+                    <span class="text-slate-500 dark:text-slate-400">)</span>
+                    <span class="text-slate-400">×</span>
+                    <span class="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded text-blue-700 dark:text-blue-300 font-bold">${multiplicador}</span>
+                </div>
             </div>
-        </div>
-    `;
+        `;
+    }
+    
+    // Patrón simple: N / D (sin multiplicación)
+    const fraccionSimple = clean.match(/^([^/]+?)\s*\/\s*([^/]+?)$/);
+    if (fraccionSimple) {
+        return `
+            <div class="bg-white dark:bg-slate-900 px-4 py-3 rounded-lg shadow border border-blue-200 dark:border-blue-800">
+                <div class="flex items-center justify-center gap-2 text-base font-semibold text-blue-600 dark:text-blue-400">
+                    ${renderizarFraccion(fraccionSimple[1].trim(), fraccionSimple[2].trim())}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Si no es fracción, mostrar como texto normal
+    return `<span class="text-base font-semibold text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 px-3 py-2 rounded-lg shadow border border-blue-200 dark:border-blue-800">${clean}</span>`;
 }
 
 function renderizarFraccion(numerador, denominador) {
@@ -999,14 +1021,14 @@ function saveIndicadorToLocalStorage(payload, savedOrigin) {
     const idFinal = payload.backendId || payload.id || Date.now().toString();
 
     const documentoPendiente = {
-        id: idFinal,  // ← MODIFICADO: Usar backendId si existe
-        backendId: payload.backendId || null,  // ← NUEVO: Guardar explícitamente
+        id: idFinal,
+        backendId: payload.backendId || null,
         fecha: now.toISOString().split('T')[0],
         hora: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
         createdAt: now.toISOString(),
         fechaRegistro: now.toISOString(),
         codigo,
-        descripcion: payload.nombreIndicador || `Ficha de indicador ${codigo}`,
+        descripcion: payload.nombreIndicador || payload.indicatorName || `Ficha de indicador ${codigo}`,
         generadoPor: payload.generadoPor || 'Facultad',
         estado: 'pendiente',
         progreso: 5,
@@ -1029,58 +1051,73 @@ function saveIndicadorToLocalStorage(payload, savedOrigin) {
     const detalleDocumentosRaw = localStorage.getItem(INDICADOR_STORAGE_KEYS.DOCUMENTOS_DETALLE);
     const detalleDocumentos = detalleDocumentosRaw ? JSON.parse(detalleDocumentosRaw) : {};
     
+    // ============================================================
+    // 🔥 FIX: MAPEAR correctamente campos del inglés al español
+    // El payload del API viene en inglés, pero la ficha usa español
+    // ============================================================
+    const tipoProcesoLabel = payload.tipoProcesoLabel || payload.processType || '';
+    const macroProcesoNombre = payload.macroProcesoNombre || payload.macroProcess || payload.process || '';
+    const unidadResponsable = payload.unidadResponsable || payload.responsibleUnit || '';
+    const objetivoProceso = payload.objetivoProceso || payload.processObjective || '';
+    const nombreIndicador = payload.nombreIndicador || payload.indicatorName || '';
+    const frecuencia = payload.frecuencia || payload.frequency || '';
+    const variables = payload.variables || '';
+    const formulaDefinicion = payload.formulaDefinicion || payload.formula || '';
+    const fuente = payload.fuente || payload.dataSource || '';
+    const meta = payload.meta !== undefined ? payload.meta : (payload.target !== undefined ? payload.target : '');
+    const version = payload.version || '1.0';
+
     detalleDocumentos[codigo] = {
         tipo: 'indicador',
         codigo,
-        titulo: payload.indicatorName || payload.nombreIndicador || `Indicador ${codigo}`,
-        version: payload.version || '1.0', 
+        titulo: nombreIndicador || `Indicador ${codigo}`,
+        version: version, 
         operacion: 'GESTION DE INDICADORES',
         fechaRegistro: now.toISOString(),
-        // 🔥 GUARDAR AMBOS: payload del backend + datos originales del formulario
         fichaData: {
-            // Datos del backend (mapeados)
-            macroProcess: payload.macroProcess,
-            process: payload.process,
-            responsibleUnit: payload.responsibleUnit,
-            processType: payload.processType,
-            processObjective: payload.processObjective,
-            indicatorName: payload.indicatorName,
-            frequency: payload.frequency,
-            variables: payload.variables,
-            dataSource: payload.dataSource,
-            formula: payload.formula,
-            target: payload.target,
-            unit: payload.unit,
+            // Datos del backend (mapeados) - en inglés
+            macroProcess: payload.macroProcess || macroProcesoNombre,
+            process: payload.process || macroProcesoNombre,
+            responsibleUnit: payload.responsibleUnit || unidadResponsable,
+            processType: payload.processType || tipoProcesoLabel,
+            processObjective: payload.processObjective || objetivoProceso,
+            indicatorName: payload.indicatorName || nombreIndicador,
+            frequency: payload.frequency || frecuencia,
+            variables: variables,
+            dataSource: payload.dataSource || fuente,
+            formula: payload.formula || formulaDefinicion,
+            target: payload.target !== undefined ? payload.target : meta,
+            unit: payload.unit || '%',
             // Datos originales del formulario (nombres en español)
-            tipoProceso: payload.tipoProceso || payload.processType,
-            tipoProcesoLabel: payload.tipoProcesoLabel || '',
-            macroProceso: payload.macroProceso || payload.macroProcess,
-            macroProcesoNombre: payload.macroProcesoNombre || payload.macroProcess || '',
-            unidadResponsable: payload.unidadResponsable || payload.responsibleUnit,
-            objetivoProceso: payload.objetivoProceso || payload.processObjective,
-            nombreIndicador: payload.nombreIndicador || payload.indicatorName,
-            frecuencia: payload.frecuencia || payload.frequency,
-            variables: payload.variables,
-            formulaDefinicion: payload.formulaDefinicion || payload.formula,
-            fuente: payload.fuente || payload.dataSource,
-            meta: payload.meta || payload.target,
-            version: payload.version || '1.0',
+            tipoProceso: payload.tipoProceso || tipoProcesoLabel,
+            tipoProcesoLabel: tipoProcesoLabel,
+            macroProceso: payload.macroProceso || macroProcesoNombre,
+            macroProcesoNombre: macroProcesoNombre,
+            unidadResponsable: unidadResponsable,
+            objetivoProceso: objetivoProceso,
+            nombreIndicador: nombreIndicador,
+            frecuencia: frecuencia,
+            variables: variables,
+            formulaDefinicion: formulaDefinicion,
+            fuente: fuente,
+            meta: meta,
+            version: version,
             codigo: codigo
         },
         indicadorData: payload,
         resumenCampos: [
-            { label: 'Version', value: payload.version || '-' },
-            { label: 'Tipo de Proceso', value: payload.tipoProcesoLabel || payload.tipoProceso || '-' },
-            { label: 'Macro Proceso', value: payload.macroProcesoNombre || payload.macroProceso || '-' },
-            { label: 'Proceso', value: payload.macroProcesoNombre || payload.macroProceso || '-' },
-            { label: 'Oficina o Unidad Responsable', value: payload.unidadResponsable || '-' },
-            { label: 'Objetivo del Proceso', value: payload.objetivoProceso || '-' },
-            { label: 'Nombre del Indicador', value: payload.nombreIndicador || '-' },
-            { label: 'Frecuencia', value: payload.frecuencia || '-' },
-            { label: 'Variables', value: payload.variables || '-' },
-            { label: 'Formula del Indicador', value: payload.formulaDefinicion || '-' },
-            { label: 'Fuente', value: payload.fuente || '-' },
-            { label: 'Meta', value: payload.meta || '-' }
+            { label: 'Version', value: version || '-' },
+            { label: 'Tipo de Proceso', value: tipoProcesoLabel || '-' },
+            { label: 'Macro Proceso', value: macroProcesoNombre || '-' },
+            { label: 'Proceso', value: macroProcesoNombre || '-' },
+            { label: 'Oficina o Unidad Responsable', value: unidadResponsable || '-' },
+            { label: 'Objetivo del Proceso', value: objetivoProceso || '-' },
+            { label: 'Nombre del Indicador', value: nombreIndicador || '-' },
+            { label: 'Frecuencia', value: frecuencia || '-' },
+            { label: 'Variables', value: variables || '-' },
+            { label: 'Formula del Indicador', value: formulaDefinicion || '-' },
+            { label: 'Fuente', value: fuente || '-' },
+            { label: 'Meta', value: meta !== '' ? String(meta) : '-' }
         ],
         adjuntos: []
     };
@@ -1092,11 +1129,10 @@ function saveIndicadorToLocalStorage(payload, savedOrigin) {
         ...payload,
         tipoDocumento: 'indicador',
         fechaRegistro: now.toISOString(),
-        macroProcesoTexto: payload.macroProcesoNombre
+        macroProcesoTexto: macroProcesoNombre
     };
     localStorage.setItem(INDICADOR_STORAGE_KEYS.INDICADORES_DETALLE, JSON.stringify(detalleIndicadores));
 
-    // Si es un indicador nuevo, limpiar historial previo que pueda existir por reutilizacion de codigo.
     if (isNewIndicator) {
         localStorage.removeItem(`${INDICADOR_STORAGE_KEYS.HISTORIAL_PREFIX}${codigo}`);
     }
@@ -1159,6 +1195,7 @@ function initFormHandler() {
             // 🔥 PAYLOAD PARA EL BACKEND (schema exacto de /portal/indicators)
             // ============================================================
             const payload = {
+                // Campos en INGLÉS (para el backend)
                 macroProcess: getSelectedOptionText(macroProcesoInput) || data.macroProceso || '',
                 process: getSelectedOptionText(macroProcesoInput) || data.proceso || data.macroProceso || '',
                 responsibleUnit: data.unidadResponsable || '',
@@ -1167,10 +1204,24 @@ function initFormHandler() {
                 indicatorName: data.nombreIndicador || '',
                 frequency: (data.frecuencia || 'MENSUAL').toUpperCase(),
                 variables: data.variables || '',
-                dataSource: data.fuente || '',           // ← Asegurar que no esté vacío
-                formula: data.formulaDefinicion || '',    // ← Asegurar que no esté vacío
+                dataSource: data.fuente || '',
+                formula: data.formulaDefinicion || '',
                 target: Number(data.meta || 0),
-                unit: data.unidad || '%'
+                unit: data.unidad || '%',
+
+                // 🔥 NUEVO: Campos en ESPAÑOL (para localStorage)
+                unidadResponsable: data.unidadResponsable || '',
+                objetivoProceso: data.objetivoProceso || '',
+                nombreIndicador: data.nombreIndicador || '',
+                frecuencia: data.frecuencia || '',
+                formulaDefinicion: data.formulaDefinicion || '',
+                fuente: data.fuente || '',
+                meta: data.meta || '',
+                version: data.version || '1.0',
+                tipoProceso: data.tipoProceso || '',
+                tipoProcesoLabel: getSelectedOptionText(tipoProcesoInput),
+                macroProceso: data.macroProceso || '',
+                macroProcesoNombre: getSelectedOptionText(macroProcesoInput) || obtenerNombreMacroProceso(data.macroProceso)
             };
 
             // ============================================================
@@ -1202,17 +1253,16 @@ function initFormHandler() {
 
                 if (result && result.success) {
                     savedOrigin = 'remote';
-                    // El backend devuelve código auto-generado
                     codigoFinal = result.data?.code || result.data?.codigo || codigoLocal;
-                    // ← NUEVO: Guardar UUID real del backend
                     backendId = result.data?.id || result.data?.uuid || null;
-                    showToast(`Ficha creada en servidor: ${codigoFinal}`, 'success');
                     
-                    // ← NUEVO: Si el backend devolvió UUID, actualizarlo en el payload para localStorage
-                    if (backendId) {
-                        console.log('✅ Backend UUID recibido:', backendId);
-                    }
+                    // 🔥 NUEVO LOG para ver qué devuelve el backend
+                    console.log('📥 Backend response data:', result.data);
+                    console.log('   backendId extraído:', backendId);
+                    
+                    showToast(`Ficha creada en servidor: ${codigoFinal}`, 'success');
                 } else {
+
                     console.warn('⚠️ API respondió error:', result?.status, result?.error);
                 }
             } else {

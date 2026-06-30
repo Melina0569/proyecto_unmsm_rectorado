@@ -1987,7 +1987,7 @@ const RemoteAPI = {
                 try {
                     const response = await fetch(`${CONFIG.REMOTE_BASE}/portal/indicators/${id}/tracking`, {
                         method: 'POST',
-                        headers: RemoteAPI.getHeaders(),
+                        headers: RemoteAPI.getHeaders(),  // ← Incluye Content-Type: application/json + Bearer token
                         body: JSON.stringify(trackingData)
                     });
                     return { success: response.ok, data: await response.json().catch(() => ({})) };
@@ -2200,23 +2200,69 @@ const RemoteAPI = {
         // ========== PORTAL - RESPUESTAS A OBSERVACIONES ==========
         responses: {
             async toObservations(documentId, subject, observations, attachments = []) {
-                const params = new URLSearchParams({
-                    subject,
-                    observations,
-                    attachments: attachments.join(',')
+                // 🔥 FIX: Construir URL con query params correctamente
+                const url = new URL(`${CONFIG.REMOTE_BASE}/portal/documents/${encodeURIComponent(documentId)}/respond`);
+                
+                // Parámetros obligatorios
+                url.searchParams.append('subject', subject);
+                url.searchParams.append('observations', observations);
+                
+                // 🔥 FIX: attachments es array[string] en query params
+                // Solo agregar si hay valores reales (no vacíos, no 'string' de placeholder)
+                const validAttachments = (Array.isArray(attachments) ? attachments : [attachments])
+                    .filter(a => a && String(a).trim() !== '' && String(a).toLowerCase() !== 'string');
+                
+                validAttachments.forEach(file => {
+                    url.searchParams.append('attachments', String(file).trim());
                 });
 
+                console.log('📤 POST', url.toString());
+
                 try {
-                    const response = await fetch(
-                        `${CONFIG.REMOTE_BASE}/portal/documents/${documentId}/respond?${params.toString()}`,
-                        {
-                            method: 'POST',
-                            headers: RemoteAPI.getHeaders()
-                        }
-                    );
-                    return { success: response.ok, data: await response.json() };
+                    // 🔥 FIX: Usar apiFetch (con auto-refresh de token) en lugar de fetch directo
+                    const response = await window.apiFetch(url.toString(), {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            // ❌ NO 'Content-Type' — body vacío, no necesita
+                        },
+                        // 🔥 CRÍTICO: Body vacío como en el curl de Swagger
+                        body: null
+                    });
+                    
+                    let data = null;
+                    const contentType = response.headers.get('content-type') || '';
+                    
+                    if (contentType.includes('application/json')) {
+                        data = await response.json();
+                    } else {
+                        const text = await response.text();
+                        data = { message: text || 'Respuesta enviada' };
+                    }
+                    
+                    if (!response.ok) {
+                        console.error('❌ respond error:', data);
+                        return { 
+                            success: false, 
+                            error: data?.message || `HTTP ${response.status}`,
+                            status: response.status,
+                            data 
+                        };
+                    }
+                    
+                    return { 
+                        success: true, 
+                        data,  // { message: "Respuesta envida exitosamente" }
+                        status: response.status 
+                    };
+
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    console.error('❌ respond exception:', error);
+                    return { 
+                        success: false, 
+                        error: error.message,
+                        status: 0 
+                    };
                 }
             }
         },
@@ -2646,70 +2692,7 @@ window.aprobarSolicitud = aprobarSolicitud;
 
     // ✅ FUNCIÓN PÚBLICA: Hacer peticiones con auto-refresh
     window.apiFetch = async function(url, options = {}) {
-        // Verificar si token está por expirar y renovar preventivamente
-        if (RemoteAPI.auth.isTokenExpiringSoon(2)) {
-            console.log('⏰ Token por expirar, renovando preventivamente...');
-            const refreshResult = await RemoteAPI.auth.refresh();
-            if (!refreshResult.success) {
-                console.error('❌ No se pudo renovar token preventivamente');
-            }
-        }
-
-        let response = await originalFetch(url, options);
-
-        // Si no es 401, retornar normalmente
-        if (response.status !== 401) {
-            return response;
-        }
-
-        // ✅ 401 DETECTADO → Intentar refresh
-        console.log('🔄 Token expirado (401), intentando renovar...');
-
-        if (isRefreshing) {
-            // Esperar a que termine el refresh en curso
-            return new Promise((resolve) => {
-                subscribeTokenRefresh((newToken) => {
-                    // Reintentar la petición original con el nuevo token
-                    const newOptions = { ...options };
-                    if (newToken) {
-                        newOptions.headers = {
-                            ...newOptions.headers,
-                            'Authorization': `Bearer ${newToken}`
-                        };
-                    }
-                    resolve(originalFetch(url, newOptions));
-                });
-            });
-        }
-
-        isRefreshing = true;
-
-        try {
-            const refreshResult = await RemoteAPI.auth.refresh();
-            
-            if (refreshResult.success && refreshResult.data?.accessToken) {
-                const newToken = refreshResult.data.accessToken;
-                onTokenRefreshed(newToken);
-                
-                // Reintentar petición original con nuevo token
-                const newOptions = { ...options };
-                newOptions.headers = {
-                    ...newOptions.headers,
-                    'Authorization': `Bearer ${newToken}`
-                };
-                
-                return originalFetch(url, newOptions);
-            } else {
-                // Refresh falló → redirigir a login
-                onTokenRefreshed(null);
-                console.error('❌ Refresh token inválido, redirigiendo a login...');
-                RemoteAPI.auth.clearSession();
-                window.location.replace('portal-inicio.html');
-                throw new Error('Sesión expirada');
-            }
-        } finally {
-            isRefreshing = false;
-        }
+        // ... tu código actual ...
     };
 
     // ✅ REEMPLAZAR fetch global con el interceptor

@@ -267,18 +267,24 @@ function cargarExpediente(codigo) {
     if (codigo) {
         expedienteActual = obtenerIndicadorGuardadoPorCodigo(codigo);
         
-        // ============================================================
-        // 🔥 NUEVO: Extraer el ID real del indicador para la API
-        // ============================================================
         if (expedienteActual) {
-            // El ID puede estar en diferentes campos según venga de la API o localStorage
-            indicadorId = expedienteActual.id 
+            // 🔥 PRIORIDAD: Usar backendId (UUID real del servidor)
+            indicadorId = expedienteActual.backendId 
+                || expedienteActual.id 
                 || expedienteActual.indicatorId 
                 || expedienteActual.indicadorId 
                 || expedienteActual.uuid
-                || codigo; // Fallback al código si no hay ID
+                || null; // ← NO usar código como fallback
             
             console.log('🆔 Indicador ID para API:', indicadorId);
+            console.log('   backendId:', expedienteActual.backendId);
+            console.log('   id:', expedienteActual.id);
+            console.log('   uuid:', expedienteActual.uuid);
+            
+            if (!indicadorId) {
+                console.warn('⚠️ No se encontró UUID del backend. El tracking solo se guardará localmente.');
+                console.warn('   Para sincronizar con API, el indicador debe haberse creado vía API primero.');
+            }
             
             mostrarInfoTecnica(expedienteActual);
             cargarDatosSeguimiento();
@@ -454,8 +460,10 @@ async function cargarDatosSeguimiento() {
     // ============================================================
     // 🔥 NUEVO: Intentar cargar desde API REAL primero
     // ============================================================
+    // ============================================================
+    // 🔥 NUEVO: Intentar cargar desde API REAL primero
+    // ============================================================
     try {
-        // El indicadorId puede ser el código si es un UUID, o necesitamos buscarlo
         const indicatorId = indicadorId || codigo;
         
         console.log('🔍 Cargando seguimiento desde API para indicador:', indicatorId);
@@ -465,15 +473,16 @@ async function cargarDatosSeguimiento() {
         if (response.success && Array.isArray(response.data)) {
             console.log('✅ Seguimiento cargado desde API:', response.data.length, 'registros');
             
-            // Mapear datos del backend al formato que usa tu frontend
+            // 🔥 MAPEO INVERSO: Del backend a tu formato local
             datosSeguimiento = response.data.map(item => ({
-                fecha: item.period || item.periodo || item.fecha || item.month || '',
-                devengado: Number(item.devengado || item.executed || 0),
-                pim: Number(item.pim || item.programmed || item.budget || 0),
-                resultado: Number(item.resultado || item.value || item.valor || item.percentage || 0),
-                metaPeriodo: Number(item.meta || item.target || item.metaPeriodo || window.metaGlobal || 0),
-                analisis: item.analisis || item.analysis || item.comment || '',
-                acciones: item.acciones || item.actions || item.measures || '',
+                fecha: item.month || item.period || item.periodo || item.fecha || '',        // month → fecha
+                devengado: Number(item.accrued || item.devengado || item.executed || 0),     // accrued → devengado
+                pim: Number(item.pim || item.programmed || item.budget || 0),                // pim → pim
+                resultado: Number(item.result || item.resultado || item.value || item.valor || item.percentage || 0), // result → resultado
+                metaPeriodo: Number(item.periodTarget || item.meta || item.target || window.metaGlobal || 0), // periodTarget → metaPeriodo
+                analisis: item.analysis || item.analisis || item.comment || '',                // analysis → analisis
+                acciones: item.improvementActions || item.acciones || item.actions || item.measures || '', // improvementActions → acciones
+                observaciones: item.observations || '',                                         // campo nuevo
                 timestamp: item.createdAt || item.updatedAt || new Date().toISOString()
             }));
             
@@ -549,7 +558,7 @@ async function guardarDatosSeguimiento() {
     localStorage.setItem(key, JSON.stringify(datosSeguimiento));
     
     // ============================================================
-    // 🔥 NUEVO: Sincronizar con API también
+    // 🔥 Sincronizar con API también (ahora con schema correcto)
     // ============================================================
     await guardarTrackingEnAPI();
     
@@ -561,34 +570,61 @@ async function guardarDatosSeguimiento() {
 // ==========================================
 
 async function guardarTrackingEnAPI() {
-    if (!indicadorId || datosSeguimiento.length === 0) return;
+    console.log('🔍 guardarTrackingEnAPI() iniciado');
+    console.log('   indicadorId:', indicadorId);
+    console.log('   datosSeguimiento.length:', datosSeguimiento.length);
+    
+    if (!indicadorId) {
+        console.warn('⚠️ indicadorId está vacío. No se puede enviar a API.');
+        return;
+    }
+    
+    if (datosSeguimiento.length === 0) {
+        console.warn('⚠️ No hay datos de seguimiento para enviar.');
+        return;
+    }
+    
+    // Validar que indicadorId parezca un UUID (36 chars con guiones)
+    const esUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(indicadorId);
+    console.log('   ¿Es UUID válido?:', esUUID);
+    
+    if (!esUUID) {
+        console.warn('⚠️ indicadorId NO es un UUID válido:', indicadorId);
+        console.warn('   La API requiere un UUID como a5a6902d-5738-42a6-b89d-4b9a8700656a');
+        return;
+    }
     
     try {
-        // Preparar datos para el backend
-        const trackingData = datosSeguimiento.map(d => ({
-            period: d.fecha,
-            devengado: d.devengado,
-            pim: d.pim,
-            resultado: d.resultado,
-            meta: d.metaPeriodo,
-            analisis: d.analisis,
-            acciones: d.acciones
-        }));
+        const ultimoDato = datosSeguimiento[datosSeguimiento.length - 1];
         
-        // Enviar el último dato (la API suele aceptar uno por uno)
-        const ultimoDato = trackingData[trackingData.length - 1];
+        const payload = {
+            month: ultimoDato.fecha,
+            accrued: ultimoDato.devengado,
+            pim: ultimoDato.pim,
+            result: ultimoDato.resultado,
+            periodTarget: ultimoDato.metaPeriodo || window.metaGlobal || 0,
+            analysis: ultimoDato.analisis || '',
+            observations: ultimoDato.observaciones || '',
+            improvementActions: ultimoDato.acciones || ''
+        };
         
-        console.log('📤 Enviando tracking a API:', ultimoDato);
+        console.log('📤 Enviando tracking a API:', payload);
+        console.log('🆔 Indicator ID (UUID):', indicadorId);
         
-        const response = await API.portal.indicators.addTracking(indicadorId, ultimoDato);
+        const response = await API.portal.indicators.addTracking(indicadorId, payload);
+        
+        console.log('📥 Respuesta API:', response);
         
         if (response.success) {
-            console.log('✅ Tracking guardado en API');
+            console.log('✅ Tracking guardado en API:', response.data);
+            showToast('Sincronizado con servidor', 'success', 2000);
         } else {
-            console.warn('⚠️ No se pudo guardar en API:', response.error);
+            console.warn('⚠️ API respondió error:', response.error, 'Status:', response.status);
+            showToast('Guardado solo localmente', 'warning', 3000);
         }
     } catch (error) {
         console.error('❌ Error guardando tracking en API:', error);
+        showToast('Error de conexión. Solo local.', 'warning', 3000);
     }
 }
 
@@ -732,6 +768,7 @@ async function guardarDato() {
     const resultado = parseFloat(document.getElementById('input-resultado').value) || 0;
     const analisis = document.getElementById('input-analisis').value;
     const acciones = document.getElementById('input-acciones').value;
+    // const observaciones = document.getElementById('input-observaciones')?.value || ''; // si agregas el campo
     
     const nuevoDato = {
         fecha,
@@ -741,6 +778,7 @@ async function guardarDato() {
         resultado,
         analisis,
         acciones,
+        // observaciones, // descomentar si agregas el campo al formulario
         timestamp: new Date().toISOString()
     };
     

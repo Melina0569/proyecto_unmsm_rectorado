@@ -161,46 +161,17 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Agregar evento para el botón ENVIAR del formulario de respuesta
     const enviarBtn = document.querySelector('#formulario-respuesta button.bg-primary');
-    if (enviarBtn) {
-        enviarBtn.addEventListener('click', async function(e) {
-            e.preventDefault();
-            // Obtener datos del formulario
-            const asunto = document.getElementById('resp-asunto')?.value || '';
-            const observaciones = document.getElementById('resp-observaciones')?.value || '';
-            const codigo = document.getElementById('detail-codigo')?.textContent || '';
-            const adjunto = window.respuestaAdjuntoTemporal || null;
-            if (!asunto || !observaciones) {
-                showToast('Debe completar asunto y observaciones', 'error');
-                return;
-            }
-            // Crear objeto de notificación/corrección
-            const correccion = {
-                id: `corr_${Date.now()}`,
-                codigo: codigo,
-                asunto: asunto,
-                observaciones: observaciones,
-                fecha: new Date().toISOString(),
-                adjunto: adjunto,
-                estado: 'en_proceso',
-                correoInstitucional: '', // Puedes agregar campo si lo necesitas
-            };
-            // Guardar en localStorage (sigpro_correcciones_solicitudes)
-            let historial = [];
-            try {
-                historial = JSON.parse(localStorage.getItem('sigpro_correcciones_solicitudes')) || [];
-            } catch {}
-            historial.push(correccion);
-            localStorage.setItem('sigpro_correcciones_solicitudes', JSON.stringify(historial));
-            // Limpiar adjunto temporal
-            window.respuestaAdjuntoTemporal = null;
-            // Notificar éxito
-            showToast('Respuesta enviada y archivo subido correctamente', 'success');
-            // Opcional: cerrar formulario o limpiar campos
-            document.getElementById('resp-asunto').value = 'Corrección sobre el proceso';
-            document.getElementById('resp-observaciones').value = '';
-            if (respFileInput) respFileInput.value = '';
-        });
-    }
+        if (enviarBtn) {
+            // Eliminar listeners anteriores para evitar duplicados
+            const nuevoBtn = enviarBtn.cloneNode(true);
+            enviarBtn.parentNode.replaceChild(nuevoBtn, enviarBtn);
+            
+            nuevoBtn.addEventListener('click', async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                await enviarRespuestaObservaciones();
+            });
+        }
 });
 
 function guardarAdjunto(detalle) {
@@ -825,73 +796,112 @@ async function archivoAAdjunto(file) {
 
 // ✅ FUNCIÓN FALTANTE - Agregar esto:
 
-async function guardarRespuestaConAdjuntos() {
+// ==========================================
+// ENVIAR RESPUESTA A OBSERVACIONES (CORREGIDO)
+// ==========================================
+
+async function enviarRespuestaObservaciones() {
     const observaciones = document.getElementById('resp-observaciones')?.value.trim();
-    const asunto = document.getElementById('resp-asunto')?.value.trim() || 'Respuesta';
+    const asunto = document.getElementById('resp-asunto')?.value.trim() || 'Respuesta a observaciones';
     const codigo = document.getElementById('detail-codigo')?.textContent;
     
+    // Validaciones
     if (!observaciones) {
         showToast('Por favor ingrese sus observaciones', 'warning');
         return;
     }
     if (!codigo) {
-        showToast('Error: no se encontró código', 'error');
+        showToast('Error: no se encontró código del documento', 'error');
         return;
     }
     
+    // 🔥 BUSCAR EL ID REAL DEL BACKEND (UUID)
+    const doc = allDocuments.find(d => d.codigo === codigo);
+    let documentId = doc?.backendId || doc?.id;
+    
+    // Validar que sea un UUID válido
+    const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    
+    if (!isUUID(documentId)) {
+        console.error('❌ ID no es UUID válido:', documentId);
+        showToast('Error: Documento no tiene ID válido del servidor', 'error');
+        return;
+    }
+    
+    // Preparar attachments (nombres de archivos como strings)
+    let attachmentNames = [];
+    if (window.archivoRespuestaActual) {
+        attachmentNames = [window.archivoRespuestaActual.name];
+    }
+    
+    console.log('📤 Enviando respuesta:', {
+        documentId,
+        asunto,
+        observaciones: observaciones.substring(0, 50) + '...',
+        attachments: attachmentNames
+    });
+    
+    // Mostrar estado de carga
+    const btnEnviar = document.querySelector('#formulario-respuesta button.bg-primary');
+    const textoOriginal = btnEnviar?.textContent || 'Enviar';
+    if (btnEnviar) {
+        btnEnviar.disabled = true;
+        btnEnviar.textContent = 'Enviando...';
+    }
+    
     try {
-        const token = localStorage.getItem('token');
+        // 🔥 LLAMADA A API.JS — Token se maneja automáticamente, NO se expone
+        const result = await API.portal.responses.toObservations(
+            documentId,
+            asunto,
+            observaciones,
+            attachmentNames
+        );
         
-        // 🔥 CAMBIO: Usar FormData para enviar archivos
-        const formData = new FormData();
-        formData.append('codigo', codigo);
-        formData.append('asunto', asunto);
-        formData.append('observaciones', observaciones);
-        
-        if (window.archivoRespuestaActual) {
-            formData.append('adjunto', window.archivoRespuestaActual);
+        if (!result.success) {
+            throw new Error(result.error || `Error ${result.status}`);
         }
         
-        // 🔥 FIX: Usar API.js para enviar respuesta (adaptar según endpoint disponible)
-        // Nota: Si no existe endpoint específico, guardar solo en localStorage
-        let response = { ok: true, status: 200 };
-        try {
-            const respResult = await API.portal.responses.toObservations(codigo, asunto, observaciones, 
-                window.archivoRespuestaActual ? [window.archivoRespuestaActual.name] : []);
-            if (!respResult.success) {
-                console.warn('Backend no disponible para rectificaciones, usando localStorage');
-            }
-        } catch (apiError) {
-            console.warn('Error enviando al backend, guardando localmente:', apiError);
-        }
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `Error ${response.status}`);
-        }
-        
-        const result = await response.json();
-        
-        // Guardar también en localStorage como backup
+        // ✅ ÉXITO: Guardar en localStorage como backup/historial
         const correccion = {
-            id: result.id || `corr_${Date.now()}`,
-            codigo, fecha: new Date().toISOString(), asunto, observaciones,
-            estado: 'SUBSANADO', responsable: 'FACULTAD',
+            id: `resp_${Date.now()}`,
+            codigoDocumento: codigo,
+            documentId: documentId,
+            fecha: new Date().toISOString(),
+            asunto: asunto,
+            observaciones: observaciones,
+            estado: 'SUBSANADO',
+            responsable: 'FACULTAD',
             adjunto: window.respuestaAdjuntoTemporal || null
         };
+        
         let lista = JSON.parse(localStorage.getItem(STORAGE_KEYS.CORRECCIONES_LISTA)) || [];
         lista.push(correccion);
         localStorage.setItem(STORAGE_KEYS.CORRECCIONES_LISTA, JSON.stringify(lista));
         
-        showToast('Respuesta enviada correctamente', 'success');
-        toggleFormularioRespuesta();
+        showToast(result.data?.message || 'Respuesta enviada correctamente', 'success');
         
-        // Recargar rectificaciones
+        // Limpiar formulario
+        document.getElementById('resp-observaciones').value = '';
+        document.getElementById('resp-asunto').value = 'Respuesta a observaciones';
+        window.respuestaAdjuntoTemporal = null;
+        window.archivoRespuestaActual = null;
+        const fileInput = document.getElementById('resp-file-input');
+        if (fileInput) fileInput.value = '';
+        
+        // Cerrar formulario y recargar
+        toggleFormularioRespuesta();
         cargarRectificaciones(codigo, document.getElementById('detail-estado')?.textContent);
         
     } catch (error) {
-        console.error('Error:', error);
+        console.error('❌ Error enviando respuesta:', error);
         showToast(`Error: ${error.message}`, 'error');
+    } finally {
+        // Restaurar botón
+        if (btnEnviar) {
+            btnEnviar.disabled = false;
+            btnEnviar.textContent = textoOriginal;
+        }
     }
 }
 
@@ -1669,7 +1679,7 @@ window.viewDocument = async function(docId) {
             transaccion: detalleBackend.transaccion || detalleBackend.numeroTransaccion || doc.codigo,
             etapa: detalleBackend.etapa || getEtapaByEstado(detalleBackend.status || doc.estado),
             version: detalleBackend.version || `${doc.codigo}-V1`,
-            resumenCampos: detalleBackend.campos || detalleBackend.resumenCampos || [],
+            resumenCampos: detalleBackend.campos || detalleBackend.resumenCampos || detalleBackend.fields || detalleBackend.data || [],
             historial: detalleBackend.historial || detalleBackend.seguimiento || [{
                 fecha: `${formatDate(doc.fecha)} ${doc.hora}`,
                 progreso: doc.progreso,
@@ -1979,6 +1989,16 @@ function generateDefaultDetail(doc) {
 }
 
 function showDetailView(detalle) {
+    // DEBUG: Ver qué campos llegan del backend/localStorage
+    console.log('🔍 DEBUG showDetailView:', {
+        codigo: detalle.codigo,
+        resumenCamposCount: detalle.resumenCampos?.length || 0,
+        campos: detalle.resumenCampos?.map(c => ({ 
+            labelOriginal: c.label, 
+            labelNormalizado: normalizar(c.label),
+            value: c.value?.substring?.(0, 30) || c.value 
+        }))
+    });
     console.log('🔍 showDetailView() llamada con detalle:', detalle);
     console.log('   • Código:', detalle.codigo);
     console.log('   • Tipo:', detalle.tipo);
@@ -2019,17 +2039,23 @@ function showDetailView(detalle) {
         if (campos.length > 0) {
             const tipoDetalle = normalizar(detalle.tipo || detalle.asunto || '');
             const valor = (patterns, fallback = '-') => {
-    const item = campos.find(c => {
-        const label = normalizar(c.label || '');
-        return patterns.some(p => {
-            if (p instanceof RegExp) return p.test(label);
-            return label.includes(p);
-        });
-    });
-    return item?.value || fallback;
-
-    
-};
+                if (!Array.isArray(campos) || campos.length === 0) return fallback;
+                
+                const item = campos.find(c => {
+                    const label = normalizar(c.label || '');
+                    return patterns.some(p => {
+                        if (p instanceof RegExp) return p.test(label);
+                        // 🔥 FIX: Normalizar también el pattern string para que coincida
+                        return label.includes(normalizar(p));
+                    });
+                });
+                
+                // 🔥 FIX: Verificar que el valor no sea vacío, null o undefined
+                const val = item?.value;
+                return (val !== undefined && val !== null && String(val).trim() !== '' && String(val).trim() !== '-') 
+                    ? String(val).trim() 
+                    : fallback;
+            };
 
             // Para documentos distintos de indicador, mostrar solo los campos realmente llenados.
             if (!/indicador/.test(tipoDetalle)) {
