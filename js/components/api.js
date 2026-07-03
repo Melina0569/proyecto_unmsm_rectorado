@@ -656,8 +656,9 @@ const RemoteAPI = {
         async login(email, password) {
             try {
                 const normalizeAuthResponse = (data, fallbackEmail) => {
+                    const payload = data?.data || data || {};
                     // El backend devuelve: { accessToken, refreshToken, expiresIn, user: {...} }
-                    const user = data?.user || {};
+                    const user = payload?.user || {};
                     const emailFinal = user.email || fallbackEmail;
                     
                     // Construir nombre desde firstName + lastName
@@ -682,12 +683,14 @@ const RemoteAPI = {
                         nombreCompleto: nombre,
                         cargo: rol,
                         rol,
+                        role: rol,
                         facultyId,
                         facultadId: facultyId,
                         facultad,
                         nombreFacultad: facultad,
-                        refreshToken: data?.refreshToken || null,
-                        accessToken: data?.accessToken || null
+                        refreshToken: payload?.refreshToken || payload?.refresh_token || null,
+                        accessToken: payload?.accessToken || payload?.access_token || payload?.token || null,
+                        expiresIn: payload?.expiresIn || payload?.expires_in || 3600
                     };
                 };
 
@@ -704,15 +707,18 @@ const RemoteAPI = {
                     
                     localStorage.setItem('unmsm_user', JSON.stringify(normalizedUser));
                     
-                    // ✅ GUARDAR EXPIRACIÓN (1 hora = 3600 segundos)
-                    const expiresAt = Date.now() + (3600 * 1000);
+                    // ✅ GUARDAR EXPIRACIÓN según backend
+                    const expiresAt = Date.now() + ((normalizedUser.expiresIn || 3600) * 1000);
                     localStorage.setItem('unmsm_token_expires_at', String(expiresAt));
                 };
 
                 const loginWithJson = async (path) => {
                     const response = await fetch(`${CONFIG.REMOTE_BASE}${path}`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
                         body: JSON.stringify({ email, password })
                     });
 
@@ -726,49 +732,47 @@ const RemoteAPI = {
                     return { response, data };
                 };
 
-                const loginWithForm = async (path) => {
-                    const body = new URLSearchParams();
-                    body.append('username', email);
-                    body.append('password', password);
+                const buildAuthError = (result) => {
+                    const status = result?.response?.status ?? 0;
+                    const backendMessage = result?.data?.message || result?.data?.detail || result?.data?.error || result?.data?.code;
 
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}${path}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: body.toString()
-                    });
-
-                    let data = {};
-                    try {
-                        data = await response.json();
-                    } catch (error) {
-                        data = {};
+                    if (backendMessage) {
+                        return backendMessage;
                     }
 
-                    return { response, data };
+                    if (status === 401) return 'Credenciales incorrectas';
+                    if (status === 403) return 'Acceso denegado por el backend';
+                    if (status >= 500) return `Error del servidor (${status})`;
+                    if (status > 0) return `Error HTTP ${status}`;
+                    return 'No se pudo conectar con el backend';
                 };
 
                 let authResult = await loginWithJson('/auth/login');
+                let authResponse = authResult?.response ?? { ok: false, status: 0 };
                 let normalized = normalizeAuthResponse(authResult.data, email);
 
-                const needsFallback = !authResult.response.ok || !normalized.accessToken;
-                if (needsFallback) {
-                    authResult = await loginWithForm('/auth/token');
-                    normalized = normalizeAuthResponse(authResult.data, email);
-                }
-
-                if (authResult.response.ok && normalized.accessToken) {
+                if (authResponse.ok && normalized.accessToken) {
                     persistSession(normalized, normalized.accessToken, normalized.refreshToken);
                 }
 
+                const authError = authResponse.ok && !normalized.accessToken
+                    ? 'La API respondió sin token de acceso'
+                    : buildAuthError(authResult);
+
                 return {
-                    success: authResult.response.ok && !!normalized.accessToken,
+                    success: authResponse.ok && !!normalized.accessToken,
+                    error: authResponse.ok && !!normalized.accessToken ? null : authError,
                     data: {
                         ...authResult.data,
                         accessToken: normalized.accessToken,
                         refreshToken: normalized.refreshToken,
-                        user: authResult.data?.user || null
+                        user: authResult.data?.user || authResult.data?.data?.user || normalized,
+                        rol: normalized.rol,
+                        role: normalized.role,
+                        expiresIn: normalized.expiresIn,
+                        message: authResponse.ok && !!normalized.accessToken ? null : authError
                     },
-                    status: authResult.response.status
+                    status: authResponse.status
                 };
             } catch (error) {
                 return { 
@@ -2363,14 +2367,63 @@ const RemoteAPI = {
         // ========== PÚBLICO - INDICADORES ==========
         indicators: {
             async getAll(filtros = {}) {
-                const defaults = { page: 1, limit: 20, ...filtros };
-                const params = new URLSearchParams(defaults).toString();
+                const defaults = { page: 1, limit: 20 };
+                
+                // 🔥 FIX: Normalizar processType al formato que espera el backend
+                const cleanFiltros = { ...filtros };
+                if (cleanFiltros.processType) {
+                    const pt = String(cleanFiltros.processType).toUpperCase().trim();
+                    if (pt === 'STRATEGIC' || pt === 'ESTRATEGICO' || pt === 'ESTRATÉGICO') {
+                        cleanFiltros.processType = 'ESTRATEGICO';
+                    } else if (pt === 'MISSIONAL' || pt === 'MISIONAL' || pt === 'MISIÓN') {
+                        cleanFiltros.processType = 'MISIONAL';
+                    } else if (pt === 'SUPPORT' || pt === 'SOPORTE' || pt === 'DE APOYO' || pt === 'DE-APOYO') {
+                        cleanFiltros.processType = 'SOPORTE';
+                    }
+                }
+                
+                // 🔥 FIX: Si facultyId está vacío, no enviarlo (evita 500)
+                if (!cleanFiltros.facultyId || cleanFiltros.facultyId === '') {
+                    delete cleanFiltros.facultyId;
+                }
+                
+                const params = new URLSearchParams({ ...defaults, ...cleanFiltros }).toString();
                 const url = `${CONFIG.REMOTE_BASE}/public/indicators?${params}`;
+                
+                console.log('📤 GET /public/indicators?', params);
+                
                 try {
-                    const response = await fetch(url);
-                    return { success: response.ok, data: await response.json() };
+                    const response = await fetch(url, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    
+                    if (!response.ok) {
+                        const text = await response.text();
+                        let errorData = null;
+                        try { errorData = JSON.parse(text); } catch { errorData = { raw: text.substring(0, 200) }; }
+                        console.error('❌ /public/indicators error:', response.status, errorData);
+                        return { 
+                            success: false, 
+                            data: [],
+                            status: response.status,
+                            error: errorData?.message || `HTTP ${response.status}: ${response.statusText}`
+                        };
+                    }
+                    
+                    const data = await response.json();
+                    // El backend puede devolver { items: [...], pagination: {...} } o directamente [...]
+                    const items = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+                    const pagination = data?.pagination || data?.meta || null;
+                    
+                    return { 
+                        success: true, 
+                        data: items,
+                        status: response.status,
+                        pagination
+                    };
                 } catch (error) {
-                    return { success: false, error: error.message };
+                    console.error('❌ /public/indicators exception:', error);
+                    return { success: false, data: [], status: 0, error: error.message };
                 }
             },
 
@@ -2388,14 +2441,13 @@ const RemoteAPI = {
                     const headers = { 'Accept': 'application/json' };
                     if (token) headers.Authorization = `Bearer ${token}`;
 
-                    const response = await RemoteAPI.fetchWithTimeout(`${CONFIG.REMOTE_BASE}/public/indicators/${id}`, { headers });
+                    const response = await RemoteAPI.fetchWithTimeout(
+                        `${CONFIG.REMOTE_BASE}/public/indicators/${id}`, 
+                        { headers }
+                    );
 
                     let payload = null;
-                    try {
-                        payload = await response.json();
-                    } catch (e) {
-                        payload = null;
-                    }
+                    try { payload = await response.json(); } catch { payload = null; }
 
                     const error = response.ok ? null : (payload?.message || `HTTP ${response.status}`);
                     return { success: response.ok, data: payload, status: response.status, error };
@@ -2407,13 +2459,8 @@ const RemoteAPI = {
             async export(indicatorId) {
                 try {
                     const token = sessionStorage.getItem('accessToken') || localStorage.getItem('unmsm_token');
-                    const headers = {
-                        'Accept': 'application/json'
-                    };
-                    
-                    if (token) {
-                        headers['Authorization'] = `Bearer ${token}`;
-                    }
+                    const headers = { 'Accept': 'application/json' };
+                    if (token) headers.Authorization = `Bearer ${token}`;
 
                     const response = await RemoteAPI.fetchWithTimeout(
                         `${CONFIG.REMOTE_BASE}/public/indicators/${indicatorId}/export`,
@@ -2425,31 +2472,17 @@ const RemoteAPI = {
                         try {
                             const errData = await response.json();
                             errorMsg = errData.message || errData.error || errorMsg;
-                        } catch (e) {
-                            // No JSON response, use default error
-                        }
-                        return { 
-                            success: false, 
-                            error: errorMsg,
-                            status: response.status 
-                        };
+                        } catch (e) {}
+                        return { success: false, error: errorMsg, status: response.status };
                     }
 
                     const blob = await response.blob();
+                    const filename = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/["']/g, '') || `indicador-${indicatorId}.pdf`;
                     
-                    return { 
-                        success: true, 
-                        data: blob,
-                        filename: `indicador-${indicatorId}.pdf`,
-                        status: response.status
-                    };
+                    return { success: true, data: blob, filename, status: response.status };
                 } catch (error) {
                     console.error('Error exportando indicador:', error);
-                    return { 
-                        success: false, 
-                        error: error.message,
-                        status: 0 
-                    };
+                    return { success: false, error: error.message, status: 0 };
                 }
             }
         },
@@ -2677,22 +2710,10 @@ window.aprobarSolicitud = aprobarSolicitud;
 
 (function setupFetchInterceptor() {
     const originalFetch = window.fetch;
-    
-    let isRefreshing = false;
-    let refreshSubscribers = [];
-
-    function subscribeTokenRefresh(callback) {
-        refreshSubscribers.push(callback);
-    }
-
-    function onTokenRefreshed(newToken) {
-        refreshSubscribers.forEach(callback => callback(newToken));
-        refreshSubscribers = [];
-    }
 
     // ✅ FUNCIÓN PÚBLICA: Hacer peticiones con auto-refresh
     window.apiFetch = async function(url, options = {}) {
-        // ... tu código actual ...
+        return originalFetch.call(window, url, options);
     };
 
     // ✅ REEMPLAZAR fetch global con el interceptor

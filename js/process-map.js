@@ -151,6 +151,11 @@ const ProcessMap = {
                         missional: d.missional || [],
                         support: d.support || []
                     };
+                    
+                    // Asignar tipo automáticamente según la categoría
+                    this.processes.strategic.forEach(p => p.type = 'strategic');
+                    this.processes.missional.forEach(p => p.type = 'missional');
+                    this.processes.support.forEach(p => p.type = 'support');
                 }
                 this.updateUIFacultyInfo();
                 // Si el endpoint público viene vacío, usar la fuente remota secundaria para mostrar el mapa
@@ -196,6 +201,12 @@ const ProcessMap = {
                     missional: remoteProcessMap.missional || [],
                     support: remoteProcessMap.support || []
                 };
+                
+                // Asignar tipo automáticamente según la categoría
+                this.processes.strategic.forEach(p => p.type = 'strategic');
+                this.processes.missional.forEach(p => p.type = 'missional');
+                this.processes.support.forEach(p => p.type = 'support');
+                
                 this.renderProcesses();
                 return;
             }
@@ -204,6 +215,12 @@ const ProcessMap = {
             const fallback = await window.API?.processes?.getByFaculty?.(this.facultyId);
             if (fallback && fallback.success) {
                 this.processes = fallback.data;
+                
+                // Asignar tipo automáticamente si el fallback también viene sin type
+                if (this.processes.strategic) this.processes.strategic.forEach(p => p.type = p.type || 'strategic');
+                if (this.processes.missional) this.processes.missional.forEach(p => p.type = p.type || 'missional');
+                if (this.processes.support) this.processes.support.forEach(p => p.type = p.type || 'support');
+                
                 this.renderProcesses();
             }
         } catch (error) {
@@ -2170,6 +2187,7 @@ const ProcessMap = {
                     process.fichaPdfUrl = resolved;
                     // conservar campo de descarga si viene separado
                     process.fichaDownloadUrl = d.downloadUrl && String(d.downloadUrl).startsWith('/') ? base + d.downloadUrl : d.downloadUrl || null;
+                    this.currentFichaTecnicaDownloadUrl = process.fichaDownloadUrl || null;
                     process.ficha = d;
                 }
             } catch (e) {
@@ -2235,9 +2253,9 @@ const ProcessMap = {
                         }
                     } else {
                         // Intentar usar downloadUrl si existe
-                        if (this.currentFichaTecnicaDownloadUrl) {
+                        if (process.fichaDownloadUrl) {
                             try {
-                                const dresp = await fetch(this.currentFichaTecnicaDownloadUrl, { method: 'GET', mode: 'cors' });
+                                const dresp = await fetch(process.fichaDownloadUrl, { method: 'GET', mode: 'cors' });
                                 if (dresp.ok) {
                                     const blob = await dresp.blob();
                                     if (this.currentFichaTecnicaBlobUrl) window.URL.revokeObjectURL(this.currentFichaTecnicaBlobUrl);
@@ -2259,9 +2277,9 @@ const ProcessMap = {
                     }
                 } catch (err) {
                     console.warn('Prefetch ficha técnica falló, usando URL directa o download:', err);
-                    if (this.currentFichaTecnicaDownloadUrl) {
+                    if (process.fichaDownloadUrl) {
                         try {
-                            const dresp = await fetch(this.currentFichaTecnicaDownloadUrl, { method: 'GET', mode: 'cors' });
+                            const dresp = await fetch(process.fichaDownloadUrl, { method: 'GET', mode: 'cors' });
                             if (dresp.ok) {
                                 const blob = await dresp.blob();
                                 if (this.currentFichaTecnicaBlobUrl) window.URL.revokeObjectURL(this.currentFichaTecnicaBlobUrl);

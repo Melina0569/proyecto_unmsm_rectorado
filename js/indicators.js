@@ -2,130 +2,22 @@
  * INDICATORS MODULE
  * Maneja la lógica de indicadores de gestión
  */
-
-// Datos de ejemplo expandidos con más información
-const exampleIndicators = [
-    {
-        id: 'IND-E-001',
-        title: 'Ejecución presupuestaria de recursos RDR',
-        code: 'IND-E-001',
-        version: '1.0',
-        desc: 'Evaluar el nivel de avance en la ejecución del gasto y la capacidad de gestión presupuestal.',
-        facultyId: 'all',
-        type: 'strategic',
-        icon: 'query_stats',
-        color: 'blue',
-        proceso: 'Gestión Estratégica',
-        responsable: 'Jefe de la Unidad de Planificación, Presupuesto y Racionalización',
-        objetivo: 'Evaluar el nivel de avance en la ejecución del gasto y la capacidad de gestión presupuestal.',
-        indicadorNombre: 'Porcentaje de Ejecución presupuestaria de los recursos directamente recaudados (RDR)',
-        frecuencia: 'Mensual',
-        variableN: 'Presupuesto ejecutado por la facultad en recursos directamente recaudados (RDR)',
-        variableD: 'Presupuesto asignado a la facultad en recursos directamente recaudados (RDR)',
-        fuente: 'Quipucamayoc',
-        meta: 90,
-        seguimiento: [
-            { periodo: '2025-I', N: 78, D: 90, meta: 90, valor: 86.7, estado: 'Riesgo', observaciones: 'Ajustes de programación presupuestal' },
-            { periodo: '2025-II', N: 84, D: 92, meta: 90, valor: 91.3, estado: 'Óptimo', observaciones: 'Ejecución recuperada' }
-        ]
-    },
-    {
-        id: 'IND-E-002',
-        title: 'Cumplimiento de acciones estratégicas',
-        code: 'IND-E-002',
-        version: '1.0',
-        desc: 'Evaluar el nivel de cumplimiento de la programación operativa y la capacidad de gestión para ejecutar actividades previstas.',
-        facultyId: 'all',
-        type: 'strategic',
-        icon: 'task_alt',
-        color: 'teal',
-        proceso: 'Gestión Estratégica',
-        responsable: 'Jefe de la Unidad de Planificación, Presupuesto y Racionalización',
-        objetivo: 'Evaluar el nivel de cumplimiento de la programación operativa y la capacidad de gestión para ejecutar las actividades previstas.',
-        indicadorNombre: 'Porcentaje de cumplimiento de Acciones Estratégicas',
-        frecuencia: 'Anual',
-        variableN: 'Acciones estratégicas con avance igual o mayor al 75%',
-        variableD: 'Acciones estratégicas programadas',
-        fuente: 'Plan Estratégico',
-        meta: 90,
-        seguimiento: [
-            { periodo: '2024', N: 42, D: 50, meta: 90, valor: 84.0, estado: 'Riesgo', observaciones: 'Brecha en actividades transversales' },
-            { periodo: '2025', N: 47, D: 50, meta: 90, valor: 94.0, estado: 'Óptimo', observaciones: 'Meta superada' }
-        ]
-    },
-    {
-        id: 'IND-001',
-        title: "Proceso de matrícula",
-        code: "PROC-001",
-        version: "1",
-        desc: "Procedimiento completo para la matrícula de estudiantes en los diferentes ciclos académicos.",
-        facultyId: '20',
-        type: 'strategic',
-        icon: 'how_to_reg',
-        color: 'blue',
-        proceso: "Gestión académica",
-        responsable: "Jefe de la Oficina de Registro Académico",
-        objetivo: "Asegurar el registro oportuno y formal de la carga académica de los estudiantes matriculados conforme al cronograma universitario vigente.",
-        indicadorNombre: "Porcentaje de estudiantes matriculados en el plazo establecido",
-        frecuencia: "Semestral",
-        variableN: "Estudiantes matriculados en el plazo",
-        variableD: "Total de estudiantes admitidos",
-        fuente: "Sistema de Matrícula",
-        meta: 90,
-        seguimiento: [
-            { periodo: '2026-1', N: 450, D: 500, meta: 90, valor: 90, estado: 'Óptimo', observaciones: '' },
-            { periodo: '2026-2', N: 480, D: 500, meta: 90, valor: 96, estado: 'Óptimo', observaciones: 'Mejora en proceso' }
-        ]
-    },
-    {
-        id: 'IND-002',
-        title: "Emisión de Grados",
-        code: "PROC-002",
-        version: "1",
-        desc: "Gestión administrativa para la expedición de títulos y grados académicos de bachiller.",
-        facultyId: '20',
-        type: 'missional',
-        icon: 'description',
-        color: 'teal',
-        proceso: "Gestión de grados y títulos",
-        responsable: "Jefe de la Unidad de Grados y Títulos",
-        objetivo: "Garantizar la emisión oportuna de grados y títulos dentro de los plazos establecidos por normativa universitaria.",
-        indicadorNombre: "Porcentaje de grados emitidos en el plazo legal",
-        frecuencia: "Mensual",
-        variableN: "Grados emitidos en plazo",
-        variableD: "Total de solicitudes aprobadas",
-        fuente: "Sistema de Trámite Documentario",
-        meta: 85,
-        seguimiento: [
-            { periodo: '2026-1', N: 85, D: 100, meta: 85, valor: 85, estado: 'Óptimo', observaciones: '' },
-            { periodo: '2026-2', N: 80, D: 100, meta: 85, valor: 80, estado: 'Riesgo', observaciones: 'Demoras en firmas' }
-        ]
-    },
-    {
-        id: 'IND-003',
-        title: "Traslado Interno",
-        code: "PROC-003",
-        version: "1",
-        desc: "Evaluación y trámite para el cambio de escuela profesional dentro de la misma facultad.",
-        facultyId: '19',
-        type: 'support',
-        icon: 'school',
-        color: 'orange',
-        proceso: "Gestión de traslados",
-        responsable: "Director de Escuela Profesional",
-        objetivo: "Evaluar y tramitar los cambios de escuela profesional garantizando el cumplimiento de los requisitos académicos establecidos.",
-        indicadorNombre: "Porcentaje de traslados resueltos en el plazo",
-        frecuencia: "Semestral",
-        variableN: "Traslados resueltos en plazo",
-        variableD: "Total de solicitudes de traslado",
-        fuente: "Comisión de Traslados",
-        meta: 90,
-        seguimiento: [
-            { periodo: '2026-1', N: 18, D: 25, meta: 90, valor: 72, estado: 'Crítico', observaciones: 'Acumulación de casos' },
-            { periodo: '2026-2', N: 20, D: 25, meta: 90, valor: 80, estado: 'Riesgo', observaciones: '' }
-        ]
+// ============================================
+// PROTECCIÓN: Verificar que API esté disponible
+// ============================================
+function ensureApi() {
+    if (typeof window.API === 'undefined' || !window.API) {
+        console.error('❌ API no está definida. Posibles causas:');
+        console.error('   1. api.js no se cargó (verifica <script src="js/api.js">)');
+        console.error('   2. api.js tiene un error de JavaScript (revisa la Consola)');
+        console.error('   3. El orden de scripts es incorrecto');
+        return false;
     }
-];
+    return true;
+}
+
+// Alias global para compatibilidad
+var API = window.API;
 
 // Estado actual
 let currentIndicators = [];
@@ -348,9 +240,13 @@ function extractVariables(rawVariables, fallbackN = '', fallbackD = '') {
 }
 
 function getStoredIndicators() {
+    // 🔥 SOLO lee indicadores que fueron previamente guardados desde la API
+    // No genera datos ficticios. Si no hay nada en localStorage, devuelve [].
+    
     const documentosLista = safeParseArray(localStorage.getItem(INDICATOR_STORAGE_KEYS.DOCUMENTOS_LISTA));
     const detalleIndicadores = safeParseObject(localStorage.getItem(INDICATOR_STORAGE_KEYS.INDICADORES_DETALLE));
     const detalleDocumentos = safeParseObject(localStorage.getItem(INDICATOR_STORAGE_KEYS.DOCUMENTOS_DETALLE));
+
     const activeIndicatorCodes = new Set(
         documentosLista
             .filter((doc) => {
@@ -363,6 +259,11 @@ function getStoredIndicators() {
             .map((doc) => String(doc?.codigo || '').trim())
             .filter(Boolean)
     );
+
+    // Si no hay códigos activos, no hay nada que mostrar
+    if (activeIndicatorCodes.size === 0) {
+        return [];
+    }
 
     const byCode = new Map();
 
@@ -591,7 +492,22 @@ document.addEventListener('DOMContentLoaded', () => {
  * Carga indicadores
  */
 async function loadIndicators(facultyId = null) {
+    // 🔥 PROTECCIÓN
+    if (!ensureApi()) {
+        lastIndicatorsMeta = { 
+            source: 'remote', 
+            total: 0, 
+            status: 0, 
+            error: 'API no está disponible. Verifica que api.js se cargue correctamente.' 
+        };
+        currentIndicators = [];
+        renderIndicators([]);
+        return;
+    }
     selectedFacultyId = facultyId ? String(facultyId) : '';
+    
+    // Solo usar localStorage como respaldo si explícitamente se solicita (modo offline)
+    // En modo remoto normal, si la API falla, mostramos vacío con el error
     const allIndicators = getAllIndicators();
 
     const applyFacultyFilter = (items) => {
@@ -603,7 +519,10 @@ async function loadIndicators(facultyId = null) {
     };
 
     try {
-        const remoteResult = await (selectedFacultyId ? getIndicatorsByFaculty(selectedFacultyId, 1, 20) : getIndicators(1, 20));
+        // 🔥 FIX: Llamar a la API con facultyId si existe
+        const remoteResult = await (selectedFacultyId 
+            ? getIndicatorsByFaculty(selectedFacultyId, 1, 20) 
+            : getIndicators(1, 20));
 
         let payload = [];
         if (!remoteResult) {
@@ -620,54 +539,66 @@ async function loadIndicators(facultyId = null) {
             payload = remoteResult.results;
         }
 
-        const remoteTotal = Array.isArray(payload) ? payload.length : (remoteResult?.pagination?.total ?? (remoteResult?.data?.pagination?.total ?? 0) );
-        const remoteStatus = remoteResult?.status ?? (remoteResult?.data?.status) ?? (remoteResult?.success ? 200 : 0);
-        const remoteError = remoteResult?.error ?? (remoteResult?.data?.message) ?? null;
+        const remoteTotal = Array.isArray(payload) ? payload.length : (remoteResult?.pagination?.total ?? 0);
+        const remoteStatus = remoteResult?.status ?? (remoteResult?.success ? 200 : 0);
+        const remoteError = remoteResult?.error ?? null;
 
-        // Guardar metadata para el render UI
-        lastIndicatorsMeta = { source: 'remote', total: Number(remoteTotal || 0), status: Number(remoteStatus || 0), error: remoteError };
+        lastIndicatorsMeta = { 
+            source: 'remote', 
+            total: Number(remoteTotal || 0), 
+            status: Number(remoteStatus || 0), 
+            error: remoteError 
+        };
 
+        // 🔥 FIX: Si la API devuelve error (como 500), NO usar datos locales como fallback
+        if (!remoteResult || !remoteResult.success || remoteStatus >= 500) {
+            console.warn('⚠️ API de indicadores no disponible o error:', remoteError);
+            currentIndicators = [];
+            renderIndicators([]);
+            return;
+        }
+
+        // Mapear respuesta de la API al formato de UI
         let remoteIndicators = (Array.isArray(payload) && payload.length > 0)
-            ? payload.map((item) => ({
-                id: String(item.id || item.code || item.codigo || generateId()),
-                title: item.nombreIndicador || item.title || item.name || `Indicador ${item.code || item.codigo || ''}`.trim(),
-                code: item.code || item.codigo || item.id || 'IND',
-                version: item.version || '1',
-                desc: item.descripcion || item.desc || item.objetivo || 'Indicador aprobado del repositorio público.',
-                facultyId: normalizeFacultyId(item.facultadId || item.facultyId || 'all'),
-                type: resolveIndicatorType(item.tipo || item.type || item.tipoProceso),
-                icon: item.icon || 'monitoring',
-                color: getIndicatorColorByType(resolveIndicatorType(item.tipo || item.type || item.tipoProceso)),
-                proceso: item.proceso || item.macroProcesoNombre || item.macroProceso || '-',
-                responsable: item.responsable || item.unidadResponsable || '-',
-                objetivo: item.objetivo || item.objetivoProceso || '-',
-                indicadorNombre: item.nombreIndicador || item.name || '-',
-                frecuencia: item.frecuencia || '-',
-                variableN: item.variableN || '-',
-                variableD: item.variableD || '-',
-                fuente: item.fuente || '-',
-                meta: Number(item.meta ?? item.target ?? 0) || 0,
-                seguimiento: Array.isArray(item.seguimiento) ? item.seguimiento : []
-            }))
-            : allIndicators;
+            ? payload.map((item) => mapApiIndicatorToUi(item)).filter(Boolean)
+            : [];
 
-        // Per-item detail fallback: for items missing variables or seguimiento, try to fetch detail
-        const needsDetail = remoteIndicators.filter((it) => (!it.variableN || it.variableN === '-' || !it.seguimiento || it.seguimiento.length === 0));
+        // Solo si la API devolvió datos vacíos pero exitosos (200 + []), 
+        // y el usuario tiene datos guardados en localStorage, mostrar esos
+        if (remoteIndicators.length === 0 && allIndicators.length > 0) {
+            console.log('📭 API devolvió 0 indicadores, mostrando datos locales guardados...');
+            remoteIndicators = allIndicators;
+            lastIndicatorsMeta.source = 'local';
+        }
+
+        // Per-item detail fallback: para items que les falten variables o seguimiento
+        const needsDetail = remoteIndicators.filter((it) => 
+            (!it.variableN || it.variableN === '-' || !it.seguimiento || it.seguimiento.length === 0)
+        );
+        
         if (needsDetail.length > 0) {
-            const detailPromises = needsDetail.map((it) => API.public.indicators.getById(it.id).catch(() => ({ success: false })));
+            const detailPromises = needsDetail.map((it) => 
+                API.public.indicators.getById(it.id).catch(() => ({ success: false }))
+            );
             const details = await Promise.all(detailPromises);
             for (let i = 0; i < needsDetail.length; i += 1) {
                 const original = needsDetail[i];
                 const detailRes = details[i];
-                if (detailRes && detailRes.success && detailRes.data) {
+                if (detailRes?.success && detailRes.data) {
                     const d = detailRes.data;
                     const idx = remoteIndicators.findIndex((r) => r.id === original.id);
                     if (idx >= 0) {
                         remoteIndicators[idx] = {
                             ...remoteIndicators[idx],
-                            variableN: remoteIndicators[idx].variableN && remoteIndicators[idx].variableN !== '-' ? remoteIndicators[idx].variableN : (d.variableN || d.variableNLabel || remoteIndicators[idx].variableN),
-                            variableD: remoteIndicators[idx].variableD && remoteIndicators[idx].variableD !== '-' ? remoteIndicators[idx].variableD : (d.variableD || d.variableDLabel || remoteIndicators[idx].variableD),
-                            seguimiento: (Array.isArray(d.seguimiento) && d.seguimiento.length > 0) ? d.seguimiento : remoteIndicators[idx].seguimiento
+                            variableN: remoteIndicators[idx].variableN && remoteIndicators[idx].variableN !== '-' 
+                                ? remoteIndicators[idx].variableN 
+                                : (d.variableN || d.variableNLabel || remoteIndicators[idx].variableN),
+                            variableD: remoteIndicators[idx].variableD && remoteIndicators[idx].variableD !== '-' 
+                                ? remoteIndicators[idx].variableD 
+                                : (d.variableD || d.variableDLabel || remoteIndicators[idx].variableD),
+                            seguimiento: (Array.isArray(d.seguimiento) && d.seguimiento.length > 0) 
+                                ? d.seguimiento 
+                                : remoteIndicators[idx].seguimiento
                         };
                     }
                 }
@@ -677,10 +608,12 @@ async function loadIndicators(facultyId = null) {
         const indicators = applyFacultyFilter(remoteIndicators);
         currentIndicators = indicators;
         renderIndicators(indicators);
+        
     } catch (e) {
-        const indicators = applyFacultyFilter(allIndicators);
-        currentIndicators = indicators;
-        renderIndicators(indicators);
+        console.error('❌ Error cargando indicadores:', e);
+        lastIndicatorsMeta = { source: 'remote', total: 0, status: 0, error: e.message };
+        currentIndicators = [];
+        renderIndicators([]);
     }
 }
 
@@ -805,9 +738,9 @@ function renderIndicators(indicators) {
     if (!grid) return;
 
     if (indicators.length === 0) {
-        // Mensaje más explícito según la última metadata remota
         let message = 'No se encontraron indicadores para esta facultad';
         let extraHtml = '';
+        
         if (lastIndicatorsMeta && lastIndicatorsMeta.source === 'remote') {
             if (lastIndicatorsMeta.status === 200 && Number(lastIndicatorsMeta.total) === 0) {
                 message = 'No hay indicadores publicados para esta facultad.';
@@ -818,11 +751,16 @@ function renderIndicators(indicators) {
             } else if (lastIndicatorsMeta.error) {
                 message = `No se pudo cargar indicadores: ${lastIndicatorsMeta.error}`;
             }
-
-            // ofrecer ver indicadores locales como fallback
-            extraHtml = `<div class="mt-4">
-                <button class="px-4 py-2 bg-primary text-white rounded-lg" onclick="showLocalExamples()">Ver indicadores locales</button>
-            </div>`;
+            
+            // 🔥 Solo mostrar botón de fallback si hay datos locales REALES guardados
+            const localCount = getAllIndicators().length;
+            if (localCount > 0) {
+                extraHtml = `<div class="mt-4">
+                    <button class="px-4 py-2 bg-primary text-white rounded-lg" onclick="showLocalExamples()">
+                        Ver ${localCount} indicador(es) guardado(s) localmente
+                    </button>
+                </div>`;
+            }
         }
 
         grid.innerHTML = `
@@ -909,13 +847,8 @@ function selectIndicator(indicatorId, options = {}) {
 
 // Fallback helper: render indicadores locales generados
 function showLocalExamples() {
-    try {
-        const local = getAllIndicators();
-        currentIndicators = local;
-        renderIndicators(local);
-    } catch (e) {
-        console.error('No se pudieron cargar indicadores locales:', e);
-    }
+    // 🔥 Ya no muestra datos de ejemplo. Solo recarga desde la API.
+    loadIndicators(selectedFacultyId || null);
 }
 
 /**
@@ -1476,6 +1409,44 @@ async function downloadIndicator(indicatorId) {
         }
     }
 }
+
+// Añadir al final del archivo, junto a las otras inicializaciones
+async function loadFacultyOptions() {
+    if (!ensureApi()) return;
+    
+    try {
+        const res = await API.public.faculties.getAll({ page: 1, limit: 50 });
+        const faculties = res.success && Array.isArray(res.data) ? res.data : [];
+        
+        const container = document.getElementById('faculty-options-container');
+        if (!container) return;
+        
+        container.innerHTML = faculties.map(f => `
+            <button type="button" 
+                    class="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 
+                           hover:bg-slate-100 dark:hover:bg-slate-700 
+                           transition-colors faculty-option" 
+                    data-value="${f.id}">
+                ${f.name}
+            </button>
+        `).join('');
+        
+        // Re-inicializar event listeners
+        initCustomSelect();
+        
+    } catch (e) {
+        console.error('Error cargando facultades:', e);
+    }
+}
+
+// Modificar el DOMContentLoaded existente:
+document.addEventListener('DOMContentLoaded', () => {
+    loadFacultyOptions();  // ← NUEVO: Cargar facultades desde API
+    loadIndicators();
+    initFacultyFilter();
+    initSearch();
+    initRealtimeSync();
+});
 
 // Exportar funciones globales
 window.selectIndicator = selectIndicator;
