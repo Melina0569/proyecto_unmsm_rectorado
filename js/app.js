@@ -19,41 +19,33 @@ const App = {
             return;
         }
 
-        const token = localStorage.getItem('token');
-        const headers = {
-            Accept: 'application/json'
-        };
-
-        if (token) {
-            headers.Authorization = `Bearer ${token}`;
-        }
-
         try {
-            const response = await fetch('http://localhost:8080/v1/public/stats', {
-                method: 'GET',
-                headers
-            });
-
-            if (!response.ok) {
-                throw new Error(`Error obteniendo stats globales (${response.status})`);
+            const result = await API.dashboard.getPublicMetrics();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Error obteniendo stats');
             }
 
-            const data = await response.json();
+            const data = result.data || {};
 
-            // Soporta variaciones de naming del backend sin romper la UI.
-            const faculties = data.faculties ?? data.facultyCount ?? data.totalFaculties;
-            const indicators = data.indicators ?? data.indicatorsCount ?? data.totalIndicators;
-            const flows = data.flows ?? data.flowsCount ?? data.totalFlows;
-            const activeUsers = data.activeUsers ?? data.usersActive ?? data.activeUsersCount ?? data.users;
+            // ✅ Extraer valores con múltiples fallback keys
+            const faculties = data.faculties ?? data.facultyCount ?? data.totalFaculties ?? null;
+            const indicators = data.indicators ?? data.indicatorsCount ?? data.totalIndicators ?? null;
+            const flows = data.flows ?? data.flowsCount ?? data.totalFlows ?? null;
+            const activeUsers = data.activeUsers ?? data.usersActive ?? data.activeUsersCount ?? data.users ?? null;
 
+            // Solo actualizar si el valor es válido
             if (Number.isFinite(Number(faculties))) facultyEl.textContent = String(faculties);
             if (Number.isFinite(Number(indicators))) indicatorsEl.textContent = String(indicators);
             if (Number.isFinite(Number(flows))) flowsEl.textContent = String(flows);
             if (Number.isFinite(Number(activeUsers))) usersEl.textContent = String(activeUsers);
+            
         } catch (error) {
-            console.error(error);
+            console.warn('Stats no disponibles:', error.message);
+            // No sobreescribir - dejar los valores del HTML o mostrar guiones
         }
     },
+    
 
     // Tema oscuro/claro
     initTheme() {

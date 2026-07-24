@@ -20,15 +20,23 @@ const INDICADOR_CONFIG = {
     SHOW_DOCUMENTOS_BUTTON_DELAY_MS: 1400
 };
 
+const _SK_MODE = (typeof CONFIG !== 'undefined' && CONFIG.MODE) ? CONFIG.MODE : 'local';
 const INDICADOR_STORAGE_KEYS = {
-    DOCUMENTOS_LISTA: 'sigpro_documentos_lista',
-    DOCUMENTOS_DETALLE: 'sigpro_documentos_detalle',
-    INDICADORES_DETALLE: 'sigpro_indicadores_detalle',
-    HISTORIAL_PREFIX: 'sigpro_historial_datos_'
+    DOCUMENTOS_LISTA:    `${_SK_MODE}_sigpro_documentos_lista`,
+    DOCUMENTOS_DETALLE:  `${_SK_MODE}_sigpro_documentos_detalle`,
+    INDICADORES_DETALLE: `${_SK_MODE}_sigpro_indicadores_detalle`,
+    HISTORIAL_PREFIX:    'sigpro_historial_datos_'   // este SÍ queda sin prefijo
 };
 
+/*
 const FICHA_CONFIG = INDICADOR_CONFIG;
-const FICHA_STORAGE_KEYS = INDICADOR_STORAGE_KEYS;
+const _SK_MODE = (typeof CONFIG !== 'undefined' && CONFIG.MODE) ? CONFIG.MODE : 'local';
+const FICHA_STORAGE_KEYS = {
+    DOCUMENTOS_LISTA:    `${_SK_MODE}_sigpro_documentos_lista`,
+    INDICADORES_DETALLE: `${_SK_MODE}_sigpro_indicadores_detalle`,
+    DOCUMENTOS_DETALLE:  `${_SK_MODE}_sigpro_documentos_detalle`
+};
+*/
 
 const FACULTY_CODE_MAP = {
     'Facultad de medicina': 'FM',
@@ -1233,7 +1241,7 @@ function initFormHandler() {
                 tipoProcesoLabel: getSelectedOptionText(tipoProcesoInput),
                 macroProcesoNombre: getSelectedOptionText(macroProcesoInput) || obtenerNombreMacroProceso(data.macroProceso),
                 facultadId: resolveFacultyId(),
-                generadoPor: currentUser?.correo || 'Facultad',
+                generadoPor: 'Facultad',
                 estado: 'pendiente',
                 version: data.version || '1.0'
             };

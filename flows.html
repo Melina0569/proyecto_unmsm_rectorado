@@ -271,13 +271,25 @@
                             placeholder-slate-400
                             focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20
                             transition-all duration-200 ease-in-out" 
-                    placeholder="Buscar indicadores por nombre, código o tipo..."/>
+                    placeholder="Buscar flujogramas por nombre, código o tipo..."/>
             </div>
             
         </div>
 
         <!-- Input hidden para mantener compatibilidad con JS existente -->
         <input type="hidden" id="faculty-select" value="">
+
+        <!-- Loading state -->
+        <div id="loading-state" class="hidden py-12 text-center">
+            <span class="material-icons-round text-4xl text-primary animate-spin">refresh</span>
+            <p class="mt-4 text-slate-500 dark:text-slate-400">Cargando flujogramas...</p>
+        </div>
+
+        <!-- No results -->
+        <div id="no-results" class="hidden py-12 text-center">
+            <span class="material-icons-round text-4xl text-slate-400">search_off</span>
+            <p class="mt-4 text-slate-500 dark:text-slate-400">No se encontraron flujogramas para esta facultad</p>
+        </div>
 
         <!-- Cards Grid -->
         <div id="procedures-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
@@ -354,6 +366,7 @@
     <script src="js/utils/helpers.js"></script>
     <script src="js/services/Modal.js"></script>
     <script src="js/services/Toast.js"></script>
+    <script src="js/components/api.js"></script>
     <script src="js/flows.js"></script>
 </body>
 </html>

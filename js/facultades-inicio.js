@@ -330,13 +330,18 @@ function calcularContadoresDesdeLocalStorage() {
     let enProceso = 0;
     let completados = 0;
 
-    // Revisar todas las claves de localStorage que contienen documentos
+    // 🔧 FIX: Definir qué claves revisar
     const clavesRevisar = [
         'sigpro_documentos_lista',
-        'sigpro_reportes',
-        'sigpro_indicadores_detalle',
-        'sigpro_documentos_detalle'
+        'local_sigpro_documentos_lista',
+        'sigpro_user_documents',
+        'local_sigpro_user_documents'
     ];
+
+    // 🔧 FIX: Fecha límite para considerar "documentos del usuario"
+    // Solo contar documentos creados DESPUÉS de la fecha de seed (2026-07-22)
+    // O documentos que tengan el flag isUserCreated: true
+    const FECHA_SEED = new Date('2026-07-22T00:00:00Z').getTime();
 
     for (const clave of clavesRevisar) {
         try {
@@ -344,26 +349,34 @@ function calcularContadoresDesdeLocalStorage() {
             if (!raw) continue;
 
             const datos = JSON.parse(raw);
+            if (!Array.isArray(datos)) continue;
 
-            // Si es un array (lista de documentos)
-            if (Array.isArray(datos)) {
-                for (const doc of datos) {
-                    const estado = normalizarEstado(doc.estado || doc.status);
-                    if (estado === 'pendiente') pendientes++;
-                    else if (estado === 'en_proceso') enProceso++;
-                    else if (estado === 'completado') completados++;
-                }
-            }
+            for (const doc of datos) {
+                // 🔧 FIX: Ignorar datos de demo explícitamente marcados
+                if (doc.isDemo === true) continue;
 
-            // Si es un objeto (detalle por código)
-            else if (datos && typeof datos === 'object') {
-                for (const [codigo, doc] of Object.entries(datos)) {
-                    if (!doc || typeof doc !== 'object') continue;
-                    const estado = normalizarEstado(doc.estado || doc.status);
-                    if (estado === 'pendiente') pendientes++;
-                    else if (estado === 'en_proceso') enProceso++;
-                    else if (estado === 'completado') completados++;
+                // 🔧 FIX: Ignorar documentos de demo por código conocido
+                const codigo = String(doc.codigo || doc.id || '').toUpperCase();
+                if (codigo.includes('PE01-001') || codigo.includes('PE01-002')) continue;
+                if (codigo.includes('IND-FM-PE01')) continue;
+
+                // 🔧 FIX: Ignorar documentos creados antes de la fecha de seed
+                // (los datos de demo tienen fechas antiguas como 2025-01-15)
+                const fechaDoc = doc.fecha || doc.createdAt || doc.fechaCreacion;
+                if (fechaDoc) {
+                    const fechaMs = new Date(fechaDoc).getTime();
+                    if (!isNaN(fechaMs) && fechaMs < FECHA_SEED) {
+                        continue; // Es un documento de demo antiguo
+                    }
                 }
+
+                // 🔧 FIX: Ignorar documentos de expedientes_lista (son todos demo)
+                if (clave === 'sigpro_expedientes_lista') continue;
+
+                const estado = normalizarEstado(doc.estado || doc.status);
+                if (estado === 'pendiente') pendientes++;
+                else if (estado === 'en_proceso') enProceso++;
+                else if (estado === 'completado') completados++;
             }
 
         } catch (e) {

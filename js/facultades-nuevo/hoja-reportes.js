@@ -27,9 +27,10 @@ const REPORT_CONFIG = {
     SHOW_DOCUMENTOS_BUTTON_DELAY_MS: 1400
 };
 
+const _SK_MODE = (typeof CONFIG !== 'undefined' && CONFIG.MODE) ? CONFIG.MODE : 'local';
 const REPORT_STORAGE_KEYS = {
-    DOCUMENTOS_LISTA: 'sigpro_documentos_lista',
-    DOCUMENTOS_DETALLE: 'sigpro_documentos_detalle'
+    DOCUMENTOS_LISTA:   `${_SK_MODE}_sigpro_documentos_lista`,
+    DOCUMENTOS_DETALLE: `${_SK_MODE}_sigpro_documentos_detalle`
 };
 
 const FACULTY_CODE_MAP = {

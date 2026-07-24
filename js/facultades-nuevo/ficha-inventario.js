@@ -15,8 +15,10 @@ const FICHA_CONFIG = {
     SHOW_DOCUMENTOS_BUTTON_DELAY_MS: 1400
 };
 
+const _SK_MODE = (typeof CONFIG !== 'undefined' && CONFIG.MODE) ? CONFIG.MODE : 'local';
 const FICHA_STORAGE_KEYS = {
-    DOCUMENTOS_LISTA: 'sigpro_documentos_lista'
+    DOCUMENTOS_LISTA:   `${_SK_MODE}_sigpro_documentos_lista`,
+    DOCUMENTOS_DETALLE: `${_SK_MODE}_sigpro_documentos_detalle`  // ← agregar también
 };
 
 const FACULTY_CODE_MAP = {
@@ -213,7 +215,7 @@ function generateInventoryCode() {
     const year = new Date().getFullYear();
     const facultyCode = resolveFacultyCode();
     const sequence = getNextSequence(facultyCode, year);
-    return `INV-${facultyCode}-${year}-${String(sequence).padStart(3, '0')}`;
+    return `INV-${facultyCode}-${year}-${sequence}`;   // ← sin padStart
 }
 
 function showToast(message, type = 'info', duration = 3000) {
@@ -281,13 +283,104 @@ function goToDocumentos(codigo) {
     window.location.href = destino;
 }
 
-function guardarInventarioLocal(payload) {
+// ==========================================
+// INDEXEDDB: Almacén para adjuntos pesados
+// ==========================================
+
+function openSigproIndexedDB() {
+    return new Promise((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') {
+            reject(new Error('IndexedDB no disponible'));
+            return;
+        }
+        const request = indexedDB.open('sigpro_adjuntos_db', 1);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('adjuntos')) {
+                db.createObjectStore('adjuntos', { keyPath: 'id' });
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('No se pudo abrir IndexedDB'));
+    });
+}
+
+/**
+ * Guarda el contenido base64 de los adjuntos en IndexedDB y retorna
+ * solo metadata ligera (sin el contenido pesado) para localStorage.
+ */
+async function persistirAdjuntosGrandes(codigo, adjuntos) {
+    if (!adjuntos || adjuntos.length === 0) return [];
+
+    try {
+        const db = await openSigproIndexedDB();
+        const tx = db.transaction('adjuntos', 'readwrite');
+        const store = tx.objectStore('adjuntos');
+
+        const metadata = [];
+        for (let i = 0; i < adjuntos.length; i++) {
+            const adj = adjuntos[i];
+            const id = `${codigo}_adj_${i}_${Date.now()}`;
+
+            // Solo guardar en IndexedDB si hay contenido pesado (base64)
+            if (adj.contenido && String(adj.contenido).length > 200) {
+                await new Promise((res, rej) => {
+                    const putReq = store.put({
+                        id,
+                        contenido: adj.contenido,
+                        nombre: adj.nombre,
+                        tipoMime: adj.tipoMime || adj.tipo || '',
+                        fecha: adj.fecha || new Date().toISOString()
+                    });
+                    putReq.onsuccess = () => res();
+                    putReq.onerror = () => rej(putReq.error);
+                });
+            }
+
+            metadata.push({
+                nombre: adj.nombre,
+                tipo: adj.tipo,
+                tamaño: adj.tamaño,
+                fecha: adj.fecha,
+                activo: adj.activo !== false,
+                icono: adj.icono,
+                indexedDbId: id   // ← referencia para recuperarlo luego
+            });
+        }
+        return metadata;
+    } catch (e) {
+        console.warn('IndexedDB falló, usando solo metadata sin contenido:', e);
+        return adjuntos.map(adj => ({
+            nombre: adj.nombre,
+            tipo: adj.tipo,
+            tamaño: adj.tamaño,
+            fecha: adj.fecha,
+            activo: adj.activo !== false,
+            icono: adj.icono
+        }));
+    }
+}
+
+// ==========================================
+// GUARDAR INVENTARIO (ahora async)
+// ==========================================
+
+async function guardarInventarioLocal(payload) {
     const now = new Date();
     const codigo = payload.codigo;
     const documentosRaw = localStorage.getItem(FICHA_STORAGE_KEYS.DOCUMENTOS_LISTA);
     const documentos = documentosRaw ? JSON.parse(documentosRaw) : [];
     const fechaElaboracion = payload.fechaElaboracion || '';
     const version = payload.version || '';
+
+    // 1️⃣  Mover adjuntos pesados a IndexedDB, quedarnos solo con metadata
+    const adjuntosLigeros = await persistirAdjuntosGrandes(codigo, payload.adjuntos || []);
+
+    // 2️⃣  Payload limpio (sin base64) para guardar en fichaData
+    const payloadLimpio = {
+        ...payload,
+        adjuntos: adjuntosLigeros
+    };
 
     const documentoPendiente = {
         id: payload.id || Date.now().toString(),
@@ -312,8 +405,9 @@ function guardarInventarioLocal(payload) {
     }
     localStorage.setItem(FICHA_STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(documentos));
 
-    const detalleRaw = localStorage.getItem('sigpro_documentos_detalle');
+    const detalleRaw = localStorage.getItem(FICHA_STORAGE_KEYS.DOCUMENTOS_DETALLE);
     const detalle = detalleRaw ? JSON.parse(detalleRaw) : {};
+
     detalle[codigo] = {
         tipo: 'inventario',
         asunto: 'Inventarios',
@@ -323,15 +417,22 @@ function guardarInventarioLocal(payload) {
         fechaElaboracion,
         operacion: 'GESTION DE INVENTARIO',
         fechaRegistro: now.toISOString(),
-        fichaData: payload,
+        fichaData: payloadLimpio,   // ← sin base64
         resumenCampos: [
             { label: 'Versión', value: version || '-' },
             { label: 'Fecha de elaboración', value: fechaElaboracion || '-' },
-            { label: 'Documento adjunto', value: (payload.adjuntos || []).map((adj) => adj.nombre).join(', ') || '-' }
+            { label: 'Documento adjunto', value: adjuntosLigeros.map(a => a.nombre).join(', ') || '-' }
         ],
-        adjuntos: payload.adjuntos || []
+        adjuntos: adjuntosLigeros     // ← sin base64
     };
-    localStorage.setItem('sigpro_documentos_detalle', JSON.stringify(detalle));
+
+    try {
+        localStorage.setItem(FICHA_STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
+        localStorage.setItem('sigpro_documentos_detalle', JSON.stringify(detalle));
+    } catch (quotaError) {
+        console.error('❌ localStorage lleno incluso sin adjuntos:', quotaError);
+        throw new Error('Almacenamiento local lleno. Elimine documentos antiguos o adjunte archivos más pequeños.');
+    }
 }
 
 function setDemoUser() {
@@ -456,7 +557,7 @@ async function initFormHandler() {
                 ...data,
                 codigo: data.codigo || generateInventoryCode(),
                 facultadId: resolveFacultyId(),
-                generadoPor: currentUser?.correo || 'Facultad',
+                generadoPor: 'Facultad',
                 origen: 'local',
                 adjuntos
             };

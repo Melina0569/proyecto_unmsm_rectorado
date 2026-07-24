@@ -7,7 +7,7 @@
 const CONFIG = {
     // 'local' = Usa LocalStorage (sin internet, datos locales)
     // 'remote' = Usa API real UNMSM (requiere internet, datos compartidos)
-    MODE: 'remote', // Se puede sobrescribir con localStorage: api_mode
+    MODE: 'local', // Se puede sobrescribir con localStorage: api_mode
     
     // URL de la API real
     REMOTE_BASE: 'http://localhost:8080/v1',
@@ -15,6 +15,14 @@ const CONFIG = {
     // Timeout para cold start de Render (60 segundos)
     TIMEOUT: 60000
 };
+
+// ============================================
+// CLAVE ÚNICA POR MODO (evita contaminación)
+// ============================================
+function getStorageKey(baseKey) {
+    // Cada modo tiene su propio namespace
+    return `${CONFIG.MODE}_${baseKey}`;
+}
 
 // Credenciales locales unicas para acceso administrativo (Racio)
 const LOCAL_ADMIN_CREDENTIALS = {
@@ -88,17 +96,25 @@ function generateFacultyFlows(facultyId) {
     types.forEach(type => {
         const names = typeNames[type];
         names.forEach((name, idx) => {
+            // 🔧 FIX: El PDF real de Gestión Estratégica SOLO para Medicina (facultyId = 1)
+            const isMedicina = String(facultyId) === '1';
+            const isFirstFlow = (counter === 1);
+            const hasRealPdf = isFirstFlow && isMedicina;
+            
             flows.push({
-                id: `flow-${facultyId}-${type}-${idx}`,
-                code: `FL-${String(counter).padStart(3, '0')}`,
-                name: `Proceso de ${name}`,
+                id: hasRealPdf ? 'PE-01' : `flow-${facultyId}-${type}-${idx}`,
+                code: hasRealPdf ? 'PE-01' : `FL-${String(counter).padStart(3, '0')}`,
+                name: isFirstFlow ? 'Gestión Estratégica' : `Proceso de ${name}`,
                 type: type,
                 description: `Flujograma del proceso de ${name.toLowerCase()}`,
                 pages: Math.floor(Math.random() * 5) + 2,
-                lastUpdated: '2024-01-15',
-                pdfUrl: `#pdf-${facultyId}-${counter}`,
+                lastUpdated: new Date().toISOString().split('T')[0],
+                pdfUrl: hasRealPdf ? 'docs/pdfs/flujogramas/FLUJOGRAMA DE GESTIÓN ESTRATÉGICA (2).pdf' : `#pdf-${facultyId}-${counter}`,
                 downloads: 0,
-                facultyId: facultyId
+                facultyId: facultyId,
+                // AGREGA ESTAS 2 LÍNEAS:
+                estado: 'pendiente',
+                isSystemGenerated: true   // flag para saber que es auto-generado
             });
             counter++;
         });
@@ -128,7 +144,7 @@ function generateFacultyIndicators(facultyId) {
                 description: `Métrica de ${name.toLowerCase()}`,
                 target: Math.floor(Math.random() * 30) + 70, // 70-100%
                 current: Math.floor(Math.random() * 40) + 60,
-                lastUpdated: '2024-01-15',
+                lastUpdated: new Date().toISOString().split('T')[0],
                 facultyId: facultyId
             });
             counter++;
@@ -184,47 +200,54 @@ async function getFaculties() {
 // ============================================
 const LocalAPI = {
     db: {
-        faculties: 'sigpro_faculties',
-        indicators: 'sigpro_indicators',
-        processes: 'sigpro_processes',
-        version: 'sigpro_data_version',
-        processesVersion: 'sigpro_processes_version'
+        faculties: getStorageKey('sigpro_faculties'),      // local_sigpro_faculties
+        indicators: getStorageKey('sigpro_indicators'),    // local_sigpro_indicators
+        processes: getStorageKey('sigpro_processes'),
+        version: getStorageKey('sigpro_data_version'),
+        processesVersion: getStorageKey('sigpro_processes_version'),
+        documentosLista: getStorageKey('sigpro_documentos_lista'),      // ← AGREGAR
+        documentosDetalle: getStorageKey('sigpro_documentos_detalle'),    // ← AGREGAR
+        indicadoresDetalle: getStorageKey('sigpro_indicadores_detalle')   // ← AGREGAR
     },
 
     init() {
         console.log('API Local - Inicializando...');
         
-        const storedProcessesVersion = localStorage.getItem(this.db.processesVersion);
+        const storedVersion = localStorage.getItem(this.db.version);
         
-        if (storedProcessesVersion !== DATA_VERSION) {
-            console.log(`🆕 Nueva versión de procesos detectada (${storedProcessesVersion} → ${DATA_VERSION})`);
-            this.clearAllProcesses();
-            localStorage.setItem(this.db.processesVersion, DATA_VERSION);
+        // Siempre regenerar si cambió la versión o no hay datos
+        if (storedVersion !== DATA_VERSION) {
+            console.log(`🆕 Versión ${storedVersion} → ${DATA_VERSION}, regenerando datos locales...`);
+            this.clearAll();
+            localStorage.setItem(this.db.version, DATA_VERSION);
         }
         
         if (!localStorage.getItem(this.db.faculties)) {
-            console.log('Generando datos iniciales...');
+            console.log('Generando 20 facultades locales...');
             this.seedData();
         }
     },
 
-    clearAllProcesses() {
-        console.log('Limpiando procesos...');
-        for (let i = localStorage.length - 1; i >= 0; i--) {
+    clearAll() {
+        // Solo limpiar claves del modo LOCAL (prefijo 'local_')
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key && key.startsWith('faculty_processes_')) {
-                localStorage.removeItem(key);
+            if (key && key.startsWith('local_')) {
+                keysToRemove.push(key);
             }
         }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        console.log(`🧹 Limpiadas ${keysToRemove.length} claves locales`);
     },
 
     
 
     // TUS 20 FACULTADES ORIGINALES
     async seedData() {
-        /**const defaultFaculties = [
+        const defaultFaculties = [
             { id: 1, name: 'Medicina', code: 'FM', icon: 'medical_services', color: 'red', indicators: 12, flows: 8, processes: 5, createdAt: new Date().toISOString() },
-            { id: 2, name: 'Derecho y Ciencia Política', code: 'FDCP', icon: 'gravel', color: 'indigo', indicators: 15, flows: 6, processes: 4, createdAt: new Date().toISOString() },
+            { id: 2, name: 'Derecho y Ciencia Política', code: 'FDCP', icon: 'gavel', color: 'indigo', indicators: 15, flows: 6, processes: 4, createdAt: new Date().toISOString() },
             { id: 3, name: 'Letras y Ciencias Humanas', code: 'FLCH', icon: 'history_edu', color: 'amber', indicators: 10, flows: 12, processes: 7, createdAt: new Date().toISOString() },
             { id: 4, name: 'Farmacia y Bioquímica', code: 'FFB', icon: 'vaccines', color: 'cyan', indicators: 12, flows: 8, processes: 5, createdAt: new Date().toISOString() },
             { id: 5, name: 'Odontología', code: 'FO', icon: 'health_and_safety', color: 'teal', indicators: 12, flows: 8, processes: 5, createdAt: new Date().toISOString() },
@@ -243,11 +266,113 @@ const LocalAPI = {
             { id: 18, name: 'Psicología', code: 'FP', icon: 'psychology', color: 'fuchsia', indicators: 14, flows: 10, processes: 6, createdAt: new Date().toISOString() },
             { id: 19, name: 'Ingeniería Eléctrica y Electrónica', code: 'FIEE', icon: 'electrical_services', color: 'amber', indicators: 12, flows: 15, processes: 9, createdAt: new Date().toISOString() },
             { id: 20, name: 'Ingeniería de Sistemas e Informática', code: 'FISI', icon: 'computer', color: 'sky', indicators: 16, flows: 8, processes: 5, createdAt: new Date().toISOString() }
-        ];**/
+        ];
         
-        const defaultFaculties = await getFaculties();
         localStorage.setItem(this.db.faculties, JSON.stringify(defaultFaculties));
-        console.log('✅ 20 facultades cargadas en LocalStorage');
+        console.log('✅ 20 facultades locales guardadas en:', this.db.faculties);
+
+        // ============================================================
+        // INDICADORES DE EJEMPLO - MEDICINA PE.01 (SIEMPRE DISPONIBLES)
+        // ============================================================
+        
+        // 1. Lista de documentos
+        let docsLista = JSON.parse(localStorage.getItem(this.db.documentosLista) || '[]');
+        docsLista = docsLista.filter(d => d.codigo !== 'IND-FM-2026-001' && d.codigo !== 'IND-FM-2026-002');
+        docsLista.push(
+            {
+                "id": "ind-fm-2026-001",
+                "codigo": "IND-FM-2026-001",
+                "tipo": "indicador",
+                "estado": "aprobado",
+                "facultadId": "1",
+                "nombreFacultad": "Facultad de Medicina",
+                "descripcion": "Índice de Satisfacción de Usuarios Externos",
+                "fecha": "2026-01-15T10:00:00Z",
+                "isDemo": true
+            },
+            {
+                "id": "ind-fm-2026-002",
+                "codigo": "IND-FM-2026-002",
+                "tipo": "indicador",
+                "estado": "aprobado",
+                "facultadId": "1",
+                "nombreFacultad": "Facultad de Medicina",
+                "descripcion": "Tasa de Cumplimiento del Plan Estratégico Institucional",
+                "fecha": "2026-02-20T14:30:00Z",
+                "isDemo": true
+            }
+        );
+        localStorage.setItem(this.db.documentosLista, JSON.stringify(docsLista));
+
+        // 2. Detalles de indicadores
+        let docsDetalle = JSON.parse(localStorage.getItem(this.db.documentosDetalle) || '{}');
+        docsDetalle['IND-FM-2026-001'] = {
+            "fichaData": {
+                "codigo": "IND-FM-2026-001",
+                "nombreIndicador": "Índice de Satisfacción de Usuarios Externos",
+                "macroProcesoNombre": "PE.01 Gestión Estratégica",
+                "macroProcesoTexto": "PE.01",
+                "macroProceso": "PE.01",
+                "proceso": "PE.01",
+                "procesoNombre": "Gestión Estratégica",
+                "codigoProceso": "PE.01",
+                "tipoProceso": "ESTRATEGICO",
+                "version": "2.0",
+                "unidadResponsable": "Oficina de Calidad - Facultad de Medicina",
+                "responsable": "Dra. María Elena Vargas",
+                "frecuencia": "Semestral",
+                "variableN": "N° de usuarios satisfechos (encuesta ≥4)",
+                "variableD": "Total de usuarios encuestados",
+                "fuente": "Encuesta de Satisfacción SIGPRO - FM",
+                "meta": "85",
+                "objetivoProceso": "Medir el nivel de satisfacción de los usuarios externos (pacientes, familiares, comunidad) respecto a los servicios académicos y de salud ofrecidos por la Facultad de Medicina.",
+                "descripcion": "Índice de Satisfacción de Usuarios Externos"
+            }
+        };
+        docsDetalle['IND-FM-2026-002'] = {
+            "fichaData": {
+                "codigo": "IND-FM-2026-002",
+                "nombreIndicador": "Tasa de Cumplimiento del Plan Estratégico Institucional",
+                "macroProcesoNombre": "PE.01 Gestión Estratégica",
+                "macroProcesoTexto": "PE.01",
+                "macroProceso": "PE.01",
+                "proceso": "PE.01",
+                "procesoNombre": "Gestión Estratégica",
+                "codigoProceso": "PE.01",
+                "tipoProceso": "ESTRATEGICO",
+                "version": "1.5",
+                "unidadResponsable": "Dirección de Planificación - FM",
+                "responsable": "Dr. Carlos Alberto Mendoza",
+                "frecuencia": "Anual",
+                "variableN": "N° de metas del PEI cumplidas",
+                "variableD": "Total de metas del PEI programadas",
+                "fuente": "Sistema de Gestión del Plan Estratégico UNMSM",
+                "meta": "90",
+                "objetivoProceso": "Evaluar el grado de cumplimiento de las metas establecidas en el Plan Estratégico Institucional de la Facultad de Medicina, asegurando la alineación con los objetivos de la Decana de América.",
+                "descripcion": "Tasa de Cumplimiento del Plan Estratégico Institucional"
+            }
+        };
+        localStorage.setItem(this.db.documentosDetalle, JSON.stringify(docsDetalle));
+
+        // 3. Historiales de seguimiento
+        localStorage.setItem('sigpro_historial_datos_IND-FM-2026-001', JSON.stringify([
+            {"fecha": "2023-I", "periodo": "2023-I", "resultado": 72.5, "devengado": 145, "pim": 200, "metaPeriodo": 80, "analisis": "Primer semestre con encuesta piloto. Baja participación de usuarios.", "acciones": "Ampliar cobertura de encuestas en hospitales asociados."},
+            {"fecha": "2023-II", "periodo": "2023-II", "resultado": 78.0, "devengado": 195, "pim": 250, "metaPeriodo": 80, "analisis": "Mejora significativa tras implementación de encuestas digitales.", "acciones": "Capacitar personal en atención al usuario."},
+            {"fecha": "2024-I", "periodo": "2024-I", "resultado": 82.3, "devengado": 247, "pim": 300, "metaPeriodo": 82, "analisis": "Supera meta por primera vez. Alta satisfacción en servicios de consulta externa.", "acciones": "Mantener estándares y replicar modelo en otras áreas."},
+            {"fecha": "2024-II", "periodo": "2024-II", "resultado": 85.7, "devengado": 300, "pim": 350, "metaPeriodo": 85, "analisis": "Meta alcanzada con éxito. Satisfacción óptima en todas las áreas evaluadas.", "acciones": "Consolidar buenas prácticas, planificar encuesta anual 2025."},
+            {"fecha": "2025-I", "periodo": "2025-I", "resultado": 88.2, "devengado": 353, "pim": 400, "metaPeriodo": 85, "analisis": "Tendencia ascendente sostenida. Mejor resultado histórico.", "acciones": "Propuesta de aumentar meta al 90% para 2025-II."}
+        ]));
+
+        localStorage.setItem('sigpro_historial_datos_IND-FM-2026-002', JSON.stringify([
+            {"fecha": "2020", "periodo": "2020", "resultado": 65.0, "devengado": 13, "pim": 20, "metaPeriodo": 75, "analisis": "Año afectado por pandemia COVID-19. Reprogramación de metas.", "acciones": "Revisar cronograma y ajustar metas a contexto post-pandemia."},
+            {"fecha": "2021", "periodo": "2021", "resultado": 70.0, "devengado": 14, "pim": 20, "metaPeriodo": 75, "analisis": "Recuperación gradual. Dificultades en metas de infraestructura.", "acciones": "Priorizar metas de investigación y docencia."},
+            {"fecha": "2022", "periodo": "2022", "resultado": 78.0, "devengado": 39, "pim": 50, "metaPeriodo": 80, "analisis": "Mejora notable. Avance en acreditación internacional.", "acciones": "Fortalecer seguimiento trimestral de metas."},
+            {"fecha": "2023", "periodo": "2023", "resultado": 85.0, "devengado": 51, "pim": 60, "metaPeriodo": 85, "analisis": "Meta alcanzada. Éxito en internacionalización y publicaciones.", "acciones": "Replicar modelo de gestión en otros procesos estratégicos."},
+            {"fecha": "2024", "periodo": "2024", "resultado": 92.0, "devengado": 69, "pim": 75, "metaPeriodo": 90, "analisis": "Excelente desempeño. Cumplimiento superior al 90% por primera vez.", "acciones": "Ajustar Plan Estratégico 2025-2030 con metas más ambiciosas."},
+            {"fecha": "2025", "periodo": "2025", "resultado": 91.5, "devengado": 22, "pim": 24, "metaPeriodo": 90, "analisis": "En curso. Proyección favorable para cierre de año.", "acciones": "Monitorear metas pendientes de investigación clínica."}
+        ]));
+
+        console.log('✅ Indicadores de Medicina PE.01 precargados permanentemente');
     },
 
     // ========== AUTENTICACIÓN LOCAL ==========
@@ -500,43 +625,83 @@ const LocalAPI = {
 
     // ========== DASHBOARD ==========
     dashboard: {
-            async getPublicMetrics() {
-                try {
-                    // Intentar endpoint público /public/stats (sin auth)
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}/public/stats`, {
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    return { success: true, data };
-                } catch (error) {
-                    console.warn('Dashboard público no disponible:', error.message);
-                    return { success: false, error: error.message };
-                }
-            }
-        },
+        async getPublicMetrics() {
+            // ✅ MODO LOCAL: Calcular desde datos locales, NUNCA hacer fetch
+            const faculties = JSON.parse(localStorage.getItem(this.db.faculties) || '[]');
+            
+            const totalIndicators = faculties.reduce((sum, f) => sum + (f.indicators || 0), 0);
+            const totalFlows = faculties.reduce((sum, f) => sum + (f.flows || 0), 0);
+            
+            const stats = {
+                faculties: faculties.length,
+                facultyCount: faculties.length,
+                totalFaculties: faculties.length,
+                indicators: totalIndicators,
+                indicatorsCount: totalIndicators,
+                totalIndicators: totalIndicators,
+                flows: totalFlows,
+                flowsCount: totalFlows,
+                totalFlows: totalFlows,
+                activeUsers: 20,
+                usersActive: 20,
+                activeUsersCount: 20,
+                users: 20
+            };
+            
+            console.log('📊 [LOCAL] Stats calculados:', stats);
+            return { success: true, data: stats };
+        }
+    },
 
     // ========== DOCUMENTOS (Simulado) ==========
     documentos: {
         async getAll(filtros = {}) {
             await simulateDelay(400);
-            // Devuelve flujogramas como documentos
-            const allDocs = [];
-            for (let i = 1; i <= 20; i++) {
-                const flows = JSON.parse(localStorage.getItem(`faculty_flows_${i}`) || '[]');
-                allDocs.push(...flows);
+            
+            // ✅ SOLO documentos creados por usuarios (reportes, indicadores, etc.)
+            // NO incluimos flujogramas auto-generados que son fantasmas
+            let allDocs = [];
+            
+            // 1. Leer desde la lista oficial de documentos del dashboard
+            const docsLista = JSON.parse(localStorage.getItem(LocalAPI.db.documentosLista) || '[]');
+            // 1b. También leer desde la clave SIN prefijo (donde guardan todas las fichas)
+            //     Esto cubre ficha-indicador, ficha-caracterizacion, ficha-flujograma,
+            //     ficha-inventario y hoja-reporte que todas usan 'sigpro_documentos_lista'
+            const docsListaSinPrefijo = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+            // Fusionar evitando duplicados por código
+            const codigosEnLista = new Set(docsLista.map(d => d.codigo));
+            const docsSinPrefijuNuevos = docsListaSinPrefijo.filter(d => !codigosEnLista.has(d.codigo));
+            allDocs = [...docsLista, ...docsSinPrefijuNuevos];
+            
+            // 2. También sincronizar con reportes creados
+            const reportes = JSON.parse(localStorage.getItem('sigpro_reportes') || '[]');
+            for (const rep of reportes) {
+                const yaExiste = allDocs.some(d => d.id === rep.id);
+                if (!yaExiste) {
+                    allDocs.push({
+                        id: rep.id,
+                        codigo: rep.code || rep.id,
+                        tipo: 'reporte',
+                        estado: rep.status === 'PENDING' ? 'pendiente' : 
+                                rep.status === 'IN_PROGRESS' ? 'en_proceso' : 
+                                rep.status === 'COMPLETED' ? 'completado' : 'pendiente',
+                        descripcion: `Reporte ${rep.semester} - ${rep.responsibleName}`,
+                        fecha: rep.createdAt ? rep.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+                        generadoPor: 'Facultad',
+                        progreso: rep.status === 'COMPLETED' ? 100 : rep.status === 'IN_PROGRESS' ? 50 : 5,
+                        facultadId: rep.facultyId || '',
+                        origen: 'local'
+                    });
+                }
             }
             
+            // 3. Aplicar filtros
             let data = allDocs;
             if (filtros.facultadId) {
-                data = data.filter(d => d.facultyId == filtros.facultadId);
+                data = data.filter(d => String(d.facultadId) === String(filtros.facultadId));
             }
             if (filtros.estado) {
-                data = data.map(d => ({ ...d, estado: filtros.estado }));
+                data = data.filter(d => d.estado === filtros.estado);
             }
             
             return { success: true, data };
@@ -549,7 +714,7 @@ const LocalAPI = {
                 data: { 
                     id: id, 
                     nombre: 'Documento ' + id,
-                    estado: 'aprobado'
+                    estado: 'pendiente'
                 } 
             };
         }
@@ -586,6 +751,134 @@ const LocalAPI = {
         }
     },
 
+        // ========== PORTAL (Simulado para modo local) ==========
+    portal: {
+        reports: {
+            async create(reportData) {
+                await simulateDelay(600);
+                
+                const localId = `local-${Date.now()}`;
+                const reporteGuardado = {
+                    id: localId,
+                    ...reportData,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    status: 'PENDING'
+                };
+                
+                // 1. Guardar en reportes
+                const existing = JSON.parse(localStorage.getItem('sigpro_reportes') || '[]');
+                existing.push(reporteGuardado);
+                localStorage.setItem('sigpro_reportes', JSON.stringify(existing));
+                
+                // 2. Guardar en lista del dashboard
+                const docsLista = JSON.parse(localStorage.getItem(LocalAPI.db.documentosLista) || '[]');
+                docsLista.unshift({
+                    id: localId,
+                    codigo: reportData.code || `HR-${Date.now()}`,
+                    tipo: 'reporte',
+                    estado: 'pendiente',
+                    descripcion: reportData.description || `Reporte ${reportData.semester} - ${reportData.responsibleName}`,
+                    fecha: new Date().toISOString().split('T')[0],
+                    hora: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
+                    generadoPor: reportData.responsibleName || 'Facultad',
+                    progreso: 5,
+                    facultadId: reportData.facultyId || 1,
+                    origen: 'local'
+                });
+                localStorage.setItem(LocalAPI.db.documentosLista, JSON.stringify(docsLista));
+                
+                // ============================================
+                // ✅ AGREGA ESTO: Información técnica para el visor
+                // ============================================
+                let docsDetalle = JSON.parse(localStorage.getItem(LocalAPI.db.documentosDetalle) || '{}');
+                docsDetalle[localId] = {
+                    fichaData: {
+                        codigo: reportData.code || `HR-${Date.now()}`,
+                        nombreIndicador: reportData.title || reportData.description || `Reporte ${reportData.semester}`,
+                        macroProcesoNombre: reportData.macroProcess ? `${reportData.macroProcess}` : 'No especificado',
+                        macroProcesoTexto: reportData.macroProcess || '--',
+                        macroProceso: reportData.macroProcess || '--',
+                        proceso: reportData.process || '--',
+                        procesoNombre: reportData.process || 'No especificado',
+                        codigoProceso: reportData.process || '--',
+                        tipoProceso: reportData.processType || 'SOPORTE',
+                        version: '1.0',
+                        unidadResponsable: reportData.unit || 'Facultad',
+                        responsable: reportData.responsibleName || 'No especificado',
+                        frecuencia: 'Semestral',
+                        variableN: 'N/A',
+                        variableD: 'N/A',
+                        fuente: 'Sistema SIGPRO',
+                        meta: '100',
+                        objetivoProceso: reportData.objective || 'Sin objetivo especificado',
+                        descripcion: reportData.description || 'Sin descripción'
+                    },
+                    // ✅ Archivos adjuntos / PDF
+                    archivos: reportData.attachments || [],
+                    pdfUrl: reportData.pdfUrl || reportData.fileUrl || null,
+                    pdfBase64: reportData.pdfBase64 || null  // si guardas el PDF en base64
+                };
+                localStorage.setItem(LocalAPI.db.documentosDetalle, JSON.stringify(docsDetalle));
+                // ============================================
+                
+                console.log('✅ [LOCAL] Reporte creado con detalle técnico:', reporteGuardado);
+                
+                return {
+                    success: true,
+                    data: {
+                        id: localId,
+                        code: reportData.code,
+                        status: 'PENDING',
+                        message: 'Reporte creado en modo local'
+                    },
+                    status: 201
+                };
+            }
+        },
+        
+        documents: {
+            async getAll(filtros = {}) {
+                return LocalAPI.documentos.getAll(filtros);
+            },
+            async getById(id) {
+                return LocalAPI.documentos.getById(id);
+            },
+            async getHistory(id) {
+                await new Promise(r => setTimeout(r, 200));
+                // Leer historial guardado localmente si existe
+                const historial = JSON.parse(
+                    localStorage.getItem(`sigpro_historial_rect_${id}`) || '[]'
+                );
+                return { success: true, data: { documentos: historial } };
+            },
+            async delete(id) {
+                // Borrar de TODAS las listas
+                let docsLista = JSON.parse(localStorage.getItem(LocalAPI.db.documentosLista) || '[]');
+                docsLista = docsLista.filter(d => d.id !== id && d.codigo !== id);
+                localStorage.setItem(LocalAPI.db.documentosLista, JSON.stringify(docsLista));
+                
+                let reportes = JSON.parse(localStorage.getItem('sigpro_reportes') || '[]');
+                // Borrar por id, por code y por codigo (cubrir todos los formatos posibles)
+                reportes = reportes.filter(r => r.id !== id && r.code !== id && r.codigo !== id);
+                localStorage.setItem('sigpro_reportes', JSON.stringify(reportes));
+                
+                // Borrar también detalle
+                let docsDetalle = JSON.parse(localStorage.getItem(LocalAPI.db.documentosDetalle) || '{}');
+                delete docsDetalle[id];
+                localStorage.setItem(LocalAPI.db.documentosDetalle, JSON.stringify(docsDetalle));
+                
+                return { success: true };
+            }
+        },
+        
+        dashboard: {
+            async get() {
+                return LocalAPI.dashboard.getPublicMetrics();
+            }
+        }
+    },
+
     // ========== UTILIDADES ==========
     async reset() {
         localStorage.removeItem(this.db.faculties);
@@ -593,6 +886,9 @@ const LocalAPI = {
         localStorage.removeItem(this.db.processes);
         localStorage.removeItem(this.db.version);
         localStorage.removeItem(this.db.processesVersion);
+        localStorage.removeItem('sigpro_approved_docs');        
+        localStorage.removeItem('sigpro_access_requests');      
+        localStorage.removeItem('sigpro_documentos_lista');     
         
         for (let i = localStorage.length - 1; i >= 0; i--) {
             const key = localStorage.key(i);
@@ -956,13 +1252,20 @@ const RemoteAPI = {
     // ========== DASHBOARD ==========
     dashboard: {
         async getPublicMetrics() {
-        try {
-            // ✅ Usar /v1/public/stats (el endpoint que SÍ existe)
-            const response = await fetch(`${CONFIG.REMOTE_BASE}/public/stats`, {
-                headers: { 'Accept': 'application/json' }
-            });
-                return { success: response.ok, data: await response.json() };
+            try {
+                // ✅ MODO REMOTO: Solo fetch al backend
+                const response = await fetch(`${CONFIG.REMOTE_BASE}/public/stats`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                return { success: true, data };
             } catch (error) {
+                console.warn('[REMOTE] Dashboard no disponible:', error.message);
                 return { success: false, error: error.message };
             }
         }
@@ -2609,26 +2912,54 @@ const RemoteAPI = {
 // ============================================
 // EXPORTAR API SEGÚN MODO SELECCIONADO
 // ============================================
-// Forzar uso del modo remoto (usar la API real)
-// Forzar uso del modo remoto SIEMPRE
-CONFIG.MODE = 'remote';
-// Limpiar cualquier modo local que pudiera estar guardado
-localStorage.removeItem('api_mode');
 
-const API = RemoteAPI;
+// ✅ Leer modo guardado o usar el de CONFIG (NO forzar 'remote')
+const savedMode = localStorage.getItem('api_mode');
+if (savedMode === 'local' || savedMode === 'remote') {
+    CONFIG.MODE = savedMode;
+}
+
+const API = CONFIG.MODE === 'local' ? LocalAPI : RemoteAPI;
+
+if (CONFIG.MODE === 'local') {
+    LocalAPI.init();
+}
 
 // Helpers para cambiar modo
 API.CONFIG = CONFIG;
 API.setMode = (mode) => {
     if (mode === 'local' || mode === 'remote') {
+        // Guardar el modo anterior para saber qué limpiar
+        const previousMode = CONFIG.MODE;
+        
         CONFIG.MODE = mode;
         localStorage.setItem('api_mode', mode);
+        
+        console.log(`🔄 Cambiando modo: ${previousMode} → ${mode}`);
+        
+        // Opcional: limpiar datos del modo anterior para evitar basura
+        if (previousMode !== mode) {
+            const prefixToClean = previousMode === 'local' ? 'local_' : 'remote_';
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(prefixToClean)) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            console.log(`🧹 Limpiados ${keysToRemove.length} datos del modo ${previousMode}`);
+        }
+        
         location.reload();
     }
 };
 API.getMode = () => CONFIG.MODE;
 
 window.API = API;
+window.LocalAPI = LocalAPI;
+window.RemoteAPI = RemoteAPI;
+window.CONFIG = CONFIG;
 console.log(`✅ API UNMSM cargada en modo: ${CONFIG.MODE.toUpperCase()}`);
 console.log(`   Base URL: ${CONFIG.MODE === 'remote' ? CONFIG.REMOTE_BASE : 'LocalStorage'}`);
 
@@ -2648,6 +2979,7 @@ async function aprobarSolicitud(idSolicitud, token) {
     const authToken = token || localStorage.getItem('token') || localStorage.getItem('unmsm_token');
     
     try {
+
         const response = await fetch(
             `${CONFIG.REMOTE_BASE}/admin/access-requests/${idSolicitud}/approve`,
             {
@@ -2705,6 +3037,83 @@ async function aprobarSolicitud(idSolicitud, token) {
 window.aprobarSolicitud = aprobarSolicitud;
 
 // ============================================
+// UTILIDAD: Guardar documento creado por el usuario
+// ============================================
+
+/**
+ * Guarda un documento creado por el usuario en localStorage
+ * para que el dashboard lo cuente correctamente.
+ * 
+ * @param {Object} doc - Documento creado
+ * @param {string} doc.id - ID del documento
+ * @param {string} doc.tipo - Tipo: 'indicador', 'flujograma', 'caracterizacion', 'reporte', 'inventario'
+ * @param {string} doc.estado - Estado: 'pendiente', 'en_proceso', 'completado'
+ * @param {string} doc.titulo - Título del documento
+ */
+function guardarDocumentoUsuario(doc) {
+    // 1. Guardar en la clave dedicada del dashboard
+    const clave = getStorageKey('sigpro_user_documents');
+    let docs = [];
+    
+    try {
+        const raw = localStorage.getItem(clave);
+        if (raw) docs = JSON.parse(raw);
+    } catch (e) {
+        docs = [];
+    }
+    
+    docs.push({
+        id: doc.id || generateId(),
+        tipo: doc.tipo || 'documento',
+        estado: doc.estado || 'pendiente',
+        titulo: doc.titulo || 'Sin título',
+        fecha: new Date().toISOString(),
+        facultyId: doc.facultyId || localStorage.getItem('unmsm_faculty_id') || ''
+    });
+    
+    localStorage.setItem(clave, JSON.stringify(docs));
+    
+    // 🔧 FIX: También sincronizar con sigpro_documentos_lista para compatibilidad
+    try {
+        const listaKey = 'sigpro_documentos_lista';
+        let lista = [];
+        const rawLista = localStorage.getItem(listaKey);
+        if (rawLista) lista = JSON.parse(rawLista);
+        
+        // Solo agregar si no existe ya
+        const yaExiste = lista.some(d => d.id === doc.id);
+        if (!yaExiste) {
+            lista.push({
+                id: doc.id || generateId(),
+                codigo: doc.id || generateId(),
+                tipo: doc.tipo || 'documento',
+                estado: doc.estado || 'pendiente',
+                nombre: doc.titulo || 'Sin título',
+                descripcion: doc.titulo || 'Sin título',
+                fecha: new Date().toISOString(),
+                hora: new Date().toLocaleTimeString('es-PE'),
+                createdAt: new Date().toISOString(),
+                facultyId: doc.facultyId || localStorage.getItem('unmsm_faculty_id') || ''
+            });
+            localStorage.setItem(listaKey, JSON.stringify(lista));
+        }
+    } catch (e) {
+        console.warn('No se pudo sincronizar con sigpro_documentos_lista:', e);
+    }
+    
+    console.log('✅ Documento guardado:', doc);
+    
+    // Disparar evento para actualizar dashboard en tiempo real
+    window.dispatchEvent(new StorageEvent('storage', {
+        key: clave,
+        newValue: JSON.stringify(docs)
+    }));
+}
+
+// Exponer globalmente
+window.guardarDocumentoUsuario = guardarDocumentoUsuario;
+
+// ============================================
 // INTERCEPTOR FETCH CON AUTO-REFRESH (AGREGAR AL FINAL)
 // ============================================
 
@@ -2721,3 +3130,4 @@ window.aprobarSolicitud = aprobarSolicitud;
     
     console.log('✅ Interceptor fetch con auto-refresh activado');
 })();
+

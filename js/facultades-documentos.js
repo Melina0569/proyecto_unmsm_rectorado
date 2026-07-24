@@ -30,11 +30,13 @@ let allDocuments = [];
 let filteredDocuments = [];
 let rectificacionSeleccionada = null; // índice/objeto seleccionado para el botón RESPONDER
 
+// Mismo prefijo que usa api.js → evita que el borrado limpie claves distintas a las que lee
+const _mode = (typeof CONFIG !== 'undefined' && CONFIG.MODE) ? CONFIG.MODE : 'local';
 const STORAGE_KEYS = {
-    DOCUMENTOS_LISTA: 'sigpro_documentos_lista',
-    INDICADORES_DETALLE: 'sigpro_indicadores_detalle',
-    DOCUMENTOS_DETALLE: 'sigpro_documentos_detalle',
-    CORRECCIONES_LISTA: 'sigpro_correcciones_solicitudes'
+    DOCUMENTOS_LISTA:    `${_mode}_sigpro_documentos_lista`,
+    INDICADORES_DETALLE: `${_mode}_sigpro_indicadores_detalle`,
+    DOCUMENTOS_DETALLE:  `${_mode}_sigpro_documentos_detalle`,
+    CORRECCIONES_LISTA:  `${_mode}_sigpro_correcciones_solicitudes`
 };
 
 // ============================================
@@ -44,19 +46,18 @@ const STORAGE_KEYS = {
 // Cuando el navegador restaura la página desde bfcache (botón Atrás)
 window.addEventListener('pageshow', function(event) {
     if (event.persisted) {
-        // La página viene del caché, verificar sesión
         const hasToken = !!(
             localStorage.getItem('token') ||
             localStorage.getItem('unmsm_token') ||
             localStorage.getItem('auth_token') ||
-            localStorage.getItem('accessToken')
+            localStorage.getItem('accessToken') ||
+            localStorage.getItem('unmsm-token') ||
+            localStorage.getItem('jwt')
         );
         
         if (!hasToken) {
-            // Sin sesión = redirigir al login
             window.location.replace('portal-inicio-facultades.html');
         } else {
-            // Con sesión = recargar para estado fresco
             window.location.reload();
         }
     }
@@ -67,18 +68,18 @@ window.addEventListener('pageshow', function(event) {
 // ============================================
 
 (function checkSessionOnLoad() {
-    // Verificar si hay token de autenticación
     const hasToken = !!(
         localStorage.getItem('token') ||
         localStorage.getItem('unmsm_token') ||
         localStorage.getItem('auth_token') ||
-        localStorage.getItem('accessToken')
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('unmsm-token') ||      // ← NUEVO: formato con guión
+        localStorage.getItem('jwt')                 // ← NUEVO: algunas APIs usan jwt
     );
     
-    // Si no hay token, redirigir al login inmediatamente
     if (!hasToken) {
         window.location.replace('portal-inicio-facultades.html');
-        return; // Detener ejecución del resto del script
+        return;
     }
 })();
 
@@ -188,7 +189,7 @@ function guardarAdjunto(detalle) {
     }
 
     // Obtener storage actual
-    let storage = JSON.parse(localStorage.getItem('sigpro_documentos_detalle')) || {};
+    let storage = JSON.parse(localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE)) || {};
 
     // Si no existe ese documento, crearlo
     if (!storage[codigo]) {
@@ -211,7 +212,7 @@ function guardarAdjunto(detalle) {
     storage[codigo].adjuntos = [adjunto];
 
     // Guardar en localStorage
-    localStorage.setItem('sigpro_documentos_detalle', JSON.stringify(storage));
+    localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(storage));
 
     console.log("✅ Archivo guardado en sistema:", storage[codigo]);
 
@@ -412,7 +413,8 @@ function buscarEnLocalStorageYAbrir(docCode, docId) {
     
     try {
         // Buscar en sigpro_documentos_lista
-        const docsRaw = localStorage.getItem('sigpro_documentos_lista');
+        const docsRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA)
+             || localStorage.getItem('sigpro_documentos_lista');
         const reportesRaw = localStorage.getItem('sigpro_reportes');
         
         let localDoc = null;
@@ -507,8 +509,14 @@ async function loadDashboardData() {
     try {
         showToast('Cargando documentos...', 'info');
         
-        const token = localStorage.getItem('token');
+        // 🔥 FIX: Buscar el token correcto que usa la API
+        const token = localStorage.getItem('unmsm_token') || 
+                      localStorage.getItem('token') || 
+                      localStorage.getItem('auth_token') ||
+                      localStorage.getItem('accessToken');
+        
         if (!token) {
+            console.error('❌ No se encontró token en localStorage');
             window.location.replace('portal-inicio-facultades.html');
             return;
         }
@@ -603,6 +611,14 @@ async function loadDashboardData() {
         });
 
         console.log(`✅ Total documentos cargados: ${allDocuments.length} (API: ${apiDocsNormalizados.length}, Locales: ${localDocs.length})`);
+
+        // 🔥 FIX PRINCIPAL: Si después de mergear API + locales no hay nada, cargar ejemplos
+        if (allDocuments.length === 0) {
+            console.log('📭 Sin datos de API ni locales, cargando ejemplos de demostración...');
+            loadMockData();
+            showToast('Mostrando ejemplos de demostración', 'info', 3000);
+            return; // loadMockData ya hace renderTable() y updateStats
+        }
 
         filteredDocuments = [...allDocuments];
         updateStatsFromCurrentDocuments();
@@ -717,7 +733,8 @@ function loadMockData() {
             generadoPor: 'Facultad',
             estado: 'pendiente',
             progreso: 5,
-            facultadId: 1
+            facultadId: 1,
+            origen: 'mock'
         },
         {
             id: 'doc-2',
@@ -728,7 +745,8 @@ function loadMockData() {
             generadoPor: 'Racionalización',
             estado: 'en_proceso',
             progreso: 50,
-            facultadId: 1
+            facultadId: 1,
+            origen: 'mock'
         },
         {
             id: 'doc-3',
@@ -739,7 +757,8 @@ function loadMockData() {
             generadoPor: 'Racionalización',
             estado: 'completado',
             progreso: 100,
-            facultadId: 1
+            facultadId: 1,
+            origen: 'mock'
         }
     ];
     
@@ -1348,59 +1367,63 @@ window.deleteDocument = async function(docId) {
 function eliminarDelFrontend(doc) {
     const docId = doc.id;
     const codigo = doc.codigo;
-
     // Remover de arrays en memoria
     allDocuments = allDocuments.filter(d => d.id !== docId);
     filteredDocuments = filteredDocuments.filter(d => d.id !== docId);
-
-    // Limpiar localStorage
-    const keysToClean = [
-        { key: 'sigpro_reportes', filterBy: 'codigo' },
-        { key: STORAGE_KEYS.DOCUMENTOS_DETALLE, isObject: true, objectKey: codigo },
-        { key: STORAGE_KEYS.INDICADORES_DETALLE, isObject: true, objectKey: codigo },
-        { key: STORAGE_KEYS.DOCUMENTOS_LISTA, filterBy: 'codigo' }
-    ];
-
-    keysToClean.forEach(({ key, filterBy, isObject, objectKey }) => {
+    // ─── Limpiar sigpro_reportes ───────────────────────────────────────────
+    // Los items en sigpro_reportes usan el campo 'code' (no 'codigo') y 'id'
+    try {
+        const reportesRaw = localStorage.getItem('sigpro_reportes');
+        if (reportesRaw) {
+            const reportes = JSON.parse(reportesRaw);
+            const filtrados = reportes.filter(r =>
+                r.id !== docId &&
+                r.code !== codigo &&
+                r.codigo !== codigo   // por compatibilidad con entradas antiguas
+            );
+            localStorage.setItem('sigpro_reportes', JSON.stringify(filtrados));
+        }
+    } catch (e) { console.error('Error limpiando sigpro_reportes:', e); }
+    // ─── Limpiar lista de documentos (clave CON prefijo — la que usa api.js) ─
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
+        if (raw) {
+            const lista = JSON.parse(raw);
+            const filtrada = lista.filter(d => d.id !== docId && d.codigo !== codigo);
+            localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(filtrada));
+        }
+    } catch (e) { console.error('Error limpiando DOCUMENTOS_LISTA:', e); }
+    // ─── Limpiar lista SIN prefijo (compatibilidad con guardarDocumentoUsuario) ─
+    try {
+        const raw = localStorage.getItem('sigpro_documentos_lista');
+        if (raw) {
+            const lista = JSON.parse(raw);
+            const filtrada = lista.filter(d => d.id !== docId && d.codigo !== codigo);
+            localStorage.setItem('sigpro_documentos_lista', JSON.stringify(filtrada));
+        }
+    } catch (e) { console.error('Error limpiando sigpro_documentos_lista sin prefijo:', e); }
+    // ─── Limpiar detalles (objeto clave→valor) ────────────────────────────
+    [STORAGE_KEYS.DOCUMENTOS_DETALLE, STORAGE_KEYS.INDICADORES_DETALLE,
+     'sigpro_documentos_detalle', 'sigpro_indicadores_detalle'].forEach(key => {
         try {
             const raw = localStorage.getItem(key);
             if (!raw) return;
-            
-            if (isObject) {
-                const data = JSON.parse(raw);
-                if (data && typeof data === 'object' && data[objectKey]) {
-                    delete data[objectKey];
-                    localStorage.setItem(key, JSON.stringify(data));
-                }
-            } else {
-                const list = JSON.parse(raw);
-                if (Array.isArray(list)) {
-                    const filtered = list.filter(item => item?.[filterBy] !== codigo);
-                    localStorage.setItem(key, JSON.stringify(filtered));
-                }
-            }
-        } catch (e) {
-            console.error(`Error limpiando ${key}:`, e);
-        }
+            const data = JSON.parse(raw);
+            let changed = false;
+            [docId, codigo].forEach(k => { if (data[k]) { delete data[k]; changed = true; } });
+            if (changed) localStorage.setItem(key, JSON.stringify(data));
+        } catch (e) { console.error(`Error limpiando ${key}:`, e); }
     });
-
-    // Limpiar historial si es indicador
+    // ─── Limpiar historial si es indicador ───────────────────────────────
     if (doc.tipo === 'indicador') {
         localStorage.removeItem(`sigpro_historial_datos_${codigo}`);
     }
-
-    // Persistir documentos locales restantes
     persistLocalDocuments();
     updateStatsFromCurrentDocuments();
-
-    // Ajustar paginación
     const maxPages = Math.max(1, Math.ceil(filteredDocuments.length / 10));
-    if (currentPage > maxPages) {
-        currentPage = maxPages;
-    }
-
+    if (currentPage > maxPages) currentPage = maxPages;
     renderTable();
-};
+}
 
 function loadLocalDocuments() {
     const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
@@ -1660,11 +1683,14 @@ window.viewDocument = async function(docId) {
 
         // Transformar respuesta del backend al formato interno
 
-        const localFallback = getLocalDocumentDetail(doc.codigo, doc) || {};
-        const localResumen = localFallback.resumenCampos || [];
+        const tipoDetectado = detalleBackend.type || detalleBackend.tipo ||
+            (/^IND-/i.test(doc.codigo) ? 'indicador' :
+            /^FLU-/i.test(doc.codigo) ? 'flujograma' :
+            /^CAR-/i.test(doc.codigo) ? 'caracterizacion' :
+            /^REP-/i.test(doc.codigo) ? 'reporte' : 'documento');
 
         const detalle = {
-            tipo: detalleBackend.type || detalleBackend.tipo || 'documento',
+            tipo: tipoDetectado,
             codigo: detalleBackend.code || detalleBackend.codigo || doc.codigo,
             asunto: detalleBackend.asunto || detalleBackend.title || detalleBackend.nombre || 'DOCUMENTOS',
             descripcion: detalleBackend.description || detalleBackend.descripcion || doc.descripcion,
@@ -1679,22 +1705,28 @@ window.viewDocument = async function(docId) {
             transaccion: detalleBackend.transaccion || detalleBackend.numeroTransaccion || doc.codigo,
             etapa: detalleBackend.etapa || getEtapaByEstado(detalleBackend.status || doc.estado),
             version: detalleBackend.version || `${doc.codigo}-V1`,
-            resumenCampos: detalleBackend.campos || detalleBackend.resumenCampos || detalleBackend.fields || detalleBackend.data || [],
+            // ✅ FIX 1: usar datos locales como fallback cuando el backend no manda campos
+            resumenCampos: detalleBackend.campos || detalleBackend.resumenCampos || detalleBackend.fields || detalleBackend.data || localResumen,
+            // ✅ FIX 2: incluir fichaData local para que showDetailView pueda construir el resumen por tipo
+            fichaData: localFallback.fichaData || null,
             historial: detalleBackend.historial || detalleBackend.seguimiento || [{
                 fecha: `${formatDate(doc.fecha)} ${doc.hora}`,
                 progreso: doc.progreso,
                 estado: toEstadoTexto(doc.estado),
                 generadoPor: getHistorialGeneradoPor(doc.estado, doc.generadoPor)
             }],
-            adjuntos: (detalleBackend.adjuntos || detalleBackend.attachments || []).map(adj => ({
-                nombre: adj.nombre || adj.name || adj.filename || 'Documento',
-                tipo: adj.tipo || adj.type || adj.extension?.toUpperCase() || 'PDF',
-                tamaño: adj.tamaño || adj.size || adj.tamano || '-',
-                fecha: adj.fecha || formatDate(doc.fecha),
-                activo: adj.activo !== false,
-                icono: adj.icono || (adj.tipo === 'PDF' ? 'picture_as_pdf' : 'description'),
-                contenido: adj.url || adj.contenido || adj.path || ''
-            }))
+            // ✅ FIX 3: usar adjuntos locales cuando el backend devuelve vacío
+            adjuntos: ((detalleBackend.adjuntos || detalleBackend.attachments || []).length > 0
+                ? (detalleBackend.adjuntos || detalleBackend.attachments || []).map(adj => ({
+                    nombre: adj.nombre || adj.name || adj.filename || 'Documento',
+                    tipo: adj.tipo || adj.type || adj.extension?.toUpperCase() || 'PDF',
+                    tamaño: adj.tamaño || adj.size || adj.tamano || '-',
+                    fecha: adj.fecha || formatDate(doc.fecha),
+                    activo: adj.activo !== false,
+                    icono: adj.icono || (adj.tipo === 'PDF' ? 'picture_as_pdf' : 'description'),
+                    contenido: adj.url || adj.contenido || adj.path || ''
+                }))
+                : (localFallback.adjuntos || []))
         };
 
         showDetailView(detalle);

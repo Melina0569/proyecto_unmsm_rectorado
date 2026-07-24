@@ -1,63 +1,33 @@
 // views.js - Gestión de vistas Grid/Lista, paginación y expansión
 async function getFaculties() {
-
-    try {
-
-        const token = sessionStorage.getItem('accessToken') || localStorage.getItem('unmsm_token') || localStorage.getItem('token');
-
-        const headers = {
-            "Accept": "application/json"
-        };
-
-        if (token) {
-            headers["Authorization"] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(
-            "http://localhost:8080/v1/public/faculties?page=1&limit=20",
-            {
-                method: "GET",
-                headers
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error("Error obteniendo facultades");
-        }
-
-        const payload = await response.json();
-        const data = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
-
-        // Mapeo frontend
-        const mappedFaculties = data.map(f => ({
-
-            id: f.id,
-
-            name: f.shortName || f.name,
-
-            code: f.code,
-
-            icon: getFacultyIcon(f.code),
-
-            color: getFacultyColor(f.code),
-
-            indicators: f.stats?.indicatorsCount || 0,
-
-            flows: f.stats?.flowsCount || 0,
-
-            processes: f.stats?.processesCount || 0
-        }));
-
-        console.log(mappedFaculties);
-
-        return mappedFaculties;
-
-    } catch (error) {
-
-        console.error(error);
-
+    const result = await API.faculties.getAll();
+    
+    if (!result.success) {
+        console.error('Error obteniendo facultades:', result.error);
         return [];
     }
+    
+    const data = result.data || [];
+    
+    // ✅ Mapeo robusto que funciona para LOCAL y REMOTO
+    const mappedFaculties = data.map(f => {
+        // Detectar origen por estructura
+        const isRemoteData = f.hasOwnProperty('shortName') && !f.hasOwnProperty('icon');
+        
+        return {
+            id: f.id,
+            name: f.shortName || f.name || 'Sin nombre',
+            code: f.code || 'UNK',
+            icon: f.icon || getFacultyIcon(f.code),
+            color: f.color || getFacultyColor(f.code),
+            indicators: f.indicators ?? f.stats?.indicatorsCount ?? 0,
+            flows: f.flows ?? f.stats?.flowsCount ?? 0,
+            processes: f.processes ?? f.stats?.processesCount ?? 0
+        };
+    });
+    
+    console.log(`Facultades cargadas: ${mappedFaculties.length} | modo: ${API.getMode()} | origen: ${data[0]?.icon ? 'LOCAL' : 'REMOTO'}`);
+    return mappedFaculties;
 }
 
 function getFacultyIcon(code) {
@@ -85,16 +55,6 @@ function getFacultyIcon(code) {
         FISI: 'computer',
 
     };
-
-
-
-
-
-
-
-
-
-    
 
     return icons[code] || 'school';
 }
@@ -139,7 +99,7 @@ const FacultyViews = {
 
 
     //Datos de las 20 facultades
-    /**faculties: [
+    faculties: [
         {id: 1, name: 'Medicina', code: 'FM', icon: 'medical_services', color: 'red', indicators: 12, flows: 8, processes: 5 },
         {id: 2, name: 'Derecho y Ciencia Política', code: 'FDCP', icon: 'gavel', color: 'indigo', indicators: 12, flows: 8, processes: 5 },
         {id: 3, name: 'Letras y Ciencias Humanas', code: 'FLCH', icon: 'history_edu', color: 'amber', indicators: 10, flows: 12, processes: 7 },
@@ -160,7 +120,7 @@ const FacultyViews = {
         {id: 18, name: 'Psicología', code: 'FP', icon: 'psychology', color: 'fuchsia', indicators: 16, flows: 8, processes: 5 },
         {id: 19, name: 'Ingeniería Eléctrica y Electrónica', code: 'FIEE', icon: 'electrical_services', color: 'amber', indicators: 16, flows: 11, processes: 7 },
         {id: 20, name: 'Ingeniería de Sistemas e Informática', code: 'FISI', icon: 'computer', color: 'sky', indicators: 18, flows: 14, processes: 8 },
-    ],**/
+    ],
     
     faculties : [],
 
@@ -206,6 +166,23 @@ const FacultyViews = {
 
         // Expandir/Colapsar
         this.btnExpand?.addEventListener('click', () => this.toggleExpand());
+
+        // ✅ NUEVO: Event delegation para botones de cards (Grid y Lista)
+        this.container?.addEventListener('click', (e) => {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+
+            const id = btn.closest('[data-id]')?.dataset?.id;
+            if (!id) return;
+
+            if (btn.classList.contains('btn-flows') || btn.classList.contains('btn-list-flows')) {
+                this.openFlows(id);
+            } else if (btn.classList.contains('btn-indicators') || btn.classList.contains('btn-list-indicators')) {
+                this.openIndicators(id);
+            } else if (btn.classList.contains('btn-processes') || btn.classList.contains('btn-list-processes')) {
+                this.openProcesses(id);
+            }
+        });
     },
 
     // Cambiar vista
@@ -522,29 +499,47 @@ const FacultyViews = {
     // NAVEGACIÓN - Tres métodos para los tres botones
     
     openFlows(id) {
-        const faculty = this.faculties.find(f => f.id === id);
-        if (!faculty) return;
+        // Normalizar ID a número para comparación estricta
+        const numericId = Number(id);
+        const faculty = this.faculties.find(f => f.id === numericId);
+        if (!faculty) {
+            console.error('Facultad no encontrada para flujogramas:', id);
+            return;
+        }
         
         sessionStorage.setItem('selectedFaculty', JSON.stringify(faculty));
-        window.location.href = `process-map-flujograma.html?faculty=${id}`;
+        window.location.href = `process-map-flujograma.html?faculty=${numericId}`;
     },
 
     openIndicators(id) {
-        const faculty = this.faculties.find(f => f.id === id);
-        if (!faculty) return;
+        const numericId = Number(id);
+        const faculty = this.faculties.find(f => f.id === numericId);
+        if (!faculty) {
+            console.error('Facultad no encontrada para indicadores:', id);
+            return;
+        }
         
         sessionStorage.setItem('selectedFaculty', JSON.stringify(faculty));
-        window.location.href = `process-map-indicador.html?faculty=${id}`;
+        window.location.href = `process-map-indicador.html?faculty=${numericId}`;
     },
 
     openProcesses(id) {
-        const faculty = this.faculties.find(f => f.id === id);
-        if (!faculty) return;
+        const numericId = Number(id);
+        const faculty = this.faculties.find(f => f.id === numericId);
+        if (!faculty) {
+            console.error('Facultad no encontrada para procesos:', id);
+            return;
+        }
         
         sessionStorage.setItem('selectedFaculty', JSON.stringify(faculty));
-        window.location.href = `process-map.html?faculty=${id}`;
+        window.location.href = `process-map.html?faculty=${numericId}`;
     }
 };
+// Exponer a window para que los onclick funcionen
+window.FacultyViews = FacultyViews;
+window.getFacultyIcon = getFacultyIcon;
+window.getFacultyColor = getFacultyColor;
 
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => FacultyViews.init());
+

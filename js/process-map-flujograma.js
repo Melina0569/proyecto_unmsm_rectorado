@@ -10,7 +10,7 @@ class ProcessMapFlujograma {
         this.flows = [];
         this.filteredFlows = [];
         this.currentModalFlow = null;
-        
+
         this.init();
     }
 
@@ -18,7 +18,7 @@ class ProcessMapFlujograma {
         this.loadFacultyFromURL();
         this.setupEventListeners();
         this.setupThemeToggle();
-        
+
         if (this.facultyId) {
             await this.loadFacultyData();
             await this.loadFlows();
@@ -27,9 +27,6 @@ class ProcessMapFlujograma {
         }
     }
 
-    /**
-     * Cargar facultad desde URL o sessionStorage
-     */
     loadFacultyFromURL() {
         const urlParams = new URLSearchParams(window.location.search);
         this.facultyId = urlParams.get('faculty') || '1';
@@ -61,11 +58,11 @@ class ProcessMapFlujograma {
 
         try {
             const response = await API.faculties.getById(this.facultyId);
-            
+
             if (!response.success) {
                 throw new Error(response.error);
             }
-            
+
             this.facultyData = response.data;
             sessionStorage.setItem('selectedFaculty', JSON.stringify(this.facultyData));
             this.updateUIFacultyInfo();
@@ -111,16 +108,13 @@ class ProcessMapFlujograma {
     }
 
     setupEventListeners() {
-        // Búsqueda
         const searchInput = document.getElementById('search-flows');
         if (searchInput) {
             searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
         }
 
-        // Dropdown Personalizado
         this.setupCustomDropdown();
 
-        // Modal
         const modalOverlay = document.getElementById('modal-overlay');
         const closeModalBtn = document.getElementById('btn-close-modal');
         const downloadPdfBtn = document.getElementById('btn-download-pdf');
@@ -140,86 +134,74 @@ class ProcessMapFlujograma {
         });
     }
 
-/**
- * Configura el dropdown personalizado
- */
-setupCustomDropdown() {
-    const dropdownBtn = document.getElementById('dropdown-btn');
-    const dropdownOptions = document.getElementById('dropdown-options');
-    const dropdownSelected = document.getElementById('dropdown-selected');
-    const optionButtons = document.querySelectorAll('.dropdown-option');
-    
-    if (!dropdownBtn || !dropdownOptions) return;
-    
-    let isOpen = false;
-    let currentValue = 'all';
+    setupCustomDropdown() {
+        const dropdownBtn = document.getElementById('dropdown-btn');
+        const dropdownOptions = document.getElementById('dropdown-options');
+        const dropdownSelected = document.getElementById('dropdown-selected');
+        const optionButtons = document.querySelectorAll('.dropdown-option');
 
-    // Toggle dropdown
-    dropdownBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        isOpen = !isOpen;
-        toggleDropdown();
-    });
+        if (!dropdownBtn || !dropdownOptions) return;
 
-    // Cerrar al hacer click fuera
-    document.addEventListener('click', function(e) {
-        if (isOpen && !dropdownBtn.contains(e.target) && !dropdownOptions.contains(e.target)) {
-            isOpen = false;
-            toggleDropdown();
-        }
-    });
+        let isOpen = false;
+        let currentValue = 'all';
 
-    function toggleDropdown() {
-        if (isOpen) {
-            dropdownOptions.classList.add('active');
-            dropdownBtn.classList.add('active');
-            document.body.classList.add('dropdown-open');
-        } else {
-            dropdownOptions.classList.remove('active');
-            dropdownBtn.classList.remove('active');
-            document.body.classList.remove('dropdown-open');
-        }
-    }
-
-    // Seleccionar opción
-    optionButtons.forEach(button => {
-        button.addEventListener('click', (e) => {
+        dropdownBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            const value = button.dataset.value;
-            const text = button.textContent.trim();
-            
-            // Actualizar valor actual
-            currentValue = value;
-            
-            // Actualizar texto seleccionado
-            if (dropdownSelected) {
-                dropdownSelected.textContent = text;
-            }
-            
-            // Marcar opción activa visualmente
-            optionButtons.forEach(opt => opt.classList.remove('active'));
-            button.classList.add('active');
-            
-            // Cerrar dropdown
-            isOpen = false;
+            isOpen = !isOpen;
             toggleDropdown();
-            
-            // Llamar al filtro existente
-            this.handleFilter(value);
         });
-    });
 
-    // Marcar la primera opción como activa por defecto
-    const defaultOption = document.querySelector('.dropdown-option[data-value="all"]');
-    if (defaultOption) {
-        defaultOption.classList.add('active');
+        document.addEventListener('click', function(e) {
+            if (isOpen && !dropdownBtn.contains(e.target) && !dropdownOptions.contains(e.target)) {
+                isOpen = false;
+                toggleDropdown();
+            }
+        });
+
+        function toggleDropdown() {
+            if (isOpen) {
+                dropdownOptions.classList.add('active');
+                dropdownBtn.classList.add('active');
+                document.body.classList.add('dropdown-open');
+            } else {
+                dropdownOptions.classList.remove('active');
+                dropdownBtn.classList.remove('active');
+                document.body.classList.remove('dropdown-open');
+            }
+        }
+
+        optionButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const value = button.dataset.value;
+                const text = button.textContent.trim();
+
+                currentValue = value;
+
+                if (dropdownSelected) {
+                    dropdownSelected.textContent = text;
+                }
+
+                optionButtons.forEach(opt => opt.classList.remove('active'));
+                button.classList.add('active');
+
+                isOpen = false;
+                toggleDropdown();
+
+                this.handleFilter(value);
+            });
+        });
+
+        const defaultOption = document.querySelector('.dropdown-option[data-value="all"]');
+        if (defaultOption) {
+            defaultOption.classList.add('active');
+        }
     }
-}
 
     setupThemeToggle() {
         const themeToggle = document.getElementById('theme-toggle');
         const html = document.documentElement;
-        
+
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             html.classList.add('dark');
         } else {
@@ -235,13 +217,19 @@ setupCustomDropdown() {
     }
 
     getStaticFlowsFallback() {
+        const isMedicina = String(this.facultyId) === '1';
+
+        if (!isMedicina) {
+            return [];
+        }
+
         const staticPdf = 'docs/pdfs/flujogramas/FLUJOGRAMA DE GESTIÓN ESTRATÉGICA (2).pdf';
         return [{
             id: 'static-pe-01',
             code: 'PE-01',
             title: 'Gestión Estratégica',
             type: 'estrategico',
-            activities: 0,
+            activities: 1,
             documents: 1,
             lastUpdate: new Date().toISOString(),
             imageUrl: null,
@@ -277,7 +265,8 @@ setupCustomDropdown() {
                     id: flow.id || index + 1,
                     code: flow.code || flow.codigo || `FL-${String(index + 1).padStart(3, '0')}`,
                     title: flow.title || flow.name || 'Flujograma',
-                    type: (flow.type || 'apoyo').toLowerCase().includes('estrat') ? 'estrategico' : ((flow.type || '').toLowerCase().includes('mision') ? 'misional' : 'apoyo'),
+                    type: (flow.type === 'strategic' || String(flow.type || '').toLowerCase().includes('estrat')) ? 'estrategico' :
+                          (flow.type === 'missional' || String(flow.type || '').toLowerCase().includes('mision')) ? 'misional' : 'apoyo',
                     activities: Number(flow.activities || flow.steps || 0),
                     documents: Number(flow.documents || flow.documentCount || 0),
                     lastUpdate: flow.lastUpdate || flow.updatedAt || new Date().toISOString(),
@@ -288,7 +277,10 @@ setupCustomDropdown() {
             } else {
                 const staticFlows = this.getStaticFlowsFallback();
                 this.flows = staticFlows;
-                if (processId && remoteResult.success) {
+
+                if (this.flows.length === 0) {
+                    this.showToast('No hay flujogramas disponibles para esta facultad.', 'info');
+                } else if (processId && remoteResult.success) {
                     this.showToast('El proceso no tiene flujogramas registrados. Mostrando PDF estático.', 'info');
                 } else if (!processId && remoteResult && !remoteResult.success) {
                     this.showToast('La API devolvió 403. Mostrando PDF estático local.', 'warning');
@@ -320,6 +312,7 @@ setupCustomDropdown() {
         }
 
         container.innerHTML = this.filteredFlows.map((flow, index) => this.createFlowCard(flow, index)).join('');
+        this.attachCardEventListeners();
     }
 
     createFlowCard(flow, index) {
@@ -335,13 +328,12 @@ setupCustomDropdown() {
             'apoyo': 'support_agent'
         };
 
-        // Si el PDF no está disponible, mostrar badge y deshabilitar botón
         const pdfAvailable = flow.pdfUrl && flow.pdfStatus === 'disponible';
-        const pdfBadge = !pdfAvailable ? 
+        const pdfBadge = !pdfAvailable ?
             `<span class="ml-2 px-2 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs rounded-full">Próximamente</span>` : '';
 
         return `
-            <div class="flow-card" data-id="${flow.id}" style="animation-delay: ${index * 0.05}s">
+            <div class="flow-card" data-flow-id="${flow.id}" style="animation-delay: ${index * 0.05}s">
                 <div class="flow-card-header">
                     <div class="flow-icon ${flow.type}">
                         <span class="material-symbols-outlined text-2xl">${typeIcons[flow.type]}</span>
@@ -354,12 +346,8 @@ setupCustomDropdown() {
                         </span>
                     </div>
                 </div>
-                
+
                 <div class="flow-stats">
-                    <div class="flow-stat">
-                        <span class="material-symbols-outlined">check_circle</span>
-                        <span>${flow.activities} actividades</span>
-                    </div>
                     <div class="flow-stat">
                         <span class="material-symbols-outlined">calendar_today</span>
                         <span>${this.formatDate(flow.lastUpdate)}</span>
@@ -367,12 +355,12 @@ setupCustomDropdown() {
                 </div>
 
                 <div class="flow-actions">
-                    <button class="flow-btn flow-btn-primary" onclick="processMapFlujograma.openPreview(${flow.id})">
+                    <button class="flow-btn flow-btn-primary btn-preview" data-flow-id="${flow.id}">
                         <span class="material-symbols-outlined text-sm">visibility</span>
                         Ver Flujograma
                     </button>
-                    <button class="flow-btn ${pdfAvailable ? 'flow-btn-secondary' : 'flow-btn-disabled'}" 
-                            onclick="processMapFlujograma.downloadFlow(${flow.id})"
+                    <button class="flow-btn ${pdfAvailable ? 'flow-btn-secondary' : 'flow-btn-disabled'} btn-download"
+                            data-flow-id="${flow.id}"
                             ${!pdfAvailable ? 'disabled' : ''}>
                         <span class="material-symbols-outlined text-sm">download</span>
                         ${pdfAvailable ? 'PDF' : 'Próximamente'}
@@ -382,11 +370,86 @@ setupCustomDropdown() {
         `;
     }
 
+    attachCardEventListeners() {
+        const previewButtons = document.querySelectorAll('.btn-preview');
+        const downloadButtons = document.querySelectorAll('.btn-download');
+
+        previewButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const flowId = e.currentTarget.dataset.flowId;
+                this.openPreview(flowId);
+            });
+        });
+
+        downloadButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const flowId = e.currentTarget.dataset.flowId;
+                this.downloadFlow(flowId);
+            });
+        });
+    }
+
     /**
-     * Abre el modal con vista previa del flujograma
+     * Resuelve una ruta de PDF relativa a una URL absoluta basada en la ubicación actual
      */
-    openPreview(flowId) {
-        const flow = this.flows.find(f => f.id === flowId);
+    resolvePdfUrl(pdfUrl) {
+        if (!pdfUrl) return null;
+
+        // URL absoluta: devolver tal cual
+        if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://') || pdfUrl.startsWith('//')) {
+            return pdfUrl;
+        }
+
+        // Ruta absoluta desde raíz: devolver tal cual
+        if (pdfUrl.startsWith('/')) {
+            return pdfUrl;
+        }
+
+        // Ruta relativa: resolver desde la ubicación actual
+        const currentPath = window.location.pathname;
+        const basePath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+        return window.location.origin + basePath + pdfUrl;
+    }
+
+    /**
+     * Verifica si un archivo PDF existe realmente en el servidor
+     */
+    async checkPdfExists(pdfUrl) {
+        try {
+            const resolvedUrl = this.resolvePdfUrl(pdfUrl);
+            const response = await fetch(resolvedUrl, { method: 'HEAD', mode: 'no-cors' });
+            // Con mode: 'no-cors' no podemos leer el status, pero si falla el fetch, catch lo maneja
+            return true;
+        } catch (error) {
+            console.warn('PDF no encontrado:', pdfUrl, error);
+            return false;
+        }
+    }
+
+    /**
+     * Muestra el mensaje de "Vista previa no disponible" en el modal
+     */
+    showPdfUnavailable(container, flow) {
+        container.innerHTML = `
+            <div class="w-full h-full flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-xl p-8">
+                <span class="material-symbols-outlined text-6xl text-slate-300 mb-4">picture_as_pdf</span>
+                <h4 class="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">Vista previa no disponible</h4>
+                <p class="text-slate-500 text-center max-w-md mb-4">
+                    El flujograma <strong>${flow.title}</strong> está registrado pero el archivo PDF aún no ha sido cargado al sistema.
+                </p>
+                ${flow.pdfUrl && !flow.pdfUrl.startsWith('#') ? `
+                <button onclick="window.open('${this.resolvePdfUrl(flow.pdfUrl)}', '_blank')" 
+                        class="px-4 py-2 bg-primary hover:bg-blue-800 text-white rounded-xl font-bold text-sm transition-all">
+                    <span class="material-symbols-outlined text-sm inline-block mr-1">open_in_new</span>
+                    Intentar abrir PDF
+                </button>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    async openPreview(flowId) {
+        const flow = this.flows.find(f => String(f.id) === String(flowId));
         if (!flow) return;
 
         this.currentModalFlow = flow;
@@ -398,42 +461,94 @@ setupCustomDropdown() {
         const modalImageContainer = document.getElementById('modal-image-container');
 
         if (modalTitle) modalTitle.textContent = flow.title;
-        if (modalSubtitle) modalSubtitle.textContent = `${flow.code} • ${flow.activities} actividades`;
 
-        const pdfAvailable = flow.pdfUrl && flow.pdfStatus === 'disponible';
+        // Determinar si este flujograma debería tener PDF real
+        const isMedicina = String(this.facultyId) === '1';
+        const isRealPdf = flow.pdfUrl && !flow.pdfUrl.startsWith('#') && flow.pdfStatus === 'disponible';
+        const shouldHavePdf = isMedicina && isRealPdf;
 
-        // Mostrar PDF real cuando esté disponible; fallback a imagen en los demás casos.
         if (modalImageContainer) {
-            if (pdfAvailable) {
+            if (shouldHavePdf) {
+                // Solo Medicina: intentar cargar el PDF
+                const resolvedPdfUrl = this.resolvePdfUrl(flow.pdfUrl);
+
+                // Mostrar loading mientras verificamos
                 modalImageContainer.innerHTML = `
-                    <iframe
-                        src="${flow.pdfUrl}#toolbar=0&navpanes=0&scrollbar=1"
-                        title="${flow.title}"
-                        class="w-full h-full rounded-xl bg-white"
-                        style="min-height: 70vh; border: none;"
-                    ></iframe>
-                `;
-            } else {
-                modalImageContainer.innerHTML = `
-                    <div class="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-xl">
-                        <img src="${flow.imageUrl}" 
-                             alt="${flow.title}" 
-                             class="max-w-full max-h-full object-contain rounded-xl shadow-lg"
-                             onerror="this.parentElement.innerHTML='<div class=\'text-center p-8\'><span class=\'material-symbols-outlined text-6xl text-slate-300 mb-4\'>image_not_supported</span><p class=\'text-slate-500\'>Vista previa no disponible</p></div>'">
+                    <div class="w-full h-full flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-xl p-8">
+                        <span class="material-symbols-outlined text-4xl text-secondary animate-spin mb-4">refresh</span>
+                        <p class="text-slate-500">Cargando flujograma...</p>
                     </div>
                 `;
+
+                // Intentar cargar el PDF en un iframe oculto primero para verificar
+                const testIframe = document.createElement('iframe');
+                testIframe.style.display = 'none';
+                document.body.appendChild(testIframe);
+
+                let pdfLoaded = false;
+
+                testIframe.onload = () => {
+                    try {
+                        // Si el iframe carga contenido HTML (página duplicada), el contenido tendrá <html>
+                        const content = testIframe.contentDocument || testIframe.contentWindow?.document;
+                        if (content && content.body && content.body.innerHTML.length > 100) {
+                            // Verificar si es HTML en vez de PDF
+                            const hasHtml = content.body.innerHTML.toLowerCase().includes('<!doctype') ||
+                                          content.body.innerHTML.toLowerCase().includes('<html') ||
+                                          content.body.innerHTML.toLowerCase().includes('sistema de gestión');
+                            if (hasHtml) {
+                                pdfLoaded = false;
+                            } else {
+                                pdfLoaded = true;
+                            }
+                        }
+                    } catch (e) {
+                        // Cross-origin, asumir que es PDF
+                        pdfLoaded = true;
+                    }
+                };
+
+                testIframe.onerror = () => {
+                    pdfLoaded = false;
+                };
+
+                // Dar tiempo para que cargue
+                testIframe.src = resolvedPdfUrl;
+
+                setTimeout(() => {
+                    document.body.removeChild(testIframe);
+
+                    if (pdfLoaded) {
+                        // El PDF parece válido, mostrar en iframe
+                        modalImageContainer.innerHTML = `
+                            <iframe
+                                src="${resolvedPdfUrl}#toolbar=1&navpanes=0&scrollbar=1"
+                                title="${flow.title}"
+                                class="w-full h-full rounded-xl bg-white"
+                                style="min-height: 65vh; border: none;"
+                                type="application/pdf"
+                            ></iframe>
+                        `;
+                    } else {
+                        // El PDF no es válido, mostrar mensaje
+                        this.showPdfUnavailable(modalImageContainer, flow);
+                    }
+                }, 1500);
+
+            } else {
+                // Otras facultades o sin PDF: mostrar mensaje de no disponible
+                this.showPdfUnavailable(modalImageContainer, flow);
             }
         }
 
-        // Actualizar botón de PDF en modal
         const downloadBtn = document.getElementById('btn-download-pdf');
         if (downloadBtn) {
-            downloadBtn.style.display = pdfAvailable ? 'flex' : 'none';
+            downloadBtn.style.display = isRealPdf ? 'flex' : 'none';
         }
 
         modal.classList.remove('hidden');
         modal.classList.add('flex');
-        
+
         setTimeout(() => {
             modalContent.classList.remove('scale-95', 'opacity-0');
             modalContent.classList.add('scale-100', 'opacity-100');
@@ -459,26 +574,23 @@ setupCustomDropdown() {
         }, 300);
     }
 
-    /**
-     * Descarga un flujograma - Versión temporal con mensaje
-     */
     downloadFlow(flowId) {
-        const flow = this.flows.find(f => f.id === flowId);
+        const flow = this.flows.find(f => String(f.id) === String(flowId));
         if (!flow) return;
 
-        // Verificar si el PDF está disponible
         if (!flow.pdfUrl || flow.pdfStatus !== 'disponible') {
             this.showToast('El PDF estará disponible próximamente', 'info');
             return;
         }
 
-        // Si está disponible, proceder con la descarga
+        const resolvedUrl = this.resolvePdfUrl(flow.pdfUrl);
+
         try {
             const link = document.createElement('a');
-            link.href = flow.pdfUrl;
+            link.href = resolvedUrl;
             link.download = `${flow.code}_${flow.title.replace(/\s+/g, '_')}.pdf`;
             link.target = '_blank';
-            
+
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -487,7 +599,8 @@ setupCustomDropdown() {
 
         } catch (error) {
             console.error('Error en descarga:', error);
-            this.showToast('Error al descargar el archivo', 'error');
+            window.open(resolvedUrl, '_blank');
+            this.showToast(`Abriendo PDF en nueva pestaña`, 'info');
         }
     }
 
@@ -509,12 +622,12 @@ setupCustomDropdown() {
 
     filterFlows(searchTerm, type) {
         this.filteredFlows = this.flows.filter(flow => {
-            const matchesSearch = !searchTerm || 
+            const matchesSearch = !searchTerm ||
                 flow.title.toLowerCase().includes(searchTerm) ||
                 flow.code.toLowerCase().includes(searchTerm);
-            
+
             const matchesType = type === 'all' || flow.type === type;
-            
+
             return matchesSearch && matchesType;
         });
 
@@ -531,11 +644,10 @@ setupCustomDropdown() {
     }
 
     showToast(message, type = 'info') {
-        // Crear toast simple si no existe sistema global
         const toast = document.createElement('div');
         toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-xl shadow-lg text-white text-sm font-medium z-50 transition-all duration-300 transform translate-y-0 ${
-            type === 'error' ? 'bg-red-600' : 
-            type === 'success' ? 'bg-green-600' : 
+            type === 'error' ? 'bg-red-600' :
+            type === 'success' ? 'bg-green-600' :
             type === 'warning' ? 'bg-amber-600' : 'bg-primary'
         }`;
         toast.innerHTML = `
@@ -546,9 +658,9 @@ setupCustomDropdown() {
                 ${message}
             </div>
         `;
-        
+
         document.body.appendChild(toast);
-        
+
         setTimeout(() => {
             toast.style.opacity = '0';
             toast.style.transform = 'translateY(20px)';
@@ -574,4 +686,3 @@ let processMapFlujograma;
 document.addEventListener('DOMContentLoaded', () => {
     processMapFlujograma = new ProcessMapFlujograma();
 });
-

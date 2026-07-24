@@ -29,12 +29,11 @@ const FICHA_CONFIG = {
     SHOW_DOCUMENTOS_BUTTON_DELAY_MS: 1400
 };
 
+const _SK_MODE = (typeof CONFIG !== 'undefined' && CONFIG.MODE) ? CONFIG.MODE : 'local';
 const FICHA_STORAGE_KEYS = {
-    EXPEDIENTE_ACTUAL: 'sigpro_expediente_actual',
-    EXPEDIENTES_LISTA: 'sigpro_expedientes_lista',
-    DOCUMENTOS_LISTA: 'sigpro_documentos_lista',
-    INDICADORES_DETALLE: 'sigpro_indicadores_detalle',
-    DOCUMENTOS_DETALLE: 'sigpro_documentos_detalle'
+    DOCUMENTOS_LISTA:    `${_SK_MODE}_sigpro_documentos_lista`,
+    INDICADORES_DETALLE: `${_SK_MODE}_sigpro_indicadores_detalle`,
+    DOCUMENTOS_DETALLE:  `${_SK_MODE}_sigpro_documentos_detalle`
 };
 
 const FACULTY_CODE_MAP = {
@@ -801,7 +800,7 @@ function initFormHandler() {
                 archivos: adjuntos.map((item) => ({ nombre: item.nombre, tamaño: item.tamaño, tipo: item.tipo })),
                 macroProcesoNombre: obtenerNombreMacroProceso(data.macroProceso),
                 facultadId: resolveFacultyId(),
-                generadoPor: currentUser?.correo || 'Facultad',
+                generadoPor: 'Facultad',
                 origen: 'local'
             };
 
@@ -1041,7 +1040,7 @@ function guardarFlujogramaLocalInternal(data) {
     };
     localStorage.setItem(FICHA_STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
 
-    const detalleFlujogramasRaw = localStorage.getItem('sigpro_flujogramas_detalle');
+    const detalleFlujogramasRaw = localStorage.getItem(`${_SK_MODE}_sigpro_flujogramas_detalle`);
     const detalleFlujogramas = detalleFlujogramasRaw ? JSON.parse(detalleFlujogramasRaw) : {};
     detalleFlujogramas[codigo] = {
         ...data,
@@ -1049,7 +1048,7 @@ function guardarFlujogramaLocalInternal(data) {
         fechaRegistro: now.toISOString(),
         macroProcesoTexto: data.macroProcesoNombre
     };
-    localStorage.setItem('sigpro_flujogramas_detalle', JSON.stringify(detalleFlujogramas));
+    localStorage.setItem(`${_SK_MODE}_sigpro_flujogramas_detalle`, JSON.stringify(detalleFlujogramas));
 }
 
 async function guardarFichaYRedirigir(codigo) {
