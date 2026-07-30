@@ -553,22 +553,60 @@ function mergeDocuments(primary, secondary) {
 }
 
 function loadLocalDocuments() {
-	const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
-	if (!raw) {
-		return [];
-	}
-
-	try {
-		const parsed = JSON.parse(raw);
-		if (!Array.isArray(parsed)) {
-			return [];
-		}
-
-		return parsed.map((doc, index) => normalizeDocument(doc, index));
-	} catch (error) {
-		console.error("No se pudo leer sigpro_documentos_lista:", error);
-		return [];
-	}
+    const clavesRevisar = [
+        STORAGE_KEYS.DOCUMENTOS_LISTA,  // "sigpro_documentos_lista"
+        'local_sigpro_documentos_lista',
+        'remote_sigpro_documentos_lista',
+        'sigpro_reportes'
+    ];
+    
+    let todosLosDocs = [];
+    
+    for (const clave of clavesRevisar) {
+        const raw = localStorage.getItem(clave);
+        if (!raw) continue;
+        
+        try {
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) continue;
+            
+            parsed.forEach((doc, index) => {
+                if (!doc) return;
+                
+                // Si viene de sigpro_reportes, normalizar estructura
+                if (clave === 'sigpro_reportes') {
+                    const status = normalizeEstado(doc.status || doc.estado);
+                    const fechaStr = doc.createdAt || doc.fecha || new Date().toISOString();
+                    const fecha = new Date(fechaStr);
+                    
+                    todosLosDocs.push({
+                        id: doc.id || doc.code || `REP-${index}`,
+                        codigo: doc.code || doc.id || `REP-${index}`,
+                        descripcion: doc.description || doc.title || `Reporte ${doc.semester || ''}`,
+                        facultad: doc.responsibleName || doc.generadoPor || 'Facultad',
+                        unidad: doc.unit || 'Unidad administrativa',
+                        estado: status,
+                        fecha: fecha
+                    });
+                } else {
+                    todosLosDocs.push(normalizeDocument(doc, index));
+                }
+            });
+        } catch (error) {
+            console.warn(`Error leyendo ${clave}:`, error);
+        }
+    }
+    
+    // Eliminar duplicados por código, manteniendo el más reciente
+    const porCodigo = new Map();
+    todosLosDocs.forEach(doc => {
+        const existente = porCodigo.get(doc.codigo);
+        if (!existente || (doc.fecha && existente.fecha && doc.fecha > existente.fecha)) {
+            porCodigo.set(doc.codigo, doc);
+        }
+    });
+    
+    return Array.from(porCodigo.values());
 }
 
 function extractArrayPayload(payload) {
@@ -1051,51 +1089,96 @@ function renderAdminFacultiesTable(rows) {
 }
 
 async function loadAdminFacultiesTable() {
-	const errorNode = document.getElementById("admin-faculties-error");
-	const tableBody = document.getElementById("admin-faculties-body");
+    const errorNode = document.getElementById("admin-faculties-error");
+    const tableBody = document.getElementById("admin-faculties-body");
 
-	if (!tableBody) {
-		return;
-	}
+    if (!tableBody) return;
 
-	if (errorNode) {
-		errorNode.classList.add("hidden");
-		errorNode.textContent = "";
-	}
+    if (errorNode) {
+        errorNode.classList.add("hidden");
+        errorNode.textContent = "";
+    }
 
-	if (typeof API === "undefined" || !API.admin || !API.admin.faculties) {
-		renderAdminFacultiesTable([]);
-		return;
-	}
+    let rows = [];
 
-	try {
-		let result = null;
-		if (typeof API.admin.faculties.getAll === "function") {
-			result = await API.admin.faculties.getAll();
-		}
+    // ========== INTENTO 1: API Admin ==========
+    if (typeof API !== "undefined" && API.admin?.faculties) {
+        try {
+            let result = null;
+            if (typeof API.admin.faculties.getAll === "function") {
+                result = await API.admin.faculties.getAll();
+            }
 
-		if (!result?.success && typeof API.admin.faculties.getAdminFaculties === "function") {
-			const fallbackRows = await API.admin.faculties.getAdminFaculties();
-			const rows = extractFacultyRows(fallbackRows);
-			renderAdminFacultiesTable(rows);
-			return;
-		}
+            if (!result?.success && typeof API.admin.faculties.getAdminFaculties === "function") {
+                const fallbackRows = await API.admin.faculties.getAdminFaculties();
+                rows = extractFacultyRows(fallbackRows);
+            } else if (result?.success) {
+                rows = extractFacultyRows(result.data);
+            }
+        } catch (error) {
+            console.warn("⚠️ API admin facultades tabla falló:", error.message);
+        }
+    }
 
-		if (!result?.success) {
-			throw new Error(result?.error || "No se pudieron cargar las facultades administrativas.");
-		}
+    // ========== INTENTO 2: LocalAPI / localStorage ==========
+    if (!rows.length) {
+        try {
+            // Intentar LocalAPI directo
+            if (typeof LocalAPI !== 'undefined' && LocalAPI.faculties?.getAll) {
+                const res = await LocalAPI.faculties.getAll();
+                if (res?.success && Array.isArray(res.data)) {
+                    rows = res.data.map(f => ({
+                        name: f.name || f.nombre,
+                        code: f.code || f.codigo,
+                        shortName: f.shortName || f.name?.replace('Facultad de ', ''),
+                        isActive: true,
+                        createdAt: f.createdAt,
+                        stats: {
+                            indicatorsCount: f.indicators || 0,
+                            flowsCount: f.flows || 0,
+                            processesCount: f.processes || 0,
+                            activeUsers: 0
+                        }
+                    }));
+                }
+            }
+        } catch (e) {
+            console.warn("⚠️ LocalAPI facultades tabla falló:", e.message);
+        }
+    }
 
-		const rows = extractFacultyRows(result.data);
-		renderAdminFacultiesTable(rows);
-	} catch (error) {
-		console.error("Error cargando facultades administrativas:", error);
-		renderAdminFacultiesTable([]);
-		if (errorNode) {
-			errorNode.textContent = error?.message || "No se pudieron cargar las facultades administrativas.";
-			errorNode.classList.remove("hidden");
-		}
-	}
+    // ========== INTENTO 3: localStorage directo ==========
+    if (!rows.length) {
+        try {
+            const rawLocal = localStorage.getItem('local_sigpro_faculties') 
+                || localStorage.getItem('sigpro_faculties');
+            
+            if (rawLocal) {
+                const parsed = JSON.parse(rawLocal);
+                if (Array.isArray(parsed)) {
+                    rows = parsed.map(f => ({
+                        name: f.name || f.nombre,
+                        code: f.code || f.codigo,
+                        shortName: f.shortName || f.name?.replace('Facultad de ', ''),
+                        isActive: true,
+                        createdAt: f.createdAt,
+                        stats: {
+                            indicatorsCount: f.indicators || 0,
+                            flowsCount: f.flows || 0,
+                            processesCount: f.processes || 0,
+                            activeUsers: 0
+                        }
+                    }));
+                }
+            }
+        } catch (e) {
+            console.warn("⚠️ localStorage facultades tabla falló:", e.message);
+        }
+    }
+
+    renderAdminFacultiesTable(rows);
 }
+
 
 async function loadDashboardData() {
 	const [apiDocuments] = await Promise.all([
@@ -1105,28 +1188,36 @@ async function loadDashboardData() {
 	const localDocuments = loadLocalDocuments();
 	// Cargar documentos detallados guardados por las facultades (sigpro_documentos_detalle)
 	let localDetailDocs = [];
-	try {
-		const rawDetail = localStorage.getItem('sigpro_documentos_detalle');
-		if (rawDetail) {
-			const detailMap = JSON.parse(rawDetail) || {};
-			localDetailDocs = Object.entries(detailMap).map(([codigo, detail]) => {
-				const item = detail || {};
-				const ficha = item.fichaData || {};
-				return {
-					codigo: item.codigo || ficha.codigo || codigo,
-					descripcion: item.titulo || ficha.descripcion || item.descripcion || `Documento ${codigo}`,
-					facultad: ficha.facultad || item.nombreFacultad || item.facultad || '',
-					estado: normalizeEstado(item.estado || ficha.estado || 'pendiente'),
-					fecha: parseDocumentDate(item) || parseDocumentDate(ficha) || new Date(),
-					fechaObj: parseDocumentDate(item) || parseDocumentDate(ficha) || new Date(),
-					descripcionRaw: item,
-				};
-			});
-		}
-	} catch (e) {
-		console.warn('No se pudo parsear sigpro_documentos_detalle:', e);
-		localDetailDocs = [];
-	}
+        const clavesDetalle = [
+            'sigpro_documentos_detalle',
+            'local_sigpro_documentos_detalle',
+            'remote_sigpro_documentos_detalle'
+        ];
+
+        for (const claveDetalle of clavesDetalle) {
+            try {
+                const rawDetail = localStorage.getItem(claveDetalle);
+                if (rawDetail) {
+                    const detailMap = JSON.parse(rawDetail) || {};
+                    const docs = Object.entries(detailMap).map(([codigo, detail]) => {
+                        const item = detail || {};
+                        const ficha = item.fichaData || {};
+                        return {
+                            codigo: item.codigo || ficha.codigo || codigo,
+                            descripcion: item.titulo || ficha.descripcion || item.descripcion || `Documento ${codigo}`,
+                            facultad: ficha.facultad || item.nombreFacultad || item.facultad || '',
+                            estado: normalizeEstado(item.estado || ficha.estado || 'pendiente'),
+                            fecha: parseDocumentDate(item) || parseDocumentDate(ficha) || new Date(),
+                            fechaObj: parseDocumentDate(item) || parseDocumentDate(ficha) || new Date(),
+                            descripcionRaw: item,
+                        };
+                    });
+                    localDetailDocs = localDetailDocs.concat(docs);
+                }
+            } catch (e) {
+                console.warn(`No se pudo parsear ${claveDetalle}:`, e);
+            }
+        }
 
 	// Merge: api <- local list <- local detail (detail should override summaries)
 	dashboardDocuments = mergeDocuments(apiDocuments, mergeDocuments(localDocuments, localDetailDocs));
@@ -1306,123 +1397,162 @@ async function setupFacultyNavigation() {
         </div>
     `;
 
+    let faculties = [];
+
+    // ========== INTENTO 1: API Admin ==========
     try {
-        // Cargar facultades desde la API
-        let faculties = [];
-        
-        if (typeof API !== 'undefined' && API.admin && API.admin.faculties?.getAll) {
+        if (typeof API !== 'undefined' && API.admin?.faculties?.getAll) {
             const res = await API.admin.faculties.getAll();
-            if (res?.success && Array.isArray(res.data)) {
+            if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
                 faculties = res.data;
+                console.log('✅ Facultades cargadas desde API.admin.faculties.getAll');
             }
         }
-        
-        // Fallback: intentar con endpoint público
-        if (!faculties.length && typeof API !== 'undefined' && API.public?.faculties?.getAll) {
-            const res = await API.public.faculties.getAll();
-            if (res?.success && Array.isArray(res.data)) {
-                faculties = res.data;
+    } catch (e) {
+        console.warn('⚠️ API admin facultades falló:', e.message);
+    }
+
+    // ========== INTENTO 2: API Pública ==========
+    if (!faculties.length) {
+        try {
+            if (typeof API !== 'undefined' && API.public?.faculties?.getAll) {
+                const res = await API.public.faculties.getAll();
+                if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+                    faculties = res.data;
+                    console.log('✅ Facultades cargadas desde API.public.faculties.getAll');
+                }
             }
+        } catch (e) {
+            console.warn('⚠️ API public facultades falló:', e.message);
         }
+    }
 
-        // Si no hay datos de API, mostrar error
-        if (!faculties.length) {
-            grid.innerHTML = `
-                <div class="md:col-span-full text-center py-8">
-                    <span class="material-symbols-outlined text-4xl text-slate-300">cloud_off</span>
-                    <p class="text-sm text-slate-500 mt-2">No se pudieron cargar las facultades desde el servidor.</p>
-                    <button onclick="location.reload()" class="mt-2 text-xs text-blue-600 hover:underline">Reintentar</button>
-                </div>
-            `;
-            if (status) status.textContent = "Error de conexión con el servidor";
-            return;
+    // ========== INTENTO 3: LocalAPI directo (modo local) ==========
+    if (!faculties.length) {
+        try {
+            if (typeof LocalAPI !== 'undefined' && LocalAPI.faculties?.getAll) {
+                const res = await LocalAPI.faculties.getAll();
+                if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+                    faculties = res.data;
+                    console.log('✅ Facultades cargadas desde LocalAPI.faculties.getAll');
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ LocalAPI facultades falló:', e.message);
         }
+    }
 
-        // Mapear iconos y colores por código de facultad
-        const facultyConfig = {
-            'MED': { icon: 'medical_services', color: 'red', glow: 'icon-glow-red' },
-            'DER': { icon: 'gavel', color: 'indigo', glow: 'icon-glow-indigo' },
-            'FLCH': { icon: 'history_edu', color: 'amber', glow: 'icon-glow-amber' },
-            'FFB': { icon: 'vaccines', color: 'cyan', glow: 'icon-glow-cyan' },
-            'FO': { icon: 'health_and_safety', color: 'teal', glow: 'icon-glow-teal' },
-            'FE': { icon: 'school', color: 'emerald', glow: 'icon-glow-emerald' },
-            'FQIQ': { icon: 'science', color: 'lime', glow: 'icon-glow-lime' },
-            'FMV': { icon: 'pets', color: 'orange', glow: 'icon-glow-orange' },
-            'FCA': { icon: 'work', color: 'purple', glow: 'icon-glow-purple' },
-            'FCB': { icon: 'biotech', color: 'green', glow: 'icon-glow-green' },
-            'FCC': { icon: 'money_bag', color: 'pink', glow: 'icon-glow-pink' },
-            'FCE': { icon: 'trending_up', color: 'yellow', glow: 'icon-glow-yellow' },
-            'FCF': { icon: 'antigravity', color: 'violet', glow: 'icon-glow-violet' },
-            'FCM': { icon: 'calculate', color: 'blue', glow: 'icon-glow-blue' },
-            'FCCSS': { icon: 'groups', color: 'rose', glow: 'icon-glow-rose' },
-            'FIGMMG': { icon: 'terrain', color: 'stone', glow: 'icon-glow-stone' },
-            'FII': { icon: 'precision_manufacturing', color: 'slate', glow: 'icon-glow-slate' },
-            'FP': { icon: 'psychology', color: 'fuchsia', glow: 'icon-glow-fuchsia' },
-            'FIEE': { icon: 'electrical_services', color: 'amber', glow: 'icon-glow-amber' },
-            'FISI': { icon: 'computer', color: 'sky', glow: 'icon-glow-sky' }
-        };
-
-        // Generar cards dinámicamente
-        grid.innerHTML = faculties.map(faculty => {
-            const config = facultyConfig[faculty.code] || { 
-                icon: 'school', 
-                color: 'slate', 
-                glow: 'icon-glow-slate' 
-            };
+    // ========== INTENTO 4: localStorage directo (último recurso) ==========
+    if (!faculties.length) {
+        try {
+            // Intentar con prefijo local_ (modo local)
+            const rawLocal = localStorage.getItem('local_sigpro_faculties') 
+                || localStorage.getItem('sigpro_faculties');
             
-            const stats = faculty.stats || {};
-            const shortName = faculty.shortName || faculty.name?.replace('Facultad de ', '') || faculty.name;
-            const displayName = shortName.length > 25 ? shortName.substring(0, 22) + '...' : shortName;
-            
-            // URL con el ID real de la API
-            const targetUrl = `racio-facultades-documentos.html?facultyId=${encodeURIComponent(faculty.id)}&facultyCode=${encodeURIComponent(faculty.code)}&facultyName=${encodeURIComponent(faculty.name)}`;
-            
-            return `
-                <a class="facultad-card bg-white p-5 rounded-xl shadow-sm hover-lift transition-all duration-300 flex flex-col items-center justify-center gap-3 h-36 border border-gray-100 group ${config.glow}" 
-                   href="${targetUrl}" 
-                   title="${faculty.name} - Ver ${stats.flowsCount || 0} flujogramas, ${stats.indicatorsCount || 0} indicadores"
-                   data-faculty-id="${faculty.id}"
-                   data-faculty-code="${faculty.code}">
-                    
-                    <div class="w-12 h-12 rounded-full bg-${config.color}-50 text-${config.color}-500 flex items-center justify-center group-hover:bg-${config.color}-100 transition-all icon-bg relative">
-                        <span class="material-symbols-outlined text-2xl">${config.icon}</span>
-                        ${stats.flowsCount > 0 ? `
-                            <span class="absolute -top-1 -right-1 w-5 h-5 bg-${config.color}-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
-                                ${stats.flowsCount}
-                            </span>
-                        ` : ''}
-                    </div>
-                    
-                    <span class="text-xs font-bold text-gray-700 text-center leading-tight">${displayName}</span>
-                    
-                    ${stats.indicatorsCount > 0 || stats.processesCount > 0 ? `
-                        <div class="flex gap-1 mt-1">
-                            ${stats.indicatorsCount > 0 ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium">${stats.indicatorsCount} ind</span>` : ''}
-                            ${stats.flowsCount > 0 ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-green-600 font-medium">${stats.flowsCount} fluj</span>` : ''}
-                        </div>
-                    ` : ''}
-                </a>
-            `;
-        }).join('');
-
-        // Actualizar contador
-        if (status) {
-            status.textContent = `Mostrando ${faculties.length} de ${faculties.length} facultades`;
+            if (rawLocal) {
+                const parsed = JSON.parse(rawLocal);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    faculties = parsed;
+                    console.log('✅ Facultades cargadas desde localStorage');
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ localStorage facultades falló:', e.message);
         }
+    }
 
-        // Re-inicializar el filtro de búsqueda con los nuevos elementos
-        setupFacultyFilter();
-
-    } catch (error) {
-        console.error('Error cargando facultades:', error);
+    // ========== RENDERIZAR ==========
+    if (!faculties.length) {
         grid.innerHTML = `
             <div class="md:col-span-full text-center py-8">
-                <span class="material-symbols-outlined text-4xl text-red-300">error</span>
-                <p class="text-sm text-red-500 mt-2">Error al cargar facultades: ${error.message}</p>
-                <button onclick="setupFacultyNavigation()" class="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700">Reintentar</button>
+                <span class="material-symbols-outlined text-4xl text-slate-300">cloud_off</span>
+                <p class="text-sm text-slate-500 mt-2">No se pudieron cargar las facultades desde el servidor.</p>
+                <button onclick="location.reload()" class="mt-2 text-xs text-blue-600 hover:underline">Reintentar</button>
             </div>
         `;
+        if (status) status.textContent = "Error de conexión con el servidor";
+        return;
     }
+
+    // Mapear iconos y colores por código de facultad
+    const facultyConfig = {
+        'FM': { icon: 'medical_services', color: 'red', glow: 'icon-glow-red' },
+        'FDCP': { icon: 'gavel', color: 'indigo', glow: 'icon-glow-indigo' },
+        'FLCH': { icon: 'history_edu', color: 'amber', glow: 'icon-glow-amber' },
+        'FFB': { icon: 'vaccines', color: 'cyan', glow: 'icon-glow-cyan' },
+        'FO': { icon: 'health_and_safety', color: 'teal', glow: 'icon-glow-teal' },
+        'FE': { icon: 'school', color: 'emerald', glow: 'icon-glow-emerald' },
+        'FQIQ': { icon: 'science', color: 'lime', glow: 'icon-glow-lime' },
+        'FMV': { icon: 'pets', color: 'orange', glow: 'icon-glow-orange' },
+        'FCA': { icon: 'work', color: 'purple', glow: 'icon-glow-purple' },
+        'FCB': { icon: 'biotech', color: 'green', glow: 'icon-glow-green' },
+        'FCC': { icon: 'money_bag', color: 'pink', glow: 'icon-glow-pink' },
+        'FCE': { icon: 'trending_up', color: 'yellow', glow: 'icon-glow-yellow' },
+        'FCF': { icon: 'antigravity', color: 'violet', glow: 'icon-glow-violet' },
+        'FCM': { icon: 'calculate', color: 'blue', glow: 'icon-glow-blue' },
+        'FCCSS': { icon: 'groups', color: 'rose', glow: 'icon-glow-rose' },
+        'FIGMMG': { icon: 'terrain', color: 'stone', glow: 'icon-glow-stone' },
+        'FII': { icon: 'precision_manufacturing', color: 'slate', glow: 'icon-glow-slate' },
+        'FP': { icon: 'psychology', color: 'fuchsia', glow: 'icon-glow-fuchsia' },
+        'FIEE': { icon: 'electrical_services', color: 'amber', glow: 'icon-glow-amber' },
+        'FISI': { icon: 'computer', color: 'sky', glow: 'icon-glow-sky' }
+    };
+
+    grid.innerHTML = faculties.map(faculty => {
+        const code = faculty.code || faculty.codigo || '';
+        const config = facultyConfig[code] || { 
+            icon: faculty.icon || 'school', 
+            color: faculty.color || 'slate', 
+            glow: 'icon-glow-slate' 
+        };
+        
+        const stats = faculty.stats || {};
+        // Compatibilidad con datos locales (indicators/flows/processes) vs datos API (stats object)
+        const indicatorsCount = stats.indicatorsCount ?? stats.indicators ?? faculty.indicators ?? 0;
+        const flowsCount = stats.flowsCount ?? stats.flows ?? faculty.flows ?? 0;
+        const processesCount = stats.processesCount ?? stats.processes ?? faculty.processes ?? 0;
+        
+        const shortName = faculty.shortName 
+            || faculty.name?.replace('Facultad de ', '') 
+            || faculty.nombre 
+            || faculty.name;
+        const displayName = shortName.length > 25 ? shortName.substring(0, 22) + '...' : shortName;
+        
+        const targetUrl = `racio-facultades-documentos.html?facultyId=${encodeURIComponent(faculty.id)}&facultyCode=${encodeURIComponent(code)}&facultyName=${encodeURIComponent(faculty.name || faculty.nombre)}`;
+        
+        return `
+            <a class="facultad-card bg-white p-5 rounded-xl shadow-sm hover-lift transition-all duration-300 flex flex-col items-center justify-center gap-3 h-36 border border-gray-100 group ${config.glow}" 
+               href="${targetUrl}" 
+               title="${faculty.name || faculty.nombre} - Ver ${flowsCount} flujogramas, ${indicatorsCount} indicadores"
+               data-faculty-id="${faculty.id}"
+               data-faculty-code="${code}">
+                
+                <div class="w-12 h-12 rounded-full bg-${config.color}-50 text-${config.color}-500 flex items-center justify-center group-hover:bg-${config.color}-100 transition-all icon-bg relative">
+                    <span class="material-symbols-outlined text-2xl">${config.icon}</span>
+                    ${flowsCount > 0 ? `
+                        <span class="absolute -top-1 -right-1 w-5 h-5 bg-${config.color}-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+                            ${flowsCount}
+                        </span>
+                    ` : ''}
+                </div>
+                
+                <span class="text-xs font-bold text-gray-700 text-center leading-tight">${escapeHtml(displayName)}</span>
+                
+                ${indicatorsCount > 0 || processesCount > 0 ? `
+                    <div class="flex gap-1 mt-1">
+                        ${indicatorsCount > 0 ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium">${indicatorsCount} ind</span>` : ''}
+                        ${flowsCount > 0 ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-green-600 font-medium">${flowsCount} fluj</span>` : ''}
+                    </div>
+                ` : ''}
+            </a>
+        `;
+    }).join('');
+
+    if (status) {
+        status.textContent = `Mostrando ${faculties.length} de ${faculties.length} facultades`;
+    }
+
+    setupFacultyFilter();
 }
 
 // ============================================

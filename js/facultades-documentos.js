@@ -2626,6 +2626,405 @@ window.abrirPreviewPdf = async function(indiceAdjunto) {
     }
 };
 
+// ==========================================
+// DESCARGAR FICHA TÉCNICA EN PDF - UNA SOLA HOJA
+// ==========================================
+
+async function descargarFichaTecnicaPDF() {
+    const currentDetalle = window.currentDetalle || {};
+    const docId = currentDetalle.codigo || currentDetalle.id || 'documento';
+    const panelHtml = document.getElementById('viewer-contenido');
+
+    if (!panelHtml) {
+        showToast('No hay contenido para exportar', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btn-descargar-pdf');
+    const icono = document.getElementById('icon-pdf');
+    const texto = document.getElementById('texto-pdf');
+    const setLoading = (isLoading) => {
+        if (btn) btn.disabled = isLoading;
+        if (icono) icono.textContent = isLoading ? 'hourglass_top' : 'picture_as_pdf';
+        if (texto) texto.textContent = isLoading ? 'Generando PDF...' : 'Descargar PDF';
+    };
+    setLoading(true);
+
+    let wrapper = null;
+
+    try {
+        // 1. Cargar librerías
+        if (!window.html2canvas) {
+            await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+        }
+        if (!window.jspdf?.jsPDF) {
+            await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        }
+        const { jsPDF } = window.jspdf;
+
+        // 2. Crear wrapper off-screen al ANCHO NATURAL del diseño (1100px)
+        wrapper = document.createElement('div');
+        wrapper.id = 'pdf-export-wrapper';
+        wrapper.style.cssText = `
+            position: fixed;
+            left: -9999px;
+            top: 0;
+            width: 1100px;
+            background: #ffffff;
+            z-index: -1;
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+            overflow: visible;
+        `;
+
+        // 3. Clonar contenido manteniendo su ancho natural
+        const clone = panelHtml.cloneNode(true);
+        clone.style.cssText = `
+            width: 1100px !important;
+            min-width: 1100px !important;
+            max-width: 1100px !important;
+            margin: 0 !important;
+            padding: 32px 40px !important;
+            box-sizing: border-box !important;
+            background: #ffffff !important;
+        `;
+
+        // Quitar restricciones internas que causen compresión
+        clone.querySelectorAll('*').forEach(el => {
+            el.style.maxWidth = 'none';
+        });
+
+        // Preservar colores exactos
+        const styleFix = document.createElement('style');
+        styleFix.textContent = `
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+            .material-symbols-outlined { font-family: 'Material Symbols Outlined', sans-serif !important; }
+        `;
+        clone.appendChild(styleFix);
+        
+        wrapper.appendChild(clone);
+        document.body.appendChild(wrapper);
+
+        // 4. Esperar renderizado
+        await new Promise(r => setTimeout(r, 600));
+
+        // 5. Capturar a escala ALTA para nitidez al estirar
+        const canvas = await html2canvas(wrapper, {
+            scale: 3,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            windowWidth: 1100,
+            width: 1100
+        });
+
+        // 6. Generar PDF de UNA SOLA PÁGINA que ocupe TODO el A4
+        const imgData = canvas.toDataURL('image/png', 1.0);
+
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+            compress: true
+        });
+
+        // addImage(imgData, formato, x, y, ancho_mm, alto_mm)
+        // x=0, y=0, ancho=210mm, alto=297mm → ocupa toda la hoja de borde a borde
+        pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+
+        pdf.save(`Ficha-Tecnica-${docId}.pdf`);
+        showToast('Ficha técnica descargada en una sola hoja', 'success');
+
+    } catch (error) {
+        console.error('Error generando PDF:', error);
+        showToast('Error al generar PDF. Intenta nuevamente.', 'error');
+    } finally {
+        setLoading(false);
+        if (wrapper && wrapper.parentNode) {
+            wrapper.parentNode.removeChild(wrapper);
+        }
+    }
+}
+
+// ==========================================
+// DESCARGAR REPORTE COMPLETO DEL EXPEDIENTE
+// ==========================================
+
+async function descargarReporteCompletoPDF() {
+    const detalle = window.currentDetalle;
+    if (!detalle) {
+        showToast('No hay datos del expediente cargados', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btn-descargar-reporte');
+    const icono = btn?.querySelector('.material-symbols-outlined');
+    const textoOriginal = btn?.innerHTML;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="material-symbols-outlined text-lg animate-spin">refresh</span> Generando...`;
+    }
+
+    try {
+        // Cargar librerías si no existen
+        if (!window.html2canvas) {
+            await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+        }
+        if (!window.jspdf?.jsPDF) {
+            await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        }
+        const { jsPDF } = window.jspdf;
+
+        // ==========================================
+        // 1. CONSTRUIR HTML TEMPORAL DEL REPORTE
+        // ==========================================
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = `
+            position:fixed; left:-9999px; top:0; width:1100px; background:#fff;
+            font-family:'Inter',sans-serif; color:#0f172a; padding:40px; box-sizing:border-box;
+        `;
+
+        // Helper para escapar HTML
+        const esc = (s) => String(s || '--')
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+        // Helper para badge de estado
+        const estadoColor = (estado) => {
+            const e = String(estado).toLowerCase();
+            if (e.includes('complet') || e.includes('aprob')) return ['#047857', '#d1fae5'];
+            if (e.includes('proces') || e.includes('revis')) return ['#b45309', '#fef3c7'];
+            return ['#dc2626', '#fee2e2'];
+        };
+
+        const [txtColor, bgColor] = estadoColor(detalle.estadoTexto || detalle.estado);
+
+        // === HEADER INSTITUCIONAL ===
+        let html = `
+        <div style="border-bottom:3px solid #1e3a5f; padding-bottom:20px; margin-bottom:30px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <h1 style="font-size:28px; font-weight:900; color:#0f172a; margin:0 0 6px 0; letter-spacing:-0.5px;">
+                        REPORTE DE EXPEDIENTE
+                    </h1>
+                    <p style="font-size:12px; color:#64748b; margin:0; font-weight:600; text-transform:uppercase; letter-spacing:1px;">
+                        SIGPRO - Sistema de Gestión de Procesos · UNMSM
+                    </p>
+                </div>
+                <div style="text-align:right;">
+                    <p style="font-size:11px; color:#64748b; margin:0;">Generado el</p>
+                    <p style="font-size:13px; font-weight:800; color:#0f172a; margin:2px 0 0 0;">
+                        ${new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'long',year:'numeric'})}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI CARDS -->
+        <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:16px; margin-bottom:30px;">
+            <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px; background:#f8fafc;">
+                <p style="font-size:9px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin:0 0 6px 0;">Código</p>
+                <p style="font-size:16px; font-weight:900; color:#1e3a5f; margin:0;">${esc(detalle.codigo)}</p>
+                <span style="display:inline-block; margin-top:6px; font-size:9px; font-weight:800; color:#16a34a; background:#dcfce7; padding:2px 8px; border-radius:999px;">ACTIVO</span>
+            </div>
+            <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px; background:#f8fafc;">
+                <p style="font-size:9px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin:0 0 6px 0;">Asunto</p>
+                <p style="font-size:14px; font-weight:800; color:#0f172a; margin:0;">${esc(detalle.asunto)}</p>
+            </div>
+            <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px; background:#f8fafc;">
+                <p style="font-size:9px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin:0 0 6px 0;">Estado</p>
+                <p style="font-size:14px; font-weight:900; color:${txtColor}; margin:0;">${esc(detalle.estadoTexto || detalle.estado)}</p>
+                <p style="font-size:10px; color:#94a3b8; margin:4px 0 0 0; font-style:italic;">${esc(detalle.subestado)}</p>
+            </div>
+            <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px; background:#f8fafc;">
+                <p style="font-size:9px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin:0 0 6px 0;">Actualización</p>
+                <p style="font-size:13px; font-weight:800; color:#0f172a; margin:0;">${esc(detalle.fechaActualizacion || detalle.fecha)}</p>
+            </div>
+            <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px; background:#f8fafc;">
+                <p style="font-size:9px; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin:0 0 6px 0;">Progreso</p>
+                <p style="font-size:20px; font-weight:900; color:#2563eb; margin:0;">${detalle.progreso || 0}%</p>
+                <p style="font-size:10px; color:#64748b; margin:4px 0 0 0;">Etapa: ${esc(detalle.etapa)}</p>
+            </div>
+        </div>
+
+        <!-- INFORMACIÓN TÉCNICA -->
+        <div style="margin-bottom:30px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; border-bottom:2px solid #1e3a5f; padding-bottom:8px;">
+                <span style="font-size:18px;">📋</span>
+                <h2 style="font-size:14px; font-weight:900; color:#0f172a; text-transform:uppercase; letter-spacing:1px; margin:0;">
+                    Información Técnica del Documento
+                </h2>
+            </div>
+            <div style="border:1px solid #e2e8f0; border-radius:12px; padding:24px; background:#fff;">`;
+
+        // Si hay resumenCampos, renderizar como grid
+        if (Array.isArray(detalle.resumenCampos) && detalle.resumenCampos.length > 0) {
+            html += `<div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:16px;">`;
+            detalle.resumenCampos.forEach(campo => {
+                const val = String(campo.value || '-').trim();
+                if (val && val !== '-') {
+                    html += `
+                    <div style="border-left:3px solid #cbd5e1; padding-left:12px;">
+                        <p style="font-size:9px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 4px 0;">${esc(campo.label)}</p>
+                        <p style="font-size:12px; font-weight:700; color:#0f172a; margin:0; line-height:1.5; white-space:pre-line;">${esc(val)}</p>
+                    </div>`;
+                }
+            });
+            html += `</div>`;
+        } else {
+            // Fallback: clonar el viewer-contenido si existe
+            const viewer = document.getElementById('viewer-contenido');
+            if (viewer) {
+                html += `<div id="reporte-clone-interno">${viewer.innerHTML}</div>`;
+            } else {
+                html += `<p style="color:#64748b; font-size:12px;">No hay información técnica registrada.</p>`;
+            }
+        }
+
+        html += `</div></div>`;
+
+        // === HISTORIAL ===
+        const historial = Array.isArray(detalle.historial) ? detalle.historial : [];
+        html += `
+        <div style="margin-bottom:30px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; border-bottom:2px solid #1e3a5f; padding-bottom:8px;">
+                <span style="font-size:18px;">📊</span>
+                <h2 style="font-size:14px; font-weight:900; color:#0f172a; text-transform:uppercase; letter-spacing:1px; margin:0;">
+                    Historial de Seguimiento
+                </h2>
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                <thead>
+                    <tr style="background:#f1f5f9;">
+                        <th style="padding:10px 12px; text-align:left; font-weight:800; color:#475569; text-transform:uppercase; font-size:9px; letter-spacing:1px; border-bottom:2px solid #cbd5e1;">Fecha</th>
+                        <th style="padding:10px 12px; text-align:left; font-weight:800; color:#475569; text-transform:uppercase; font-size:9px; letter-spacing:1px; border-bottom:2px solid #cbd5e1;">Progreso</th>
+                        <th style="padding:10px 12px; text-align:left; font-weight:800; color:#475569; text-transform:uppercase; font-size:9px; letter-spacing:1px; border-bottom:2px solid #cbd5e1;">Estado</th>
+                        <th style="padding:10px 12px; text-align:left; font-weight:800; color:#475569; text-transform:uppercase; font-size:9px; letter-spacing:1px; border-bottom:2px solid #cbd5e1;">Generado por</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        if (historial.length > 0) {
+            historial.forEach(h => {
+                const progColor = h.progreso >= 100 ? '#16a34a' : h.progreso >= 50 ? '#d97706' : '#dc2626';
+                html += `
+                    <tr style="border-bottom:1px solid #e2e8f0;">
+                        <td style="padding:10px 12px; color:#334155; font-weight:600;">${esc(h.fecha)}</td>
+                        <td style="padding:10px 12px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="width:60px; height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden;">
+                                    <div style="width:${h.progreso}%; height:100%; background:${progColor}; border-radius:3px;"></div>
+                                </div>
+                                <span style="font-weight:800; color:${progColor}; font-size:11px;">${h.progreso}%</span>
+                            </div>
+                        </td>
+                        <td style="padding:10px 12px;">
+                            <span style="display:inline-block; padding:2px 10px; border-radius:999px; font-size:10px; font-weight:900; text-transform:uppercase; letter-spacing:0.5px;
+                                ${h.estado === 'COMPLETADO' || h.estado === 'APROBADO' 
+                                    ? 'background:#dcfce7; color:#166534;' 
+                                    : h.estado === 'EN PROCESO' 
+                                        ? 'background:#fef3c7; color:#92400e;' 
+                                        : 'background:#fee2e2; color:#991b1b;'}">
+                                ${esc(h.estado)}
+                            </span>
+                        </td>
+                        <td style="padding:10px 12px; color:#475569; font-weight:700;">${esc(h.generadoPor)}</td>
+                    </tr>`;
+            });
+        } else {
+            html += `<tr><td colspan="4" style="padding:16px; text-align:center; color:#94a3b8; font-size:12px;">No hay registros de historial</td></tr>`;
+        }
+
+        html += `
+                </tbody>
+            </table>
+        </div>
+
+        <!-- FOOTER -->
+        <div style="margin-top:40px; border-top:2px solid #e2e8f0; padding-top:16px; display:flex; justify-content:space-between; align-items:center;">
+            <p style="font-size:10px; color:#94a3b8; font-weight:600; margin:0;">
+                © ${new Date().getFullYear()} SIGPRO - UNMSM · Oficina General de Planificación
+            </p>
+            <p style="font-size:10px; color:#94a3b8; font-weight:700; margin:0; font-family:monospace;">
+                TRANS: ${esc(detalle.transaccion || 'N/A')}
+            </p>
+        </div>`;
+
+        wrapper.innerHTML = html;
+        document.body.appendChild(wrapper);
+
+        // ==========================================
+        // 2. CAPTURAR Y GENERAR PDF
+        // ==========================================
+        await new Promise(r => setTimeout(r, 500)); // Esperar renderizado
+
+        const canvas = await html2canvas(wrapper, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            windowWidth: 1100,
+            width: 1100,
+            logging: false
+        });
+
+        // Calcular dimensiones para PDF A4
+        const imgData = canvas.toDataURL('image/png', 1.0);
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const margin = 10;
+        const imgWidth = pageWidth - (margin * 2);
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        let heightLeft = imgHeight;
+        let position = margin;
+        let pageCount = 1;
+
+        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+        heightLeft -= (pageHeight - margin);
+
+        // Si el contenido excede una página, agregar más
+        while (heightLeft > 0) {
+            position = heightLeft - imgHeight + margin;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+            heightLeft -= (pageHeight - margin);
+            pageCount++;
+        }
+
+        const fileName = `Reporte-${esc(detalle.codigo || 'expediente').replace(/\s+/g,'_')}.pdf`;
+        pdf.save(fileName);
+
+        showToast(`Reporte descargado (${pageCount} página${pageCount > 1 ? 's' : ''})`, 'success');
+
+        // Limpieza
+        document.body.removeChild(wrapper);
+
+    } catch (error) {
+        console.error('Error generando reporte PDF:', error);
+        showToast('Error al generar el reporte. Intenta nuevamente.', 'error');
+    } finally {
+        if (btn && textoOriginal) {
+            btn.disabled = false;
+            btn.innerHTML = textoOriginal;
+        }
+    }
+}
+
+// Exponer globalmente
+window.descargarReporteCompletoPDF = descargarReporteCompletoPDF;
+
+// Helper para cargar scripts dinámicamente
+function cargarScript(src) {
+    return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
+        document.head.appendChild(s);
+    });
+}
+
 // ===== NUEVA FUNCIÓN: Modal informativo cuando no hay contenido =====
 function mostrarModalDocumentoNoDisponible(adjunto) {
     let modal = document.getElementById('modal-doc-info');
@@ -2756,56 +3155,7 @@ window.cerrarPreview = function() {
     }, 300);
 };
 
-window.descargarPdfPreview = function() {
-    if (!window.adjuntoActual) {
-        showToast('No hay documento cargado', 'error');
-        return;
-    }
-    
-    const adjunto = window.adjuntoActual;
-    
-    // ==========================================
-    // 🔥 PRIORIDAD 1: Si es un blob generado (ficha técnica), usar el blob directo
-    // ==========================================
-    if (adjunto._blob) {
-        const url = URL.createObjectURL(adjunto._blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = adjunto.nombre || 'documento.pdf';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Limpiar el objeto URL temporal de descarga (no el del preview)
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        
-        showToast('Descarga iniciada', 'success');
-        return;
-    }
-    
-    // ==========================================
-    // 🔥 PRIORIDAD 2: Si tiene contenido base64/URL, usar normalizarContenidoAdjunto
-    // ==========================================
-    const source = normalizarContenidoAdjunto(adjunto);
-    if (!source) {
-        showToast('El documento no está disponible para descarga', 'error');
-        return;
-    }
-    
-    try {
-        const link = document.createElement('a');
-        link.href = source;
-        link.download = adjunto.nombre || 'documento.pdf';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        showToast('Descarga iniciada', 'success');
-    } catch (error) {
-        console.error('Error descargando:', error);
-        showToast('Error al descargar el documento', 'error');
-    }
-};
+window.descargarPdfPreview = descargarFichaTecnicaPDF;
 
 // Función global para volver al dashboard
 window.showDashboard = function() {
@@ -3910,56 +4260,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     //=========PDF DETALLE=========//
     const btnDescargarPdf = document.getElementById('btn-descargar-pdf');
-    if (btnDescargarPdf) {
-        btnDescargarPdf.addEventListener('click', async function() {
-        const btn = this;
-        const icono = document.getElementById('icon-pdf');
-        const texto = document.getElementById('texto-pdf');
-    
-        // Estado de carga
-        btn.disabled = true;
-        icono.textContent = 'hourglass_top';
-        texto.textContent = 'Generando...';
-    
-        try {
-            // ✅ FIX: Usar window.currentDetalle que se guarda en showDetailView()
-            const currentDetalle = window.currentDetalle || {};
-            const docId = currentDetalle.codigo || currentDetalle.id || 'unknown';
-            
-            let pdfSuccess = false;
-            try {
-                const pdfResult = await API.public.indicators.export(docId);
-                if (pdfResult.success && pdfResult.data) {
-                    const blob = pdfResult.data;
-                    const url = window.URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `reporte-${docId}.pdf`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                    pdfSuccess = true;
-                }
-            } catch (e) {
-                console.warn('Generación de PDF via API no disponible');
-            }
-
-            if (!pdfSuccess) {
-                throw new Error('Generación de PDF no disponible en este momento');
-            }
-        
-        } catch (error) {
-            console.error('Error:', error);
-            alert('No se pudo generar el PDF. Intente nuevamente.');
-        } finally {
-            // Restaurar botón
-            btn.disabled = false;
-            icono.textContent = 'picture_as_pdf';
-            texto.textContent = 'Descargar PDF';
+        if (btnDescargarPdf) {
+            btnDescargarPdf.addEventListener('click', descargarFichaTecnicaPDF);
         }
-        });
-    }
 
     // ==========================================
     // FUNCIONALIDAD BOTÓN RESPONDER - Mostrar formulario de respuesta

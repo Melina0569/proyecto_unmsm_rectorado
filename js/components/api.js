@@ -787,6 +787,27 @@ const LocalAPI = {
                     origen: 'local'
                 });
                 localStorage.setItem(LocalAPI.db.documentosLista, JSON.stringify(docsLista));
+
+                // ✅ AGREGAR ESTO: Sincronizar con clave sin prefijo para compatibilidad con racio-inicio
+                try {
+                    const listaGlobal = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+                    listaGlobal.unshift({
+                        id: localId,
+                        codigo: reportData.code || `HR-${Date.now()}`,
+                        tipo: 'reporte',
+                        estado: 'pendiente',
+                        descripcion: reportData.description || `Reporte ${reportData.semester} - ${reportData.responsibleName}`,
+                        fecha: new Date().toISOString().split('T')[0],
+                        hora: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
+                        generadoPor: reportData.responsibleName || 'Facultad',
+                        progreso: 5,
+                        facultadId: reportData.facultyId || 1,
+                        origen: 'local'
+                    });
+                    localStorage.setItem('sigpro_documentos_lista', JSON.stringify(listaGlobal));
+                } catch (e) {
+                    console.warn('No se pudo sincronizar con sigpro_documentos_lista:', e);
+                }
                 
                 // ============================================
                 // ✅ AGREGA ESTO: Información técnica para el visor
@@ -854,12 +875,18 @@ const LocalAPI = {
             },
             async delete(id) {
                 // Borrar de TODAS las listas
-                let docsLista = JSON.parse(localStorage.getItem(LocalAPI.db.documentosLista) || '[]');
+                let docsLista = JSON.parse(localStorage.getItem(LocalAPI.db.documentos_lista) || '[]');
                 docsLista = docsLista.filter(d => d.id !== id && d.codigo !== id);
-                localStorage.setItem(LocalAPI.db.documentosLista, JSON.stringify(docsLista));
+                localStorage.setItem(LocalAPI.db.documentos_lista, JSON.stringify(docsLista));
+                
+                // ✅ AGREGAR ESTO: Borrar también de clave sin prefijo
+                try {
+                    let globalLista = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+                    globalLista = globalLista.filter(d => d.id !== id && d.codigo !== id);
+                    localStorage.setItem('sigpro_documentos_lista', JSON.stringify(globalLista));
+                } catch (e) {}
                 
                 let reportes = JSON.parse(localStorage.getItem('sigpro_reportes') || '[]');
-                // Borrar por id, por code y por codigo (cubrir todos los formatos posibles)
                 reportes = reportes.filter(r => r.id !== id && r.code !== id && r.codigo !== id);
                 localStorage.setItem('sigpro_reportes', JSON.stringify(reportes));
                 

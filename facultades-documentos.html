@@ -362,31 +362,11 @@
                                 class="bg-white/20 hover:bg-white/30 backdrop-blur-md px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 inline-flex">
                                     <span class="material-symbols-outlined text-lg">arrow_back</span> Atrás
                             </a>
-                            <div class="relative inline-block">
-                                <!-- Cadenas decorativas -->
-                                <div class="absolute -top-3 left-4 w-1 h-6 bg-gradient-to-b from-slate-400 to-slate-600 rounded-full transform -rotate-12"></div>
-                                <div class="absolute -top-3 right-4 w-1 h-6 bg-gradient-to-b from-slate-400 to-slate-600 rounded-full transform rotate-12"></div>
-                                
-                                <!-- Botón bloqueado -->
-                                <button disabled
-                                        class="bg-slate-200 text-slate-400 px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 cursor-not-allowed border-2 border-slate-300 shadow-inner relative overflow-hidden">
-                                    
-                                    <!-- Efecto de sello/bloqueo -->
-                                    <div class="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.03)_10px,rgba(0,0,0,0.03)_20px)]"></div>
-                                    
-                                    <span class="material-symbols-outlined text-lg relative z-10">lock</span>
-                                    <span class="relative z-10">Descargar PDF</span>
-                                    
-                                    <!-- Badge -->
-                                    <span class="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-wider shadow-lg transform rotate-12 border-2 border-white">
-                                        Próx.
-                                    </span>
-                                </button>
-                                
-                                <!-- Cadenas inferiores -->
-                                <div class="absolute -bottom-2 left-6 w-0.5 h-4 bg-slate-500"></div>
-                                <div class="absolute -bottom-2 right-6 w-0.5 h-4 bg-slate-500"></div>
-                            </div>
+                            <button id="btn-descargar-reporte" onclick="descargarReporteCompletoPDF()"
+                                    class="bg-white hover:bg-blue-50 text-blue-700 px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 border-2 border-white/40 shadow-lg hover:shadow-xl hover:scale-105 transition-all">
+                                <span class="material-symbols-outlined text-lg">picture_as_pdf</span>
+                                Descargar PDF
+                            </button>
                         </div>
                     </div>
                     
