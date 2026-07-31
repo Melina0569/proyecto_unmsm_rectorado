@@ -875,9 +875,9 @@ const LocalAPI = {
             },
             async delete(id) {
                 // Borrar de TODAS las listas
-                let docsLista = JSON.parse(localStorage.getItem(LocalAPI.db.documentos_lista) || '[]');
+                let docsLista = JSON.parse(localStorage.getItem(LocalAPI.db.documentosLista) || '[]');
                 docsLista = docsLista.filter(d => d.id !== id && d.codigo !== id);
-                localStorage.setItem(LocalAPI.db.documentos_lista, JSON.stringify(docsLista));
+                localStorage.setItem(LocalAPI.db.documentosLista, JSON.stringify(docsLista));
                 
                 // ✅ AGREGAR ESTO: Borrar también de clave sin prefijo
                 try {
@@ -3068,77 +3068,89 @@ window.aprobarSolicitud = aprobarSolicitud;
 // ============================================
 
 /**
- * Guarda un documento creado por el usuario en localStorage
- * para que el dashboard lo cuente correctamente.
+ * Registra CUALQUIER documento creado en la bandeja unificada
+ * que lee racio-inicio.js. Llámalo desde el onSubmit de cada ficha.
  * 
- * @param {Object} doc - Documento creado
- * @param {string} doc.id - ID del documento
- * @param {string} doc.tipo - Tipo: 'indicador', 'flujograma', 'caracterizacion', 'reporte', 'inventario'
- * @param {string} doc.estado - Estado: 'pendiente', 'en_proceso', 'completado'
- * @param {string} doc.titulo - Título del documento
+ * @param {Object} doc
+ * @param {string} doc.id
+ * @param {string} doc.tipo   'indicador' | 'flujograma' | 'caracterizacion' | 'reporte' | 'inventario'
+ * @param {string} doc.estado 'pendiente' | 'en_proceso' | 'completado'
+ * @param {string} doc.titulo
+ * @param {string} [doc.facultad]
+ * @param {string} [doc.codigo]
  */
-function guardarDocumentoUsuario(doc) {
-    // 1. Guardar en la clave dedicada del dashboard
-    const clave = getStorageKey('sigpro_user_documents');
-    let docs = [];
-    
-    try {
-        const raw = localStorage.getItem(clave);
-        if (raw) docs = JSON.parse(raw);
-    } catch (e) {
-        docs = [];
+function registrarEnBandejaRacio(doc) {
+    if (!doc || !doc.id) {
+        console.warn('registrarEnBandejaRacio: documento inválido', doc);
+        return;
     }
-    
-    docs.push({
-        id: doc.id || generateId(),
+
+    const payload = {
+        id: doc.id,
+        codigo: doc.codigo || doc.id,
         tipo: doc.tipo || 'documento',
         estado: doc.estado || 'pendiente',
-        titulo: doc.titulo || 'Sin título',
-        fecha: new Date().toISOString(),
-        facultyId: doc.facultyId || localStorage.getItem('unmsm_faculty_id') || ''
-    });
-    
-    localStorage.setItem(clave, JSON.stringify(docs));
-    
-    // 🔧 FIX: También sincronizar con sigpro_documentos_lista para compatibilidad
+        descripcion: doc.titulo || doc.descripcion || 'Sin título',
+        nombre: doc.titulo || doc.descripcion || 'Sin título',
+        fecha: new Date().toISOString().split('T')[0],
+        hora: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        generadoPor: doc.facultad || localStorage.getItem('unmsm_faculty_name') || 'Facultad',
+        nombreFacultad: doc.facultad || localStorage.getItem('unmsm_faculty_name') || 'Facultad',
+        facultadId: doc.facultyId || localStorage.getItem('unmsm_faculty_id') || '',
+        progreso: doc.estado === 'completado' ? 100 : doc.estado === 'en_proceso' ? 50 : 5,
+        origen: API.getMode ? API.getMode() : 'local'
+    };
+
+    // 1. Guardar en clave CON prefijo del modo (local_ / remote_)
+    const claveModo = `${API.CONFIG?.MODE || 'local'}_sigpro_documentos_lista`;
     try {
-        const listaKey = 'sigpro_documentos_lista';
-        let lista = [];
-        const rawLista = localStorage.getItem(listaKey);
-        if (rawLista) lista = JSON.parse(rawLista);
-        
-        // Solo agregar si no existe ya
-        const yaExiste = lista.some(d => d.id === doc.id);
-        if (!yaExiste) {
-            lista.push({
-                id: doc.id || generateId(),
-                codigo: doc.id || generateId(),
-                tipo: doc.tipo || 'documento',
-                estado: doc.estado || 'pendiente',
-                nombre: doc.titulo || 'Sin título',
-                descripcion: doc.titulo || 'Sin título',
-                fecha: new Date().toISOString(),
-                hora: new Date().toLocaleTimeString('es-PE'),
-                createdAt: new Date().toISOString(),
-                facultyId: doc.facultyId || localStorage.getItem('unmsm_faculty_id') || ''
+        const listaModo = JSON.parse(localStorage.getItem(claveModo) || '[]');
+        // Evitar duplicados por id
+        const filtrada = listaModo.filter(d => d.id !== payload.id);
+        filtrada.unshift(payload);
+        localStorage.setItem(claveModo, JSON.stringify(filtrada));
+    } catch (e) {}
+
+    // 2. Guardar en clave SIN prefijo (compatibilidad directa con racio-inicio)
+    try {
+        const listaGlobal = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+        const filtrada = listaGlobal.filter(d => d.id !== payload.id);
+        filtrada.unshift(payload);
+        localStorage.setItem('sigpro_documentos_lista', JSON.stringify(filtrada));
+    } catch (e) {}
+
+    // 3. Si es modo remoto, guardar también en sigpro_reportes como fallback
+    if (API.CONFIG?.MODE === 'remote') {
+        try {
+            const reportes = JSON.parse(localStorage.getItem('sigpro_reportes') || '[]');
+            const filtrada = reportes.filter(r => r.id !== payload.id);
+            filtrada.unshift({
+                id: payload.id,
+                code: payload.codigo,
+                status: payload.estado.toUpperCase(),
+                description: payload.descripcion,
+                semester: '',
+                responsibleName: payload.generadoPor,
+                createdAt: payload.createdAt,
+                facultyId: payload.facultadId
             });
-            localStorage.setItem(listaKey, JSON.stringify(lista));
-        }
-    } catch (e) {
-        console.warn('No se pudo sincronizar con sigpro_documentos_lista:', e);
+            localStorage.setItem('sigpro_reportes', JSON.stringify(filtrada));
+        } catch (e) {}
     }
-    
-    console.log('✅ Documento guardado:', doc);
-    
-    // Disparar evento para actualizar dashboard en tiempo real
+
+    // 4. Disparar evento para que racio-inicio se actualice en tiempo real
     window.dispatchEvent(new StorageEvent('storage', {
-        key: clave,
-        newValue: JSON.stringify(docs)
+        key: 'sigpro_documentos_lista',
+        newValue: JSON.stringify([payload])
     }));
+
+    console.log('📥 Documento registrado en bandeja racio:', payload.codigo);
 }
 
 // Exponer globalmente
-window.guardarDocumentoUsuario = guardarDocumentoUsuario;
+window.registrarEnBandejaRacio = registrarEnBandejaRacio;
 
 // ============================================
 // INTERCEPTOR FETCH CON AUTO-REFRESH (AGREGAR AL FINAL)

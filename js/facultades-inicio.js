@@ -330,17 +330,16 @@ function calcularContadoresDesdeLocalStorage() {
     let enProceso = 0;
     let completados = 0;
 
-    // 🔧 FIX: Definir qué claves revisar
+    // 🔥 FIX: Mismas claves que usa facultades-documentos
     const clavesRevisar = [
-        'sigpro_documentos_lista',
+        'sigpro_documentos_lista',      // ← neutra, modo-agnóstica
         'local_sigpro_documentos_lista',
+        'remote_sigpro_documentos_lista',
+        'sigpro_reportes',              // ← neutra, modo-agnóstica
         'sigpro_user_documents',
         'local_sigpro_user_documents'
     ];
 
-    // 🔧 FIX: Fecha límite para considerar "documentos del usuario"
-    // Solo contar documentos creados DESPUÉS de la fecha de seed (2026-07-22)
-    // O documentos que tengan el flag isUserCreated: true
     const FECHA_SEED = new Date('2026-07-22T00:00:00Z').getTime();
 
     for (const clave of clavesRevisar) {
@@ -352,26 +351,17 @@ function calcularContadoresDesdeLocalStorage() {
             if (!Array.isArray(datos)) continue;
 
             for (const doc of datos) {
-                // 🔧 FIX: Ignorar datos de demo explícitamente marcados
                 if (doc.isDemo === true) continue;
 
-                // 🔧 FIX: Ignorar documentos de demo por código conocido
-                const codigo = String(doc.codigo || doc.id || '').toUpperCase();
+                const codigo = String(doc.codigo || doc.code || doc.id || '').toUpperCase();
                 if (codigo.includes('PE01-001') || codigo.includes('PE01-002')) continue;
                 if (codigo.includes('IND-FM-PE01')) continue;
 
-                // 🔧 FIX: Ignorar documentos creados antes de la fecha de seed
-                // (los datos de demo tienen fechas antiguas como 2025-01-15)
                 const fechaDoc = doc.fecha || doc.createdAt || doc.fechaCreacion;
                 if (fechaDoc) {
                     const fechaMs = new Date(fechaDoc).getTime();
-                    if (!isNaN(fechaMs) && fechaMs < FECHA_SEED) {
-                        continue; // Es un documento de demo antiguo
-                    }
+                    if (!isNaN(fechaMs) && fechaMs < FECHA_SEED) continue;
                 }
-
-                // 🔧 FIX: Ignorar documentos de expedientes_lista (son todos demo)
-                if (clave === 'sigpro_expedientes_lista') continue;
 
                 const estado = normalizarEstado(doc.estado || doc.status);
                 if (estado === 'pendiente') pendientes++;
@@ -864,34 +854,31 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function ejecutarLogout() {
         logoutModal.classList.add('hide-modal');
         logoutModal.classList.remove('show-modal');
-    
+        
         setTimeout(async () => {
+            // 1) Intentar logout en backend
             try {
-                if (typeof API !== 'undefined' && API.auth && API.auth.logout) {
-                    await API.auth.logout();
-                } else {
-                    const token = localStorage.getItem('unmsm_token') 
-                        || localStorage.getItem('token') 
-                        || localStorage.getItem('accessToken');
-                    
-                    if (token) {
-                        await fetch('http://localhost:8080/v1/auth/logout', {
-                            method: 'POST',
-                            headers: {
-                                'Accept': 'application/json',
-                                'Authorization': `Bearer ${token}`
-                            }
-                        });
-                    }
-                }
-            } catch (error) {
-                console.log('Logout backend (silencioso):', error.message);
-            }
-
-            localStorage.clear();
+                await API.auth.logout();
+            } catch (e) { /* silencioso */ }
+            
+            // 2) 🔥 SOLO borrar claves de sesión, NO los documentos
+            const authKeys = [
+                'token', 'unmsm_token', 'auth_token', 'accessToken', 
+                'unmsm-token', 'jwt', 'refreshToken'
+            ];
+            const profileKeys = [
+                'usuario', 'sigpro_usuario', 'usuario_actual', 
+                'user', 'unmsm_user'
+            ];
+            
+            [...authKeys, ...profileKeys].forEach(k => localStorage.removeItem(k));
+            
+            // sessionStorage es temporal, sí se puede limpiar
             sessionStorage.clear();
-
-            window.location.replace('portal-inicio-facultades.html');
+            
+            // 3) Redirigir
+            window.location.replace('index.html');
+            
         }, 400);
     }
 

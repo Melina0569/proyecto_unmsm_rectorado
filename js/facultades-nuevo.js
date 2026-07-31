@@ -475,14 +475,25 @@ function initLogoutModal() {
         logoutModal.classList.remove('show-modal');
         
         setTimeout(() => {
-            // Limpiar storage
-            localStorage.clear();
-            sessionStorage.clear();
-            
-            // Llamar al logout de API si existe
+            // 1) Llamar al logout de API si existe
             if (typeof API !== 'undefined' && API.auth && API.auth.logout) {
                 API.auth.logout().catch(() => {});
             }
+            
+            // 2) 🔥 SOLO borrar claves de sesión, NO los documentos
+            const authKeys = [
+                'token', 'unmsm_token', 'auth_token', 'accessToken', 
+                'unmsm-token', 'jwt', 'refreshToken'
+            ];
+            const profileKeys = [
+                'usuario', 'sigpro_usuario', 'usuario_actual', 
+                'user', 'unmsm_user'
+            ];
+            
+            [...authKeys, ...profileKeys].forEach(k => localStorage.removeItem(k));
+            
+            // sessionStorage es temporal, sí se puede limpiar
+            sessionStorage.clear();
             
             window.location.replace('portal-inicio-facultades.html');
         }, 400);
@@ -671,15 +682,43 @@ function init() {
 window.addEventListener('message', (event) => {
     const data = event.data || {};
     
-    if (data.type === 'navigate-to' && data.url) {
-        console.log('📨 Navegación desde iframe:', data.url);
-        window.location.href = data.url;
-    }
-    
-    if (data.type === 'report-created' && data.docCode) {
-        console.log('📨 Reporte creado desde iframe:', data.docCode);
-        // Opcional: mostrar notificación
-        showToast(`Reporte ${data.docCode} creado exitosamente`, 'success');
+    if (data.type === 'report-created' || data.type === 'document-created') {
+        const docCode = data.docCode || data.code || data.codigo;
+        const docName = data.docName || data.nombre || data.title || `Documento ${docCode}`;
+        
+        const nuevoDoc = {
+            id: data.docId || `local-${docCode}-${Date.now()}`,
+            codigo: docCode,
+            nombre: docName,
+            descripcion: docName,
+            fecha: new Date().toISOString().split('T')[0],
+            hora: new Date().toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'}) + ' H',
+            estado: data.docStatus || data.estado || 'pendiente',
+            generadoPor: 'Facultad',
+            progreso: 5,
+            facultadId: data.facultyId || 1,
+            tipo: data.docType || data.tipo || 'documento',
+            origen: 'local'
+        };
+        
+        // Guardar en sigpro_reportes (compatibilidad)
+        const reportes = JSON.parse(localStorage.getItem('sigpro_reportes') || '[]');
+        reportes.push(nuevoDoc);
+        localStorage.setItem('sigpro_reportes', JSON.stringify(reportes));
+
+        // Guardar en clave con prefijo del modo
+        const mode = (typeof CONFIG !== 'undefined' && CONFIG.MODE) || 'local';
+        const clavePrefijo = `${mode}_sigpro_documentos_lista`;
+        const docsPrefijo = JSON.parse(localStorage.getItem(clavePrefijo) || '[]');
+        docsPrefijo.push(nuevoDoc);
+        localStorage.setItem(clavePrefijo, JSON.stringify(docsPrefijo));
+
+        // 🔥 NUEVO: Guardar también en clave neutra (sin prefijo) como respaldo universal
+        const docsNeutra = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+        docsNeutra.push(nuevoDoc);
+        localStorage.setItem('sigpro_documentos_lista', JSON.stringify(docsNeutra));
+
+        showToast(`${data.docType || 'Documento'} ${docCode} creado exitosamente`, 'success');
     }
 });
 

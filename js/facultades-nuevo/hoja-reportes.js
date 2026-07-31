@@ -971,6 +971,9 @@ function initFormHandler() {
             }
             localStorage.setItem(REPORT_STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(docs));
 
+            // Sync modo-agnóstico
+            sincronizarClavesNeutras(docPendiente);
+
             // Guardar detalle con adjuntos
             const detalleRaw = localStorage.getItem(REPORT_STORAGE_KEYS.DOCUMENTOS_DETALLE);
             const detalle = safeParseJson(detalleRaw, {}) || {};
@@ -1027,6 +1030,17 @@ function initFormHandler() {
                 showToast('¡Reporte enviado y guardado correctamente!', 'success');
             } else {
                 showToast('Reporte guardado localmente (API no disponible)', 'warning', 4000);
+            }
+
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'report-created',   // <-- esta ficha usa 'report-created'
+                    docCode: codigo,
+                    docName: reportData.nombre || `Reporte ${codigo}`,
+                    docType: 'reporte',
+                    docStatus: 'pendiente',
+                    facultyId: reportData.facultadId || userFaculty?.id || 1
+                }, '*');
             }
 
             // Mostrar botón "Ver en Documentos"
@@ -1140,4 +1154,50 @@ function saveToLocalStorage(data) {
     existing.push({ ...data, id: localId, synced: false });
     localStorage.setItem(key, JSON.stringify(existing));
     return localId;
+}
+
+// ==========================================
+// SYNC MODO-AGNÓSTICO: Guarda en claves sin prefijo
+// para que funcione al cambiar local ↔ remote
+// ==========================================
+function sincronizarClavesNeutras(doc) {
+    try {
+        // 1) Lista neutral de documentos (sin prefijo local/remote)
+        const neutralRaw = localStorage.getItem('sigpro_documentos_lista');
+        const neutral = neutralRaw ? JSON.parse(neutralRaw) : [];
+        const idx = neutral.findIndex(d => d.codigo === doc.codigo);
+        if (idx >= 0) {
+            neutral[idx] = { ...neutral[idx], ...doc };
+        } else {
+            neutral.unshift(doc);
+        }
+        localStorage.setItem('sigpro_documentos_lista', JSON.stringify(neutral));
+
+        // 2) Reportes (para que el dashboard siempre cuente)
+        const reportesRaw = localStorage.getItem('sigpro_reportes');
+        const reportes = reportesRaw ? JSON.parse(reportesRaw) : [];
+        const idxR = reportes.findIndex(r => r.codigo === doc.codigo);
+        const reporteDoc = {
+            id: doc.id,
+            codigo: doc.codigo,
+            nombre: doc.descripcion,
+            descripcion: doc.descripcion,
+            fecha: doc.fecha,
+            hora: doc.hora,
+            estado: doc.estado,
+            generadoPor: doc.generadoPor,
+            progreso: doc.progreso,
+            facultadId: doc.facultadId,
+            tipo: doc.tipo,
+            origen: doc.origen
+        };
+        if (idxR >= 0) {
+            reportes[idxR] = { ...reportes[idxR], ...reporteDoc };
+        } else {
+            reportes.unshift(reporteDoc);
+        }
+        localStorage.setItem('sigpro_reportes', JSON.stringify(reportes));
+    } catch (e) {
+        console.warn('Error sincronizando a claves neutrales:', e);
+    }
 }

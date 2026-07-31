@@ -623,6 +623,8 @@ async function loadDashboardData() {
         filteredDocuments = [...allDocuments];
         updateStatsFromCurrentDocuments();
         renderTable();
+
+        persistLocalDocuments();
         
         // Si la API falló pero hay locales, mostrar advertencia suave
         if (apiDocs.length === 0 && localDocs.length > 0) {
@@ -1426,36 +1428,64 @@ function eliminarDelFrontend(doc) {
 }
 
 function loadLocalDocuments() {
-    const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
-    if (!raw) return [];
-
-    try {
-        const list = JSON.parse(raw);
-        if (!Array.isArray(list)) return [];
-
-        return list.map((doc, index) => {
-            const estado = normalizeEstadoKey(doc.estado || 'pendiente');
-            const progreso = typeof doc.progreso === 'number' ? doc.progreso : getDefaultProgressByEstado(estado);
-
-            return {
-                id: doc.backendId || doc.apiId || doc.id || `local-${doc.codigo || index}`,
-                backendId: doc.backendId || doc.apiId || null,
-                fecha: doc.fecha || new Date().toISOString().split('T')[0],
-                hora: doc.hora || '00:00 H',
-                codigo: doc.codigo || `DOC-${index}`,
-                descripcion: doc.descripcion || 'Documento sin descripción',
-                generadoPor: doc.generadoPor || 'Facultad',
-                estado,
-                progreso,
-                facultadId: doc.facultadId || 1,
-                tipo: doc.tipo || 'documento',
-                origen: doc.origen || 'local'
-            };
-        });
-    } catch (error) {
-        console.error('Error leyendo documentos locales:', error);
-        return [];
+    const clavesBuscar = [
+        STORAGE_KEYS.DOCUMENTOS_LISTA,   // local_sigpro_documentos_lista
+        'sigpro_documentos_lista',
+        'remote_sigpro_documentos_lista',
+        'sigpro_reportes',               // ← DONDE LAS FICHAS GUARDAN
+        'sigpro_user_documents',
+        'local_sigpro_user_documents'
+    ];
+    
+    let todos = [];
+    
+    for (const clave of clavesBuscar) {
+        const raw = localStorage.getItem(clave);
+        if (!raw) continue;
+        try {
+            const list = JSON.parse(raw);
+            if (!Array.isArray(list)) continue;
+            
+            const normalizados = list.map((doc, index) => {
+                const estado = normalizeEstadoKey(doc.estado || doc.status || 'pendiente');
+                const progreso = typeof doc.progreso === 'number' ? doc.progreso : getDefaultProgressByEstado(estado);
+                
+                return {
+                    // 🔥 FIX: soportar múltiples campos de ID
+                    id: doc.backendId || doc.apiId || doc.id || doc._id || `local-${doc.codigo || doc.code || index}`,
+                    backendId: doc.backendId || doc.apiId || null,
+                    // 🔥 FIX: soportar fecha en varios formatos
+                    fecha: doc.fecha || doc.createdAt || doc.fechaCreacion || new Date().toISOString().split('T')[0],
+                    hora: doc.hora || '00:00 H',
+                    // 🔥 FIX: soportar 'code' (usado por fichas) y 'codigo'
+                    codigo: doc.codigo || doc.code || doc.numeroExpediente || `DOC-${index}`,
+                    // 🔥 FIX: soportar 'nombre', 'title', 'asunto' (usado por fichas)
+                    descripcion: doc.descripcion || doc.nombre || doc.title || doc.asunto || 'Documento sin descripción',
+                    generadoPor: doc.generadoPor || doc.createdBy?.fullName || doc.createdBy?.email || 'Facultad',
+                    estado,
+                    progreso,
+                    facultadId: doc.facultadId || doc.faculty?.id || doc.facultyId || 1,
+                    tipo: doc.tipo || doc.type || 'documento',
+                    origen: doc.origen || 'local'
+                };
+            });
+            
+            todos = todos.concat(normalizados);
+        } catch (e) {
+            console.warn(`Error leyendo ${clave}:`, e);
+        }
     }
+    
+    // Eliminar duplicados por código, manteniendo el más reciente
+    const porCodigo = new Map();
+    todos.forEach(doc => {
+        const existente = porCodigo.get(doc.codigo);
+        if (!existente || new Date(doc.fecha) > new Date(existente.fecha)) {
+            porCodigo.set(doc.codigo, doc);
+        }
+    });
+    
+    return Array.from(porCodigo.values());
 }
 
 function mergeDocuments(baseDocuments, additionalDocuments) {
@@ -1514,9 +1544,10 @@ function updateCardCount(elementId, count, label) {
 
 function persistLocalDocuments() {
     const localDocs = allDocuments
-        .filter(doc => doc.origen === 'local')
+        .filter(doc => doc.origen !== 'api')
         .map(doc => ({
             id: doc.id,
+            backendId: doc.backendId || null,
             fecha: doc.fecha,
             hora: doc.hora,
             codigo: doc.codigo,
@@ -1526,10 +1557,35 @@ function persistLocalDocuments() {
             progreso: doc.progreso,
             facultadId: doc.facultadId,
             tipo: doc.tipo,
-            origen: 'local'
+            origen: doc.origen || 'local'
         }));
 
+    // Guardar en clave del modo actual (local_ o remote_)
     localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(localDocs));
+    
+    // 🔥 FIX: También guardar en clave neutra para cambio de modo
+    localStorage.setItem('sigpro_documentos_lista', JSON.stringify(localDocs));
+    
+    // Sync con sigpro_reportes para dashboard
+    try {
+        const reportes = localDocs.map(d => ({
+            id: d.id,
+            codigo: d.codigo,
+            nombre: d.descripcion,
+            descripcion: d.descripcion,
+            fecha: d.fecha,
+            hora: d.hora,
+            estado: d.estado,
+            generadoPor: d.generadoPor,
+            progreso: d.progreso,
+            facultadId: d.facultadId,
+            tipo: d.tipo,
+            origen: d.origen
+        }));
+        localStorage.setItem('sigpro_reportes', JSON.stringify(reportes));
+    } catch (e) {
+        console.warn('Error sincronizando sigpro_reportes:', e);
+    }
 }
 
 // ==========================================
@@ -4207,25 +4263,50 @@ document.addEventListener('DOMContentLoaded', async function() {
         }, 400);
     }
 
-    function ejecutarLogout() {
+    async function ejecutarLogout() {
         logoutModal.classList.add('hide-modal');
         logoutModal.classList.remove('show-modal');
         
         setTimeout(async () => {
-            const token = localStorage.getItem('auth_token');
-            
-            // 🔥 FIX: Usar API.js para logout
+            // 1) Intentar logout en backend
             try {
-                await API.auth.logout();
-            } catch (e) { /* ignorar */ }
+                if (typeof API !== 'undefined' && API.auth && API.auth.logout) {
+                    await API.auth.logout();
+                } else {
+                    const token = localStorage.getItem('unmsm_token') 
+                        || localStorage.getItem('token') 
+                        || localStorage.getItem('accessToken');
+                    
+                    if (token) {
+                        await fetch('http://localhost:8080/v1/auth/logout', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+                    }
+                }
+            } catch (error) {
+                console.log('Logout backend (silencioso):', error.message);
+            }
+
+            // 2) 🔥 SOLO borrar claves de sesión, NO los documentos
+            const authKeys = [
+                'token', 'unmsm_token', 'auth_token', 'accessToken', 
+                'unmsm-token', 'jwt', 'refreshToken'
+            ];
+            const profileKeys = [
+                'usuario', 'sigpro_usuario', 'usuario_actual', 
+                'user', 'unmsm_user'
+            ];
             
-            // 🔥 CAMBIO 2: Limpiar TODO
-            localStorage.clear();
+            [...authKeys, ...profileKeys].forEach(k => localStorage.removeItem(k));
+            
+            // sessionStorage es temporal, sí se puede limpiar
             sessionStorage.clear();
-            
-            // 🔥 CAMBIO 3: Redirigir a index.html
-            window.location.replace('index.html');
-            
+
+            window.location.replace('portal-inicio-facultades.html');
         }, 400);
     }
 

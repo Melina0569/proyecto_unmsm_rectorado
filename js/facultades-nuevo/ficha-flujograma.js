@@ -856,6 +856,17 @@ function initFormHandler() {
             }
 
             showToast(`Ficha ${data.codigo} creada exitosamente`, 'success');
+
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'document-created',
+                    docCode: data.codigo,
+                    docName: data.proceso || `Flujograma ${data.codigo}`,
+                    docType: 'flujograma',
+                    docStatus: 'pendiente',
+                    facultyId: payload.facultadId || resolveFacultyId()
+                }, '*');
+            }
             
             // Mostrar botón "Ver en Documentos" con una pequeña pausa (patrón hoja-reportes)
             if (btnExpedientes) {
@@ -1049,6 +1060,9 @@ function guardarFlujogramaLocalInternal(data) {
         macroProcesoTexto: data.macroProcesoNombre
     };
     localStorage.setItem(`${_SK_MODE}_sigpro_flujogramas_detalle`, JSON.stringify(detalleFlujogramas));
+
+    // Sync modo-agnóstico
+    sincronizarClavesNeutras(documentoPendiente);
 }
 
 async function guardarFichaYRedirigir(codigo) {
@@ -1063,4 +1077,50 @@ async function guardarFichaYRedirigir(codigo) {
         return;
     }
     window.location.href = destino;
+}
+
+// ==========================================
+// SYNC MODO-AGNÓSTICO: Guarda en claves sin prefijo
+// para que funcione al cambiar local ↔ remote
+// ==========================================
+function sincronizarClavesNeutras(doc) {
+    try {
+        // 1) Lista neutral de documentos (sin prefijo local/remote)
+        const neutralRaw = localStorage.getItem('sigpro_documentos_lista');
+        const neutral = neutralRaw ? JSON.parse(neutralRaw) : [];
+        const idx = neutral.findIndex(d => d.codigo === doc.codigo);
+        if (idx >= 0) {
+            neutral[idx] = { ...neutral[idx], ...doc };
+        } else {
+            neutral.unshift(doc);
+        }
+        localStorage.setItem('sigpro_documentos_lista', JSON.stringify(neutral));
+
+        // 2) Reportes (para que el dashboard siempre cuente)
+        const reportesRaw = localStorage.getItem('sigpro_reportes');
+        const reportes = reportesRaw ? JSON.parse(reportesRaw) : [];
+        const idxR = reportes.findIndex(r => r.codigo === doc.codigo);
+        const reporteDoc = {
+            id: doc.id,
+            codigo: doc.codigo,
+            nombre: doc.descripcion,
+            descripcion: doc.descripcion,
+            fecha: doc.fecha,
+            hora: doc.hora,
+            estado: doc.estado,
+            generadoPor: doc.generadoPor,
+            progreso: doc.progreso,
+            facultadId: doc.facultadId,
+            tipo: doc.tipo,
+            origen: doc.origen
+        };
+        if (idxR >= 0) {
+            reportes[idxR] = { ...reportes[idxR], ...reporteDoc };
+        } else {
+            reportes.unshift(reporteDoc);
+        }
+        localStorage.setItem('sigpro_reportes', JSON.stringify(reportes));
+    } catch (e) {
+        console.warn('Error sincronizando a claves neutrales:', e);
+    }
 }

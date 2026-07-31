@@ -546,7 +546,17 @@ function mergeDocuments(primary, secondary) {
 
 	secondary.forEach((doc) => {
 		const existing = byCode.get(doc.codigo);
-		byCode.set(doc.codigo, existing ? { ...existing, ...doc } : doc);
+		if (existing) {
+			// Fusionar, pero NUNCA degradar el estado (completado > en_proceso > pendiente)
+			const merged = { ...existing, ...doc };
+			const rank = (s) => (s === "completado" ? 3 : s === "en_proceso" ? 2 : s === "pendiente" ? 1 : 0);
+			if (rank(existing.estado) > rank(doc.estado)) {
+				merged.estado = existing.estado;
+			}
+			byCode.set(doc.codigo, merged);
+		} else {
+			byCode.set(doc.codigo, doc);
+		}
 	});
 
 	return Array.from(byCode.values());
@@ -554,10 +564,22 @@ function mergeDocuments(primary, secondary) {
 
 function loadLocalDocuments() {
     const clavesRevisar = [
-        STORAGE_KEYS.DOCUMENTOS_LISTA,  // "sigpro_documentos_lista"
+        STORAGE_KEYS.DOCUMENTOS_LISTA,   // "sigpro_documentos_lista"
         'local_sigpro_documentos_lista',
         'remote_sigpro_documentos_lista',
-        'sigpro_reportes'
+        'sigpro_reportes',
+        // ✅ NUEVO: indicadores guardados por ficha-indicador.html
+        'sigpro_indicadores_detalle',
+        'local_sigpro_indicadores_detalle',
+        'remote_sigpro_indicadores_detalle',
+        // ✅ NUEVO: detalles de documentos guardados por fichas técnicas
+        'sigpro_documentos_detalle',
+        'local_sigpro_documentos_detalle',
+        'remote_sigpro_documentos_detalle',
+        // ✅ NUEVO: cualquier lista de documentos de usuario
+        'sigpro_user_documents',
+        'local_sigpro_user_documents',
+        'remote_sigpro_user_documents',
     ];
     
     let todosLosDocs = [];
@@ -568,30 +590,60 @@ function loadLocalDocuments() {
         
         try {
             const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) continue;
             
-            parsed.forEach((doc, index) => {
-                if (!doc) return;
-                
-                // Si viene de sigpro_reportes, normalizar estructura
-                if (clave === 'sigpro_reportes') {
-                    const status = normalizeEstado(doc.status || doc.estado);
-                    const fechaStr = doc.createdAt || doc.fecha || new Date().toISOString();
-                    const fecha = new Date(fechaStr);
+            // Caso 1: es un array directo (listas)
+            if (Array.isArray(parsed)) {
+                parsed.forEach((doc, index) => {
+                    if (!doc) return;
+                    
+                    if (clave === 'sigpro_reportes') {
+                        const status = normalizeEstado(doc.status || doc.estado);
+                        const fechaStr = doc.createdAt || doc.fecha || new Date().toISOString();
+                        todosLosDocs.push({
+                            id: doc.id || doc.code || `REP-${index}`,
+                            codigo: doc.code || doc.id || `REP-${index}`,
+                            descripcion: doc.description || doc.title || `Reporte ${doc.semester || ''}`,
+                            facultad: doc.responsibleName || doc.generadoPor || 'Facultad',
+                            unidad: doc.unit || 'Unidad administrativa',
+                            estado: status,
+                            fecha: new Date(fechaStr)
+                        });
+                    } else {
+                        todosLosDocs.push(normalizeDocument(doc, index));
+                    }
+                });
+            }
+            // Caso 2: es un objeto mapa { codigo: detalle } (detalles de fichas)
+            else if (parsed && typeof parsed === 'object') {
+                Object.entries(parsed).forEach(([codigo, detail], index) => {
+                    if (!detail) return;
+                    const item = detail.fichaData || detail;
+                    
+                    // Extraer estado
+                    const rawEstado = item.estado || item.status || detail.estado || 'pendiente';
+                    const status = normalizeEstado(rawEstado);
+                    
+                    // Extraer fecha
+                    const fechaCandidatos = [
+                        item.fechaRegistro, item.fechaActualizacion, item.updatedAt,
+                        item.fecha, item.createdAt, item.fechaCreacion, detail.fecha
+                    ];
+                    let fecha = new Date();
+                    for (const c of fechaCandidatos) {
+                        if (c) { const d = new Date(c); if (!isNaN(d)) { fecha = d; break; } }
+                    }
                     
                     todosLosDocs.push({
-                        id: doc.id || doc.code || `REP-${index}`,
-                        codigo: doc.code || doc.id || `REP-${index}`,
-                        descripcion: doc.description || doc.title || `Reporte ${doc.semester || ''}`,
-                        facultad: doc.responsibleName || doc.generadoPor || 'Facultad',
-                        unidad: doc.unit || 'Unidad administrativa',
+                        id: item.id || codigo,
+                        codigo: item.codigo || item.code || codigo,
+                        descripcion: item.descripcion || item.titulo || item.nombreIndicador || item.name || `Documento ${codigo}`,
+                        facultad: item.nombreFacultad || item.facultad || item.unidadResponsable || detail.generadoPor || 'Facultad',
+                        unidad: item.unidadResponsable || item.unidad || item.area || 'Unidad administrativa',
                         estado: status,
                         fecha: fecha
                     });
-                } else {
-                    todosLosDocs.push(normalizeDocument(doc, index));
-                }
-            });
+                });
+            }
         } catch (error) {
             console.warn(`Error leyendo ${clave}:`, error);
         }
@@ -600,9 +652,11 @@ function loadLocalDocuments() {
     // Eliminar duplicados por código, manteniendo el más reciente
     const porCodigo = new Map();
     todosLosDocs.forEach(doc => {
-        const existente = porCodigo.get(doc.codigo);
+        const key = doc.codigo || doc.id;
+        if (!key) return;
+        const existente = porCodigo.get(key);
         if (!existente || (doc.fecha && existente.fecha && doc.fecha > existente.fecha)) {
-            porCodigo.set(doc.codigo, doc);
+            porCodigo.set(key, doc);
         }
     });
     
@@ -640,13 +694,21 @@ function extractArrayPayload(payload) {
 }
 
 async function loadApiDocuments() {
-    if (typeof API === "undefined" || !API.admin?.documents?.getAdminDocuments) return [];
+    // Si no hay API admin disponible, salir temprano
+    if (typeof API === "undefined" || !API.admin?.documents?.getAdminDocuments) {
+        return [];
+    }
 
     try {
         const result = await API.admin.documents.getAdminDocuments('', '', 1, 100);
         
         if (!result?.success) {
-            console.warn('Error cargando documentos:', result?.error);
+            console.warn('Error cargando documentos admin:', result?.error);
+            // ✅ FALLBACK: si la API falla o está en modo remoto, leer localStorage
+            if (API.CONFIG?.MODE === 'remote') {
+                console.log('📦 Fallback a localStorage por API remota vacía/fallida');
+                return [];
+            }
             return [];
         }
         
@@ -655,7 +717,6 @@ async function loadApiDocuments() {
         
         const normalized = allDocs.map((doc, i) => normalizeDocument(doc, i));
         
-        // ✅ FIX: usar doc.codigo (no doc.code)
         const unique = new Map();
         normalized.forEach(doc => unique.set(doc.codigo, doc));
         
@@ -958,7 +1019,7 @@ function renderNotifications(documents) {
 		const db = b.fechaObj || b.fecha;
 		return (db?.getTime?.() || 0) - (da?.getTime?.() || 0);
 	});
-	const latest = all.slice(0, 3);
+	const latest = all;
 
 	if (!latest.length) {
 		if (status) status.textContent = "Sin notificaciones recientes";
@@ -1179,11 +1240,8 @@ async function loadAdminFacultiesTable() {
     renderAdminFacultiesTable(rows);
 }
 
-
 async function loadDashboardData() {
-	const [apiDocuments] = await Promise.all([
-		loadApiDocuments()
-	]);
+	const [apiDocuments] = await Promise.all([loadApiDocuments()]);
 
 	const localDocuments = loadLocalDocuments();
 	// Cargar documentos detallados guardados por las facultades (sigpro_documentos_detalle)
@@ -1226,6 +1284,7 @@ async function loadDashboardData() {
 	if (dashboardDocuments.length > 0) {
 		updateCounters(dashboardDocuments);
 	}
+
 	renderNotifications(dashboardDocuments);
 	renderAccessRequests(dashboardAccessRequests);
 	updateLastRefreshLabel();
