@@ -332,15 +332,18 @@ function calcularContadoresDesdeLocalStorage() {
 
     // 🔥 FIX: Mismas claves que usa facultades-documentos
     const clavesRevisar = [
-        'sigpro_documentos_lista',      // ← neutra, modo-agnóstica
+        'sigpro_documentos_lista',
         'local_sigpro_documentos_lista',
         'remote_sigpro_documentos_lista',
-        'sigpro_reportes',              // ← neutra, modo-agnóstica
+        'sigpro_reportes',
         'sigpro_user_documents',
         'local_sigpro_user_documents'
     ];
 
-    const FECHA_SEED = new Date('2026-07-22T00:00:00Z').getTime();
+    //const FECHA_SEED = new Date('2026-07-22T00:00:00Z').getTime();//
+    
+    // 🔥 FIX: Set para evitar contar el mismo documento 2 veces
+    const procesados = new Set();
 
     for (const clave of clavesRevisar) {
         try {
@@ -351,18 +354,30 @@ function calcularContadoresDesdeLocalStorage() {
             if (!Array.isArray(datos)) continue;
 
             for (const doc of datos) {
+                if (!doc || typeof doc !== 'object') continue;
                 if (doc.isDemo === true) continue;
 
-                const codigo = String(doc.codigo || doc.code || doc.id || '').toUpperCase();
+                // 🔥 FIX: Identificador único para deduplicar
+                const codigo = String(doc.codigo || doc.code || doc.id || '').trim().toUpperCase();
+                if (!codigo) continue;
+                
+                // Si ya contamos este documento, saltarlo
+                if (procesados.has(codigo)) continue;
+                procesados.add(codigo);
+
+                // Filtrar códigos de demo
                 if (codigo.includes('PE01-001') || codigo.includes('PE01-002')) continue;
                 if (codigo.includes('IND-FM-PE01')) continue;
 
-                const fechaDoc = doc.fecha || doc.createdAt || doc.fechaCreacion;
-                if (fechaDoc) {
-                    const fechaMs = new Date(fechaDoc).getTime();
-                    if (!isNaN(fechaMs) && fechaMs < FECHA_SEED) continue;
-                }
+                // Filtrar fechas antiguas (solo si tiene fecha válida)
+                //const fechaDoc = doc.fecha || doc.createdAt || doc.fechaCreacion;
+                //if (fechaDoc) {
+                //    const fechaMs = new Date(fechaDoc).getTime();
+                //    if (!isNaN(fechaMs) && fechaMs < FECHA_SEED) continue;
+                //}
+                //
 
+                // Normalizar estado y contar
                 const estado = normalizarEstado(doc.estado || doc.status);
                 if (estado === 'pendiente') pendientes++;
                 else if (estado === 'en_proceso') enProceso++;
@@ -373,6 +388,10 @@ function calcularContadoresDesdeLocalStorage() {
             console.warn(`Error leyendo ${clave}:`, e);
         }
     }
+
+    console.log('📊 Contadores desde localStorage (deduplicados):', {
+        pendientes, enProceso, completados, totalUnicos: procesados.size
+    });
 
     return {
         pendingCount: pendientes,
@@ -877,7 +896,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             sessionStorage.clear();
             
             // 3) Redirigir
-            window.location.replace('index.html');
+            window.location.replace('portal-inicio-facultades.html');
             
         }, 400);
     }

@@ -20,12 +20,36 @@ const STATUS_OPTIONS = [
     { value: "REJECTED", label: "Rechazado" }
 ];
 
+const FALLBACK_FACULTIES = [
+	{ id: 1, name: 'Medicina', code: 'FM', shortName: 'Medicina' },
+	{ id: 2, name: 'Derecho y Ciencia Política', code: 'FDCP', shortName: 'Derecho y Ciencia Política' },
+	{ id: 3, name: 'Letras y Ciencias Humanas', code: 'FLCH', shortName: 'Letras y Ciencias Humanas' },
+	{ id: 4, name: 'Farmacia y Bioquímica', code: 'FFB', shortName: 'Farmacia y Bioquímica' },
+	{ id: 5, name: 'Odontología', code: 'FO', shortName: 'Odontología' },
+	{ id: 6, name: 'Educación', code: 'FE', shortName: 'Educación' },
+	{ id: 7, name: 'Química e Ingeniería Química', code: 'FQIQ', shortName: 'Química e Ingeniería Química' },
+	{ id: 8, name: 'Medicina Veterinaria', code: 'FMV', shortName: 'Medicina Veterinaria' },
+	{ id: 9, name: 'Ciencias Administrativas', code: 'FCA', shortName: 'Ciencias Administrativas' },
+	{ id: 10, name: 'Ciencias Biológicas', code: 'FCB', shortName: 'Ciencias Biológicas' },
+	{ id: 11, name: 'Ciencias Contables', code: 'FCC', shortName: 'Ciencias Contables' },
+	{ id: 12, name: 'Ciencias Económicas', code: 'FCE', shortName: 'Ciencias Económicas' },
+	{ id: 13, name: 'Ciencias Físicas', code: 'FCF', shortName: 'Ciencias Físicas' },
+	{ id: 14, name: 'Ciencias Matemáticas', code: 'FCM', shortName: 'Ciencias Matemáticas' },
+	{ id: 15, name: 'Ciencias Sociales', code: 'FCCSS', shortName: 'Ciencias Sociales' },
+	{ id: 16, name: 'Ingeniería Geológica, Minera, Metalúrgica y Geográfica', code: 'FIGMMG', shortName: 'Ing. Geológica, Minera, Metalúrgica y Geográfica' },
+	{ id: 17, name: 'Ingeniería Industrial', code: 'FII', shortName: 'Ingeniería Industrial' },
+	{ id: 18, name: 'Psicología', code: 'FP', shortName: 'Psicología' },
+	{ id: 19, name: 'Ingeniería Eléctrica y Electrónica', code: 'FIEE', shortName: 'Ing. Eléctrica y Electrónica' },
+	{ id: 20, name: 'Ingeniería de Sistemas e Informática', code: 'FISI', shortName: 'Ing. de Sistemas e Informática' }
+];
+
 const state = {
 	allDocuments: [],
     filteredDocuments: [],
     faculties: [],
+	faculty: "all",
     page: 1,
-    apiStatus: "",            // ✅ NUEVO: PENDING, IN_PROGRESS, COMPLETED, REJECTED para API
+	apiStatus: "all",          // ✅ NUEVO: PENDING, IN_PROGRESS, COMPLETED, REJECTED para API
     query: "",
     sortBy: "oldest"
 };
@@ -56,6 +80,8 @@ function flattenRemoteRepositoryPayload(payload) {
                 codigo: doc?.code || doc?.codigo || doc?.documentCode || doc?.id || `DOC-${index}`,
                 descripcion: doc?.title || doc?.descripcion || doc?.name || `Documento ${index}`,
                 facultad: doc?.faculty?.shortName || doc?.faculty?.name || doc?.nombreFacultad || doc?.facultad || "Facultad no registrada",
+				facultyId: doc?.facultyId || doc?.facultadId || doc?.faculty?.id || doc?.faculty?.facultyId || "",
+				facultyCode: doc?.faculty?.code || doc?.facultadCodigo || "",
                 unidad: doc?.unit || doc?.unidad || doc?.area || "Oficina responsable",
                 tipo: type,
                 estado: doc?.status || doc?.estado || 'pendiente',
@@ -74,6 +100,8 @@ function normalizeRemoteRepositoryDoc(doc, forcedType, index) {
         codigo: doc?.code || doc?.codigo || doc?.documentCode || doc?.id || `DOC-${index}`,
         descripcion: doc?.title || doc?.descripcion || doc?.name || `Documento ${index}`,
         facultad: doc?.faculty?.shortName || doc?.faculty?.name || doc?.nombreFacultad || doc?.facultad || "Facultad no registrada",
+		facultyId: doc?.facultyId || doc?.facultadId || doc?.faculty?.id || doc?.faculty?.facultyId || "",
+		facultyCode: doc?.faculty?.code || doc?.facultadCodigo || "",
         unidad: doc?.unit || doc?.unidad || doc?.area || "Oficina responsable",
         tipo: forcedType || inferType(doc?.code || doc?.codigo),
         estado: statusLabel(doc?.status || doc?.estado || "Aprobado"),
@@ -86,6 +114,18 @@ function inferProgress(status) {
     if (s.includes("complet") || s.includes("aprob")) return 100;
     if (s.includes("proceso")) return 60;
     return 15;
+}
+
+function matchesApiStatus(doc, apiStatus) {
+	if (!apiStatus || apiStatus === "all") return true;
+
+	const value = String(doc.status || doc.estado || doc.state || "").toUpperCase();
+	if (apiStatus === "PENDING") return value.includes("PENDING") || value.includes("PENDIENTE") || normalizeText(value).includes("pendiente");
+	if (apiStatus === "IN_PROGRESS") return value.includes("IN_PROGRESS") || value.includes("EN_PROGRESO") || normalizeText(value).includes("proceso");
+	if (apiStatus === "COMPLETED") return value.includes("COMPLETED") || value.includes("COMPLETADO") || normalizeText(value).includes("complet");
+	if (apiStatus === "REJECTED") return value.includes("REJECTED") || value.includes("RECHAZADO") || normalizeText(value).includes("rechaz");
+
+	return true;
 }
 
 function normalizeText(value) {
@@ -101,6 +141,64 @@ function normalizeEstado(value) {
 	if (status.includes("complet") || status.includes("aprob") || status.includes("public")) return "completado";
 	if (status.includes("proceso") || status.includes("revision") || status.includes("observ")) return "en_proceso";
 	return "pendiente";
+}
+
+function enrichDocumentFaculty(doc, faculties = state.faculties) {
+	const facultyLabel = doc.faculty || doc.facultad || doc.nombreFacultad || doc.facultadNombre || doc.facultyName || "Facultad no registrada";
+	const rawFacultyId = doc.facultyId || doc.facultadId || doc.facultad_id || doc.faculty_id || doc.faculty?.id || doc.faculty?.facultyId || "";
+	const rawFacultyCode = doc.facultyCode || doc.facultadCodigo || doc.faculty?.code || "";
+
+	const facultyMatch = Array.isArray(faculties)
+		? faculties.find((item) => (
+			normalizeText(item.id) === normalizeText(rawFacultyId)
+			|| normalizeText(item.code) === normalizeText(rawFacultyCode)
+			|| normalizeText(item.name) === normalizeText(facultyLabel)
+			|| normalizeText(item.shortName) === normalizeText(facultyLabel)
+		))
+		: null;
+
+	return {
+		...doc,
+		facultyId: String(rawFacultyId || facultyMatch?.id || ""),
+		facultyCode: String(rawFacultyCode || facultyMatch?.code || ""),
+		faculty: facultyMatch?.shortName || facultyMatch?.name || facultyLabel
+	};
+}
+
+function normalizeFacultyRow(item) {
+	if (!item) return null;
+
+	const id = item.id ?? item.facultyId ?? item.facultadId ?? item.code ?? '';
+	const name = item.name || item.shortName || item.facultad || item.nombre || '';
+	const shortName = item.shortName || item.name || name;
+	const code = item.code || item.facultyCode || item.facultadCodigo || '';
+
+	if (!id || !name) return null;
+
+	return {
+		id: String(id),
+		code: String(code),
+		name: String(name),
+		shortName: String(shortName)
+	};
+}
+
+function mergeFacultyLists(primary, fallback) {
+	const merged = new Map();
+
+	[...fallback, ...primary].forEach((item) => {
+		const faculty = normalizeFacultyRow(item);
+		if (!faculty) return;
+
+		const key = String(faculty.id || faculty.code || faculty.name).toLowerCase();
+		if (!merged.has(key)) {
+			merged.set(key, faculty);
+		} else {
+			merged.set(key, { ...merged.get(key), ...faculty });
+		}
+	});
+
+	return Array.from(merged.values());
 }
 
 function guardAdminSession() {
@@ -352,18 +450,10 @@ async function loadApiFaculties() {
 
 	try {
 		const response = await API.admin.faculties.getAll();
-		if (!response?.success) return [];
-		const rows = extractFacultyRows(response.data);
-		return rows
-			.map((item) => ({
-				id: item?.id || "",
-				code: item?.code || "",
-				name: item?.name || item?.shortName || item?.facultad || "",
-				shortName: item?.shortName || item?.name || ""
-			}))
-			.filter((item) => item.id && item.name);
+		const rows = response?.success ? extractFacultyRows(response.data) : [];
+		return mergeFacultyLists(rows, FALLBACK_FACULTIES);
 	} catch {
-		return [];
+		return mergeFacultyLists([], FALLBACK_FACULTIES);
 	}
 }
 
@@ -401,22 +491,24 @@ async function loadApiDocuments(facultyId = "", faculties = state.faculties) {
     // ═══════════════════════════════════════════════════════════
     // ESTRATEGIA 2: /admin/repository (funciona, pero suele estar vacío)
     // ═══════════════════════════════════════════════════════════
-    try {
-        console.log('🔄 /admin/repository...');
-        const repoResponse = await API.admin.repository.get(
-            facultyId && facultyId !== "all" ? { facultyId } : {}
-        );
-        
-        if (repoResponse?.success && repoResponse.data) {
-            const docs = flattenRemoteRepositoryPayload(repoResponse.data);
-            console.log(`✅ /admin/repository: ${docs.length} docs`);
-            if (docs.length > 0) {
-                return docs;
-            }
-        }
-    } catch (e) {
-        console.warn('⚠️ /admin/repository falló:', e.message);
-    }
+	if (API.admin?.repository?.get) {
+		try {
+			console.log('🔄 /admin/repository...');
+			const repoResponse = await API.admin.repository.get(
+				facultyId && facultyId !== "all" ? { facultyId } : {}
+			);
+            
+			if (repoResponse?.success && repoResponse.data) {
+				const docs = flattenRemoteRepositoryPayload(repoResponse.data).map((doc) => enrichDocumentFaculty(doc, faculties));
+				console.log(`✅ /admin/repository: ${docs.length} docs`);
+				if (docs.length > 0) {
+					return docs;
+				}
+			}
+		} catch (e) {
+			console.warn('⚠️ /admin/repository falló:', e.message);
+		}
+	}
 
     // ═══════════════════════════════════════════════════════════
     // ESTRATEGIA 3: /portal/documents (probablemente también 500)
@@ -426,7 +518,9 @@ async function loadApiDocuments(facultyId = "", faculties = state.faculties) {
             const result = await API.portal.documents.getAll({ page: 1, limit: 100 });
             if (result?.success && Array.isArray(result.data)) {
                 console.log(`✅ /portal/documents: ${result.data.length} docs`);
-                return result.data.map((doc, i) => normalizeDocument(doc, i));
+				return result.data
+					.map((doc, i) => enrichDocumentFaculty(normalizeDocument(doc, i), faculties))
+					.filter((doc) => matchesApiStatus(doc, state.apiStatus));
             }
         } catch (e) {
             console.warn('⚠️ /portal/documents falló:', e.message);
@@ -525,7 +619,11 @@ function syncDropdownSelection(type, value) {
 	const config = getDropdownConfig(type);
 	if (!config.root || !config.trigger || !config.menu || !config.label) return;
 
-	const displayLabel = type === "faculty" ? getFacultyDisplayLabel(value) : getSortDisplayLabel(value);
+	const displayLabel = type === "faculty"
+		? getFacultyDisplayLabel(value)
+		: type === "status-api"
+			? getStatusDisplayLabel(value)
+			: getSortDisplayLabel(value);
 	config.label.textContent = displayLabel;
 
 	Array.from(config.menu.querySelectorAll(".dropdown-option")).forEach((option) => {
@@ -659,6 +757,12 @@ function setupDropdownInteractions() {
         });
     }
 
+	if (statusApiConfig.menu) {
+		statusApiConfig.menu.addEventListener("mouseup", () => {
+			closeAllDropdowns();
+		});
+	}
+
     // Click outside (actualizar para incluir status-api)
     document.addEventListener("click", (event) => {
         if (!facultyConfig.root?.contains(event.target) && 
@@ -678,7 +782,8 @@ function setupDropdownInteractions() {
 async function reloadDocuments() {
     const facultyId = state.faculty === "all" ? "" : state.faculty;
     const apiDocs = await loadApiDocuments(facultyId, state.faculties);
-    state.allDocuments = apiDocs;
+	const localDocs = loadLocalDocuments();
+	state.allDocuments = mergeDocuments(apiDocs, localDocs).map((doc) => enrichDocumentFaculty(doc, state.faculties));
     applyFilters();
 }
 
@@ -686,9 +791,10 @@ function applyFilters() {
     const query = normalizeText(state.query);
 
     state.filteredDocuments = state.allDocuments
+		.filter((doc) => matchesApiStatus(doc, state.apiStatus))
         .filter((doc) => {
             if (state.faculty === "all") return true;
-            if (doc.facultyId && doc.facultyId === state.faculty) return true;
+			if (doc.facultyId && String(doc.facultyId) === String(state.faculty)) return true;
             const selectedFacultyName = getFacultyDisplayLabel(state.faculty);
             return normalizeText(doc.faculty) === normalizeText(selectedFacultyName);
         })
@@ -796,7 +902,7 @@ function populateFacultyFilter() {
 
 function resolveFacultyFromQuery() {
 	const params = new URLSearchParams(window.location.search);
-	const facultyParam = params.get("facultyId") || params.get("facultadId") || params.get("facultad");
+	const facultyParam = params.get("facultyId") || params.get("facultadId") || params.get("facultad") || params.get("facultyCode") || params.get("facultyName");
 	if (!facultyParam) return "all";
 
 	const normalizedQuery = normalizeText(facultyParam);
@@ -845,15 +951,20 @@ async function initializeDocuments() {
     
     // Cargar facultades
     state.faculties = await loadApiFaculties();
+	state.faculties = mergeFacultyLists(state.faculties, FALLBACK_FACULTIES);
+	state.faculty = resolveFacultyFromQuery();
     populateFacultyFilter();
     renderSortDropdownOptions();
     renderStatusApiDropdownOptions();
 
     // Si viene facultyId en URL
-    if (urlFaculty.id) {
-        const exists = state.faculties.find(f => f.id === urlFaculty.id);
+	if (urlFaculty.id || urlFaculty.code || urlFaculty.name) {
+		const facultyQuery = urlFaculty.id || urlFaculty.code || urlFaculty.name;
+		const exists = state.faculties.find(f => (
+			f.id === facultyQuery || f.code === facultyQuery || f.name === facultyQuery || f.shortName === facultyQuery
+		));
         if (exists) {
-            state.faculty = urlFaculty.id;
+			state.faculty = exists.id;
             // ✅ Pre-seleccionar PENDING para que el endpoint funcione
             state.apiStatus = "PENDING";
             
@@ -870,7 +981,7 @@ async function initializeDocuments() {
     // Sincronizar UI
     syncDropdownSelection("faculty", state.faculty);
     syncDropdownSelection("sort", state.sortBy);
-    syncDropdownSelection("status-api", state.apiStatus);
+	syncDropdownSelection("status-api", state.apiStatus);
 
     // Cargar documentos
     const apiDocs = await loadApiDocuments(
@@ -878,7 +989,8 @@ async function initializeDocuments() {
         state.faculties
     );
     
-    state.allDocuments = apiDocs;
+	const localDocs = loadLocalDocuments();
+	state.allDocuments = mergeDocuments(apiDocs, localDocs).map((doc) => enrichDocumentFaculty(doc, state.faculties));
     applyFilters();
 }
 

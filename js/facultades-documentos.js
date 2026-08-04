@@ -1449,14 +1449,17 @@ function loadLocalDocuments() {
             const normalizados = list.map((doc, index) => {
                 const estado = normalizeEstadoKey(doc.estado || doc.status || 'pendiente');
                 const progreso = typeof doc.progreso === 'number' ? doc.progreso : getDefaultProgressByEstado(estado);
+                const fechaBase = doc.createdAt || doc.fechaRegistro || doc.fecha || new Date().toISOString();
                 
                 return {
                     // 🔥 FIX: soportar múltiples campos de ID
                     id: doc.backendId || doc.apiId || doc.id || doc._id || `local-${doc.codigo || doc.code || index}`,
                     backendId: doc.backendId || doc.apiId || null,
                     // 🔥 FIX: soportar fecha en varios formatos
-                    fecha: doc.fecha || doc.createdAt || doc.fechaCreacion || new Date().toISOString().split('T')[0],
-                    hora: doc.hora || '00:00 H',
+                    fecha: fechaBase,
+                    hora: doc.hora || (fechaBase.includes('T') ? new Date(fechaBase).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H' : '00:00 H'),
+                    createdAt: doc.createdAt || null,
+                    fechaRegistro: doc.fechaRegistro || doc.createdAt || null,
                     // 🔥 FIX: soportar 'code' (usado por fichas) y 'codigo'
                     codigo: doc.codigo || doc.code || doc.numeroExpediente || `DOC-${index}`,
                     // 🔥 FIX: soportar 'nombre', 'title', 'asunto' (usado por fichas)
@@ -1480,7 +1483,9 @@ function loadLocalDocuments() {
     const porCodigo = new Map();
     todos.forEach(doc => {
         const existente = porCodigo.get(doc.codigo);
-        if (!existente || new Date(doc.fecha) > new Date(existente.fecha)) {
+        const docTime = new Date(doc.fecha).getTime();
+        const existenteTime = existente ? new Date(existente.fecha).getTime() : -Infinity;
+        if (!existente || docTime > existenteTime || (doc.hora && !existente.hora)) {
             porCodigo.set(doc.codigo, doc);
         }
     });
@@ -1550,6 +1555,8 @@ function persistLocalDocuments() {
             backendId: doc.backendId || null,
             fecha: doc.fecha,
             hora: doc.hora,
+            createdAt: doc.createdAt || null,
+            fechaRegistro: doc.fechaRegistro || doc.createdAt || null,
             codigo: doc.codigo,
             descripcion: doc.descripcion,
             generadoPor: doc.generadoPor,
@@ -1575,6 +1582,8 @@ function persistLocalDocuments() {
             descripcion: d.descripcion,
             fecha: d.fecha,
             hora: d.hora,
+            createdAt: d.createdAt,
+            fechaRegistro: d.fechaRegistro,
             estado: d.estado,
             generadoPor: d.generadoPor,
             progreso: d.progreso,

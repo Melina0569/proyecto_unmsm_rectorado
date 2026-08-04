@@ -684,20 +684,33 @@ window.addEventListener('message', (event) => {
     
     if (data.type === 'report-created' || data.type === 'document-created') {
         const docCode = data.docCode || data.code || data.codigo;
-        const docName = data.docName || data.nombre || data.title || `Documento ${docCode}`;
+        const prefix = String(docCode).split("-")[0].toUpperCase();
+        const tipoPorCodigo = {
+            IND: 'indicador',
+            FLU: 'flujograma',
+            CAR: 'caracterizacion',
+            INV: 'inventario',
+            REP: 'reporte',
+            HR: 'reporte',
+            PR: 'reporte'
+        };
+        const tipoReal = data.docType || data.tipo || tipoPorCodigo[prefix] || 'documento';
         
+        const now = new Date();
         const nuevoDoc = {
             id: data.docId || `local-${docCode}-${Date.now()}`,
             codigo: docCode,
             nombre: docName,
             descripcion: docName,
-            fecha: new Date().toISOString().split('T')[0],
-            hora: new Date().toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'}) + ' H',
+            fecha: now.toISOString(),  // ✅ FIX: Ahora incluye la hora real
+            hora: now.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'}) + ' H',
+            createdAt: now.toISOString(),        // ✅ NUEVO
+            fechaRegistro: now.toISOString(),    // ✅ NUEVO
             estado: data.docStatus || data.estado || 'pendiente',
             generadoPor: 'Facultad',
             progreso: 5,
             facultadId: data.facultyId || 1,
-            tipo: data.docType || data.tipo || 'documento',
+            tipo: tipoReal,
             origen: 'local'
         };
         

@@ -222,3 +222,38 @@
     });
 
 })();
+
+// ============================================
+// EFECTOS ADICIONALES
+// ============================================
+
+/**
+ * Efecto parallax suave para las burbujas al mover el mouse
+ */
+(function() {
+    'use strict';
+    // ... (tu código actual de burbujas)
+})();
+
+/**
+ * Animación de entrada para las cards al cargar
+ */
+(function() {
+    'use strict';
+    // ... (tu código actual de cards)
+})();
+
+// ============================================
+// REDIRECCIÓN AL PRESIONAR "ATRÁS"
+// ============================================
+
+(function() {
+    'use strict';
+
+    // Preparar el historial para interceptar el botón "Atrás"
+    history.pushState(null, null, location.href);
+
+    window.addEventListener('popstate', function () {
+        window.location.href = 'index.html';
+    });
+})();

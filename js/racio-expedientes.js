@@ -11,11 +11,12 @@ document.addEventListener('historial-actualizado', function(e) {
 // Corrección: Preview de documentos desde racio-expedientes
 // ==========================================
 
+const _mode = (typeof CONFIG !== 'undefined' && CONFIG.MODE) ? CONFIG.MODE : 'local';
 const STORAGE_KEYS = {
-    DOCUMENTOS_LISTA: "sigpro_documentos_lista",
-    DOCUMENTOS_DETALLE: "sigpro_documentos_detalle",
-    EXPEDIENTES_LISTA: "sigpro_expedientes_lista",
-    CORRECCIONES_LISTA: "sigpro_correcciones_solicitudes"
+    DOCUMENTOS_LISTA:    `${_mode}_sigpro_documentos_lista`,
+    DOCUMENTOS_DETALLE:  `${_mode}_sigpro_documentos_detalle`,
+    EXPEDIENTES_LISTA:   `${_mode}_sigpro_expedientes_lista`,
+    CORRECCIONES_LISTA:  `${_mode}_sigpro_correcciones_solicitudes`
 };
 
 const SAMPLE_DOCUMENTS = [
@@ -1396,41 +1397,29 @@ function setupTabsAndCorrections() {
 function normalizeDocument(doc, index) {
     const date = parseDate(doc.fecha || doc.fechaCreacion || doc.createdAt || doc.updatedAt);
     const codigo = doc.codigo || doc.code || `EXP-${date.getFullYear()}-${String(index + 1).padStart(4, "0")}`;
-    const attachmentName = doc.archivoAdjunto || doc.adjunto || doc.attachmentName || doc.nombreArchivo || doc.fileName || doc.archivo || `${codigo}.xlsx`;
-    const attachmentType = fileExtension(attachmentName);
-    const attachmentUrl = doc.archivoUrl || doc.fileUrl || doc.rutaArchivo || doc.urlArchivo || doc.url || "";
-    
-    // 🔥 Normalizar adjuntos de todas las fuentes posibles
-    const rawAttachments = Array.isArray(doc.adjuntos) && doc.adjuntos.length
-        ? doc.adjuntos
-        : (Array.isArray(doc.attachments) && doc.attachments.length ? doc.attachments : []);
-    
-    const normalizedAttachments = rawAttachments.map((item) => normalizeAttachment(item, attachmentName));
-    
-    // Si no hay adjuntos array pero hay nombre de archivo, crear uno
-    if (!normalizedAttachments.length && attachmentName) {
-        normalizedAttachments.push(normalizeAttachment({
-            name: attachmentName,
-            type: attachmentType,
-            url: attachmentUrl,
-            content: doc.contenido || doc.base64 || ""
-        }, attachmentName));
-    }
-
-    const dedupedAttachments = Array.from(
-        new Map(normalizedAttachments.map((item) => [String(item.name).toLowerCase(), item])).values()
-    );
+    const facultyId = doc.facultyId || doc.facultadId || doc.facultad_id || doc.faculty?.id || "";
+    const faculty = doc.nombreFacultad || doc.facultad || doc.facultadNombre || doc.generadoPor || "Facultad no especificada";
+    const unit = doc.unidad || doc.area || doc.generadoPor || "Unidad administrativa";
+    const status = normalizeEstado(doc.estado || doc.status || doc.estadoTexto);
+    const description = doc.descripcion || doc.nombre || "Expediente";
 
     return {
         id: doc.id || codigo,
-        codigo,
-        tipo: normalizeTipo(doc.tipo || doc.asunto || doc.categoria, codigo),
-        descripcion: doc.descripcion || doc.nombre || doc.name || "Documento sin descripcion",
-        facultad: doc.nombreFacultad || doc.facultad || doc.facultadNombre || doc.generadoPor || "Facultad no especificada",
-        unidad: doc.unidad || doc.area || doc.generadoPor || "Unidad administrativa",
-        estado: normalizeEstado(doc.estado || doc.estadoTexto || doc.status),
-        progreso: Number.isFinite(doc.progreso) ? Number(doc.progreso) : 50,
+        facultyId,
+        codigo,           // ← clave principal
+        code: codigo,     // ← alias por compatibilidad
+        faculty,
+        facultad: faculty,
+        unit,
+        unidad: unit,
+        status,
+        estado: status,
+        date,
         fecha: date,
+        progress: Number.isFinite(doc.progreso) ? Number(doc.progreso) : inferProgress(status),
+        progreso: Number.isFinite(doc.progreso) ? Number(doc.progreso) : inferProgress(status),
+        description,
+        descripcion: description,
         contenido: doc.contenido || doc.texto || doc.descripcionCompleta || "",
         resumen: doc.resumen || doc.observacion || "",
         version: doc.version || doc.versión || doc.numeroVersion || 1,
@@ -1439,7 +1428,12 @@ function normalizeDocument(doc, index) {
         reporteData: doc.reporteData && typeof doc.reporteData === "object"
             ? doc.reporteData
             : (doc.reportData && typeof doc.reportData === "object" ? doc.reportData : {}),
-        attachments: dedupedAttachments
+        adjuntos: Array.isArray(doc.adjuntos) && doc.adjuntos.length
+            ? doc.adjuntos
+            : (Array.isArray(doc.attachments) && doc.attachments.length ? doc.attachments : []),
+        attachments: Array.isArray(doc.attachments) && doc.attachments.length
+            ? doc.attachments
+            : (Array.isArray(doc.adjuntos) && doc.adjuntos.length ? doc.adjuntos : [])
     };
 }
 
@@ -1464,14 +1458,56 @@ async function loadApiDocuments() {
 }
 
 function loadLocalDocuments() {
-    const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
-    if (!raw) return [];
-    try {
-        const list = JSON.parse(raw);
-        return Array.isArray(list) ? list.map((doc, index) => normalizeDocument(doc, index)) : [];
-    } catch {
-        return [];
+    const clavesBuscar = [
+        STORAGE_KEYS.DOCUMENTOS_LISTA,      // local_... o remote_...
+        'sigpro_documentos_lista',          // sin prefijo (compatibilidad)
+        'remote_sigpro_documentos_lista',
+        'sigpro_reportes',                    // ← donde las fichas técnicas guardan
+        'sigpro_user_documents',
+        'local_sigpro_user_documents',
+        'remote_sigpro_user_documents'
+    ];
+    
+    let todos = [];
+    
+    for (const clave of clavesBuscar) {
+        const raw = localStorage.getItem(clave);
+        if (!raw) continue;
+        try {
+            const list = JSON.parse(raw);
+            if (!Array.isArray(list)) continue;
+            
+            const normalizados = list.map((doc, index) => {
+                const estado = normalizeEstado(doc.estado || doc.status || 'pendiente');
+                const progreso = Number.isFinite(doc.progreso) ? doc.progreso : inferProgress(estado);
+                const fechaRaw = doc.fecha || doc.fechaCreacion || doc.createdAt || doc.updatedAt || new Date().toISOString();
+                
+                return normalizeDocument({
+                    ...doc,
+                    fecha: fechaRaw,
+                    estado: estado,
+                    progreso: progreso
+                }, index);
+            });
+            
+            todos = todos.concat(normalizados);
+        } catch (e) {
+            console.warn(`Error leyendo ${clave}:`, e);
+        }
     }
+    
+    // Eliminar duplicados por código, manteniendo el más reciente
+    const porCodigo = new Map();
+    todos.forEach(doc => {
+        const key = doc.codigo || doc.id;
+        if (!key) return;
+        const existente = porCodigo.get(key);
+        if (!existente || (doc.fecha && existente.fecha && doc.fecha > existente.fecha)) {
+            porCodigo.set(key, doc);
+        }
+    });
+    
+    return Array.from(porCodigo.values());
 }
 
 function loadLocalDetailDocuments() {
@@ -1512,7 +1548,8 @@ function loadLocalDetailDocuments() {
                 fecha: item.fechaRegistro || fichaData.fechaRegistro || new Date().toISOString(),
                 estado: item.estado || fichaData.estado || "pendiente",
                 progreso: Number.isFinite(item.progreso) ? item.progreso : (Number.isFinite(fichaData.progreso) ? fichaData.progreso : 5),
-                adjuntos: baseAdjuntos
+                adjuntos: baseAdjuntos,
+                attachments: baseAdjuntos
             }, index);
         });
     } catch {
@@ -1520,14 +1557,14 @@ function loadLocalDetailDocuments() {
     }
 }
 
-function mergeDocuments(primary, secondary) {
-    const map = new Map();
-    primary.forEach((doc) => map.set(doc.codigo, doc));
-    secondary.forEach((doc) => {
-        const existing = map.get(doc.codigo);
-        map.set(doc.codigo, existing ? { ...existing, ...doc } : doc);
-    });
-    return Array.from(map.values());
+function mergeDocuments(apiDocs, localDocs) {
+	const map = new Map();
+	apiDocs.forEach((d) => map.set(d.codigo, d));
+	localDocs.forEach((d) => {
+		const existing = map.get(d.codigo);
+		map.set(d.codigo, existing ? { ...existing, ...d } : d);
+	});
+	return Array.from(map.values());
 }
 
 function getQueryParams() {
@@ -1546,6 +1583,7 @@ function buildDocumentFromQueryParams(params, selectedCode) {
     const unidad = params.get("unidad") || facultad || "Unidad administrativa";
     const estado = normalizeEstado(params.get("estado") || "pendiente");
     const fecha = parseDate(params.get("fecha"));
+    const tipo = params.get("tipo") || inferDocumentTypeFromCode(selectedCode);
     const progresoFromQuery = toFiniteNumber(params.get("progreso"), NaN);
     const progreso = Number.isFinite(progresoFromQuery)
         ? Math.max(0, Math.min(100, progresoFromQuery))
@@ -1554,13 +1592,17 @@ function buildDocumentFromQueryParams(params, selectedCode) {
     return {
         id: selectedCode,
         codigo: selectedCode,
-        tipo: inferDocumentTypeFromCode(selectedCode),
+        code: selectedCode,
+        tipo,
         descripcion,
         facultad,
         unidad,
         estado,
+        status: estado,
         progreso,
+        progress: progreso,
         fecha,
+        date: fecha,
         contenido: "",
         resumen: "",
         version: 1,
@@ -1675,6 +1717,7 @@ function getTechnicalInfoRows(doc) {
     const ficha = doc.fichaData || {};
     const reporte = doc.reporteData || {};
     const rows = [];
+    const resumenCampos = Array.isArray(doc.resumenCampos) ? doc.resumenCampos : [];
     const addRow = (label, value) => {
         const finalLabel = safeValue(label);
         const finalValue = safeValue(value);
@@ -1682,45 +1725,65 @@ function getTechnicalInfoRows(doc) {
         rows.push({ label: finalLabel, value: finalValue });
     };
 
+    const getResumenValue = (label, fallback = "-") => {
+        const wanted = normalizeText(label);
+        const found = resumenCampos.find((item) => normalizeText(item?.label) === wanted);
+        return found?.value || fallback;
+    };
+
     const tipoHandlers = {
         indicador: () => {
-            addRow("Tipo de Proceso", ficha.tipoProcesoLabel || ficha.tipoProceso);
-            addRow("Macro Proceso", ficha.macroProcesoNombre || ficha.macroProceso);
-            addRow("Oficina o Unidad Responsable", ficha.unidadResponsable);
-            addRow("Objetivo del Proceso", ficha.objetivoProceso);
-            addRow("Nombre del Indicador", ficha.nombreIndicador);
-            addRow("Frecuencia", ficha.frecuencia);
-            addRow("Variables", ficha.variables);
-            addRow("Formula del Indicador", ficha.formulaDefinicion || ficha.formula);
-            addRow("Fuente", ficha.fuente);
-            addRow("Meta", ficha.meta);
+            addRow("Tipo de Proceso", ficha.tipoProcesoLabel || ficha.tipoProceso || getResumenValue("Tipo de Proceso"));
+            addRow("Macro Proceso", ficha.macroProcesoNombre || ficha.macroProceso || getResumenValue("Macro Proceso"));
+            addRow("Oficina o Unidad Responsable", ficha.unidadResponsable || getResumenValue("Oficina o Unidad Responsable"));
+            addRow("Objetivo del Proceso", ficha.objetivoProceso || getResumenValue("Objetivo del Proceso"));
+            addRow("Nombre del Indicador", ficha.nombreIndicador || getResumenValue("Nombre del Indicador") || doc.descripcion);
+            addRow("Frecuencia", ficha.frecuencia || getResumenValue("Frecuencia"));
+            addRow("Variables", ficha.variables || getResumenValue("Variables"));
+            addRow("Formula del Indicador", ficha.formulaDefinicion || ficha.formula || getResumenValue("Formula del Indicador"));
+            addRow("Fuente", ficha.fuente || getResumenValue("Fuente"));
+            addRow("Meta", ficha.meta || getResumenValue("Meta"));
         },
         flujograma: () => {
-            addRow("Tipo de Proceso", ficha.tipoProcesoLabel || ficha.tipoProceso);
-            addRow("Proceso", ficha.macroProcesoNombre || ficha.macroProceso);
-            addRow("Nombre de la actividad", ficha.proceso || ficha.actividad);
+            addRow("Tipo de Proceso", ficha.tipoProcesoLabel || ficha.tipoProceso || getResumenValue("Tipo de Proceso"));
+            addRow("Proceso", ficha.macroProcesoNombre || ficha.macroProceso || getResumenValue("Proceso"));
+            addRow("Nombre de la actividad", ficha.proceso || ficha.actividad || getResumenValue("Nombre de la actividad") || doc.descripcion);
         },
         caracterizacion: () => {
-            addRow("Tipo de Proceso", ficha.tipoProcesoLabel || ficha.tipoProceso);
-            addRow("Proceso", ficha.macroProcesoNombre || ficha.macroProceso);
+            addRow("Tipo de Proceso", ficha.tipoProcesoLabel || ficha.tipoProceso || getResumenValue("Tipo de Proceso"));
+            addRow("Proceso", ficha.macroProcesoNombre || ficha.macroProceso || getResumenValue("Proceso"));
         },
         inventario: () => {
-            addRow("Versión", doc.version || ficha.version);
-            addRow("Fecha de elaboración", ficha.fechaElaboracion);
+            addRow("Versión", doc.version || ficha.version || getResumenValue("Versión"));
+            addRow("Fecha de elaboración", ficha.fechaElaboracion || getResumenValue("Fecha de elaboración"));
         },
         reporte: () => {
-            addRow("Semestre", reporte.semestre || ficha.semestreReporte);
-            addRow("Fecha de elaboracion", reporte.fechaElaboracion || ficha.fechaElaboracion);
-            addRow("Responsable", reporte.responsable || ficha.nombreResponsable);
-            addRow("Cargo", reporte.cargo || ficha.cargoResponsable);
-            addRow("Unidad orgánica Responsable", reporte.unidadOrganicaResponsable || reporte.unidadResponsable || ficha.unidadOrganicaResponsable || ficha.unidadResponsable);
-            addRow("Actividades realizadas", reporte.actividades || ficha.actividadesRealizadas);
-            addRow("Resultados obtenidos", reporte.resultados || ficha.resultadosObtenidos);
-            addRow("Observaciones", reporte.observaciones || ficha.observaciones);
+            addRow("Semestre", reporte.semestre || ficha.semestreReporte || getResumenValue("Semestre"));
+            addRow("Fecha de elaboracion", reporte.fechaElaboracion || ficha.fechaElaboracion || getResumenValue("Fecha de elaboracion"));
+            addRow("Responsable", reporte.responsable || ficha.nombreResponsable || getResumenValue("Responsable"));
+            addRow("Cargo", reporte.cargo || ficha.cargoResponsable || getResumenValue("Cargo"));
+            addRow("Unidad orgánica Responsable", reporte.unidadOrganicaResponsable || reporte.unidadResponsable || ficha.unidadOrganicaResponsable || ficha.unidadResponsable || getResumenValue("Unidad orgánica Responsable"));
+            addRow("Actividades realizadas", reporte.actividades || ficha.actividadesRealizadas || getResumenValue("Actividades realizadas"));
+            addRow("Resultados obtenidos", reporte.resultados || ficha.resultadosObtenidos || getResumenValue("Resultados obtenidos"));
+            addRow("Observaciones", reporte.observaciones || ficha.observaciones || getResumenValue("Observaciones"));
         }
     };
 
     (tipoHandlers[doc.tipo] || (() => {}))();
+
+    if (!rows.length && resumenCampos.length) {
+        resumenCampos.forEach((item) => {
+            addRow(item?.label, item?.value);
+        });
+    }
+
+    if (!rows.length && doc.tipo === "indicador") {
+        addRow("Nombre del Indicador", doc.descripcion || doc.nombre || doc.codigo);
+        addRow("Facultad", doc.facultad || doc.nombreFacultad || "-");
+        addRow("Unidad", doc.unidad || "-");
+        addRow("Estado", doc.estado || doc.status || "-");
+    }
+
     return dedupeTechnicalRows(rows);
 }
 
@@ -2636,28 +2699,26 @@ async function renderSelectedDocument() {
     if (elements.previewContent) {
         const codigo = doc.codigo;
         // Intentar cargar revisión desde API admin (si está disponible)
+        const isLocalMode = typeof API === 'undefined' || (API.CONFIG && API.CONFIG.MODE === 'local');
         let reviewPayload = null;
         let reviewError = null;
 
-        // ✅ FIX: Intentar con ID UUID primero, luego con código
-        const reviewId = doc.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(doc.id) 
-            ? doc.id 
-            : doc.codigo;
-
-        if (typeof API !== 'undefined' && API.admin?.documents?.getReview) {
+        if (!isLocalMode && typeof API !== 'undefined' && API.admin?.documents?.getReview) {
+            const reviewId = doc.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(doc.id) 
+                ? doc.id 
+                : doc.codigo;
             try {
                 const resp = await API.admin.documents.getReview(reviewId);
                 if (resp && resp.success && resp.data) {
                     reviewPayload = resp.data;
-                    console.log('✅ Review cargada:', reviewPayload);
                 } else if (resp && !resp.success) {
-                    reviewError = resp.error || resp.data?.message || `Error ${resp.status || 'desconocido'}`;
-                    console.warn('⚠️ API review error:', reviewError, resp);
+                    reviewError = resp.error || resp.data?.message;
                 }
             } catch (err) {
-                reviewError = String(err || "Error de conexión");
-                console.warn('❌ API review exception:', err);
+                reviewError = String(err);
             }
+
+
         }
 
         // Construir lista de mensajes/rectificaciones: preferir datos del review, fallback a localStorage
@@ -2827,19 +2888,86 @@ async function renderSelectedDocument() {
     renderHistoryPanel(doc.codigo);
 }
 
+function findDocumentInLocalStorage(codigo) {
+    if (!codigo) return null;
+    const keys = [
+        STORAGE_KEYS.DOCUMENTOS_LISTA,
+        STORAGE_KEYS.DOCUMENTOS_DETALLE,
+        'sigpro_documentos_lista',
+        'local_sigpro_documentos_lista',
+        'remote_sigpro_documentos_lista',
+        'sigpro_reportes',
+        'sigpro_indicadores_detalle',
+        'local_sigpro_indicadores_detalle',
+        'remote_sigpro_indicadores_detalle',
+        'sigpro_approved_docs'
+    ];
+    
+    for (const key of keys) {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) continue;
+            const parsed = JSON.parse(raw);
+            
+            if (Array.isArray(parsed)) {
+                const found = parsed.find(item => 
+                    (item.codigo || item.code || item.id) === codigo
+                );
+                if (found) return normalizeDocument(found, 0);
+            } else if (parsed && typeof parsed === 'object') {
+                // formato mapa { codigo: detalle }
+                if (parsed[codigo]) {
+                    const item = parsed[codigo];
+                    const ficha = item.fichaData || item;
+                    return normalizeDocument({
+                        ...ficha,
+                        codigo: codigo,
+                        estado: item.estado || ficha.estado || 'pendiente',
+                        progreso: item.progreso || ficha.progreso || inferProgress(item.estado || ficha.estado),
+                        adjuntos: Array.isArray(item.adjuntos) && item.adjuntos.length ? item.adjuntos : (Array.isArray(ficha.adjuntos) ? ficha.adjuntos : []),
+                        attachments: Array.isArray(item.attachments) && item.attachments.length ? item.attachments : (Array.isArray(item.adjuntos) && item.adjuntos.length ? item.adjuntos : (Array.isArray(ficha.attachments) ? ficha.attachments : []))
+                    }, 0);
+                }
+                // buscar por valores
+                const values = Object.values(parsed);
+                const found = values.find(item => item && (item.codigo || item.code || item.id) === codigo);
+                if (found) return normalizeDocument(found, 0);
+            }
+        } catch (e) { continue; }
+    }
+    return null;
+}
+
 // ==========================================
 // INICIALIZACIÓN
 // ==========================================
 
 async function initializeDocuments() {
     const apiDocs = await loadApiDocuments();
-    state.allDocuments = apiDocs;
+    const localDocs = loadLocalDocuments();
+    const detailDocs = loadLocalDetailDocuments();
+    
+    let merged = mergeDocuments(apiDocs, localDocs);
+    merged = mergeDocuments(merged, detailDocs);
+    state.allDocuments = merged;
 
     const params = getQueryParams();
     const selectedCode = params.get("codigo") || params.get("code") || "";
     state.selectedCode = selectedCode;
+    
+    // 1. Buscar en documentos ya cargados
     state.selectedDocument = state.allDocuments.find((doc) => doc.codigo === selectedCode) || null;
 
+    // 2. Fallback: buscar directo en localStorage (donde facultades-documentos guarda)
+    if (!state.selectedDocument && selectedCode) {
+        const fromStorage = findDocumentInLocalStorage(selectedCode);
+        if (fromStorage) {
+            state.selectedDocument = fromStorage;
+            state.allDocuments.unshift(fromStorage);
+        }
+    }
+
+    // 3. ÚLTIMO recurso: reconstruir desde query params (solo si no hay nada)
     if (!state.selectedDocument && selectedCode) {
         const queryDocument = buildDocumentFromQueryParams(params, selectedCode);
         if (queryDocument) {

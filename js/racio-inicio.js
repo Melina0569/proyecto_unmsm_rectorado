@@ -251,6 +251,7 @@ function guardAdminSession() {
 
 function updateLastRefreshLabel() {
 	const target = document.getElementById("last-update");
+
 	if (!target) {
 		return;
 	}
@@ -449,55 +450,181 @@ function normalizeEstado(value) {
 	return "pendiente";
 }
 
+// ============================================
+// PARSEO SEGURO DE FECHAS (ZONA HORARIA PERÚ)
+// ============================================
+
+function parsePeruDate(value) {
+    if (!value) return null;
+    if (value instanceof Date) {
+        return isNaN(value.getTime()) ? null : value;
+    }
+
+    const str = String(value).trim();
+
+    // Timestamp numérico (segundos o milisegundos)
+    if (/^\d+$/.test(str)) {
+        const num = Number(str);
+        const ms = str.length === 10 ? num * 1000 : num;
+        const d = new Date(ms);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    // Si ya trae Z o offset explícito (+05:00, -05:00), respetarlo
+    if (/Z|[+\-]\d{2}:?\d{2}$/.test(str)) {
+        const d = new Date(str);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    // Fecha sola tipo "2026-08-04" → asumir inicio del día en Perú (UTC-5)
+    // Esto evita que JavaScript la interprete como UTC y te la muestre a las 7pm
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        const d = new Date(str + 'T00:00:00-05:00');
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    // Fecha tipo "04/08/2026"
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+        const [day, month, year] = str.split('/');
+        const d = new Date(`${year}-${month}-${day}T00:00:00-05:00`);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    // Cualquier otro formato, intentar parseo nativo
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+// ✅ CORREGIDA: Ya no inventa fechas
 function parseDocumentDate(doc) {
-	const candidates = [
-		doc.fechaRegistro,
-		doc.fechaActualizacion,
-		doc.updatedAt,
-		doc.fecha,
-		doc.createdAt,
-		doc.fechaCreacion
-	];
+    const candidates = [
+        doc.createdAt,        // ← ✅ Subido al primer lugar
+        doc.fechaRegistro,
+        doc.fechaActualizacion,
+        doc.updatedAt,
+        doc.fechaCreacion,
+        doc.fecha
+    ];
 
-	for (const candidate of candidates) {
-		if (!candidate) {
-			continue;
-		}
+    for (const candidate of candidates) {
+        const date = parsePeruDate(candidate);
+        if (!date) continue;
 
-		const date = new Date(candidate);
-		if (!Number.isNaN(date.getTime())) {
-			return date;
-		}
-	}
+        if (doc.hora) {
+            const hourOnly = String(doc.hora).replace(/\s*H$/i, '').trim();
+            const [hours, minutes] = hourOnly.split(':').map((part) => Number(part));
 
-	if (doc.fecha && doc.hora) {
-		const hourOnly = String(doc.hora).replace(/\s*H$/i, '').trim();
-		const dateWithHour = new Date(`${doc.fecha}T${hourOnly}:00`);
-		if (!Number.isNaN(dateWithHour.getTime())) {
-			return dateWithHour;
-		}
-	}
+            if (Number.isFinite(hours) && Number.isFinite(minutes)) {
+                const combined = new Date(date);
+                const isMidnight =
+                    combined.getHours() === 0 &&
+                    combined.getMinutes() === 0 &&
+                    combined.getSeconds() === 0 &&
+                    combined.getMilliseconds() === 0;
 
-	return new Date();
+                if (isMidnight) {
+                    combined.setHours(hours, minutes, 0, 0);
+                    return combined;
+                }
+            }
+        }
+
+        return date;
+    }
+
+    // Solo si existe fecha + hora explícitas
+    if (doc.fecha && doc.hora) {
+        const hourOnly = String(doc.hora).replace(/\s*H$/i, '').trim();
+        const dateWithHour = new Date(`${doc.fecha}T${hourOnly}:00-05:00`);
+        if (!Number.isNaN(dateWithHour.getTime())) {
+            return dateWithHour;
+        }
+    }
+
+    return null; // ← ❌ Antes era: return new Date();
+}
+
+function inferDocumentTypeFromCode(code) {
+    const prefix = String(code || "").split("-")[0].toUpperCase();
+    if (prefix === "IND") return "indicador";
+    if (prefix === "FLU" || prefix === "FL") return "flujograma";
+    if (prefix === "CAR") return "caracterizacion";
+    if (prefix === "INV") return "inventario";
+    if (prefix === "HR" || prefix === "REP" || prefix === "PR") return "reporte";
+    return "reporte";
+}
+
+function formatTime(date) {
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("es-PE", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "America/Lima"
+    }).format(date);
+}
+
+function formatStoredHour(hourValue) {
+    if (!hourValue) return "";
+
+    const raw = String(hourValue).trim();
+    const match = raw.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return raw;
+
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return raw;
+
+    const date = new Date(2000, 0, 1, hours, minutes, 0, 0);
+    return new Intl.DateTimeFormat("es-PE", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "America/Lima"
+    }).format(date);
+}
+
+// ✅ NUEVA: Fecha fija de creación
+function formatDocumentDate(date) {
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) return "Sin fecha";
+
+    const now = new Date();
+    const isSameYear = date.getFullYear() === now.getFullYear();
+
+    return new Intl.DateTimeFormat("es-PE", {
+        day: "2-digit",
+        month: "short",
+        year: isSameYear ? undefined : "numeric",
+        timeZone: "America/Lima"
+    }).format(date);
 }
 
 function normalizeDocument(doc, index) {
-	const status = normalizeEstado(doc.estado || doc.estadoTexto || doc.status);
-	const docDate = parseDocumentDate(doc);
-	const codigo = doc.codigo || doc.code || `DOC-${index + 1}`;
-	const descripcion = doc.descripcion || doc.nombre || doc.name || "Documento sin descripcion";
-	const facultad = doc.nombreFacultad || doc.facultad || doc.facultadNombre || doc.generadoPor || "Facultad";
-	const unidad = doc.unidad || doc.area || doc.generadoPor || "Unidad administrativa";
+    const status = normalizeEstado(doc.estado || doc.estadoTexto || doc.status);
+    const docDate = parseDocumentDate(doc); // ← ahora puede ser null
+    const codigo = doc.codigo || doc.code || `DOC-${index + 1}`;
+    const descripcion = doc.descripcion || doc.nombre || doc.name || "Documento sin descripcion";
+    const facultad = doc.nombreFacultad || doc.facultad || doc.facultadNombre || doc.generadoPor || "Facultad";
+    const unidad = doc.unidad || doc.area || doc.generadoPor || "Unidad administrativa";
 
-	return {
-		id: doc.id || codigo,
-		codigo,
-		descripcion,
-		facultad,
-		unidad,
-		estado: status,
-		fecha: docDate
-	};
+    const inferredTipo = inferDocumentTypeFromCode(codigo);
+    const storedTipo = doc.tipo || doc.docType || doc.tipoDocumento;
+    const isGeneric = !storedTipo || storedTipo === 'documento' || storedTipo === 'reporte';
+    const finalTipo = isGeneric ? inferredTipo : storedTipo;
+
+    return {
+        id: doc.id || codigo,
+        codigo,
+        descripcion,
+        facultad,
+        unidad,
+        estado: status,
+        fecha: docDate, // ← puede ser null
+        hora: doc.hora || doc.horaCreacion || doc.time || '',
+        createdAt: doc.createdAt || doc.fechaRegistro || doc.fechaActualizacion || doc.updatedAt || doc.fechaCreacion || null,
+        progreso: Number.isFinite(doc.progreso) ? Number(doc.progreso) : (status === "completado" ? 100 : status === "en_proceso" ? 60 : 15),
+        tipo: finalTipo
+    };
 }
 
 function buildExpedienteDetailUrl(doc) {
@@ -508,6 +635,8 @@ function buildExpedienteDetailUrl(doc) {
 	params.set("descripcion", doc.descripcion || "");
 	params.set("estado", doc.estado || "pendiente");
 	params.set("fecha", doc.fecha instanceof Date ? doc.fecha.toISOString() : "");
+	params.set("progreso", String(doc.progreso ?? (doc.estado === "completado" ? 100 : doc.estado === "en_proceso" ? 60 : 15)));
+	if (doc.tipo) params.set("tipo", doc.tipo);
 	return `racio-expedientes.html?${params.toString()}`;
 }
 
@@ -564,83 +693,85 @@ function mergeDocuments(primary, secondary) {
 
 function loadLocalDocuments() {
     const clavesRevisar = [
-        STORAGE_KEYS.DOCUMENTOS_LISTA,   // "sigpro_documentos_lista"
+        STORAGE_KEYS.DOCUMENTOS_LISTA,
         'local_sigpro_documentos_lista',
         'remote_sigpro_documentos_lista',
         'sigpro_reportes',
-        // ✅ NUEVO: indicadores guardados por ficha-indicador.html
-        'sigpro_indicadores_detalle',
-        'local_sigpro_indicadores_detalle',
-        'remote_sigpro_indicadores_detalle',
-        // ✅ NUEVO: detalles de documentos guardados por fichas técnicas
-        'sigpro_documentos_detalle',
-        'local_sigpro_documentos_detalle',
-        'remote_sigpro_documentos_detalle',
-        // ✅ NUEVO: cualquier lista de documentos de usuario
         'sigpro_user_documents',
         'local_sigpro_user_documents',
         'remote_sigpro_user_documents',
     ];
-    
+
     let todosLosDocs = [];
-    
+
     for (const clave of clavesRevisar) {
         const raw = localStorage.getItem(clave);
         if (!raw) continue;
-        
+
         try {
             const parsed = JSON.parse(raw);
-            
-            // Caso 1: es un array directo (listas)
+
             if (Array.isArray(parsed)) {
                 parsed.forEach((doc, index) => {
                     if (!doc) return;
-                    
+
                     if (clave === 'sigpro_reportes') {
                         const status = normalizeEstado(doc.status || doc.estado);
-                        const fechaStr = doc.createdAt || doc.fecha || new Date().toISOString();
+                        // ✅ FIX: Priorizar createdAt/fechaRegistro (tienen hora real) sobre fecha (puede ser solo día)
+                        const fechaReal = doc.createdAt || doc.fechaRegistro || doc.fecha;
+                        const fechaStr = fechaReal || new Date().toISOString();
+                        const codigo = doc.code || doc.id || `REP-${index}`;
                         todosLosDocs.push({
-                            id: doc.id || doc.code || `REP-${index}`,
-                            codigo: doc.code || doc.id || `REP-${index}`,
+                            id: doc.id || codigo,
+                            codigo: codigo,
                             descripcion: doc.description || doc.title || `Reporte ${doc.semester || ''}`,
                             facultad: doc.responsibleName || doc.generadoPor || 'Facultad',
                             unidad: doc.unit || 'Unidad administrativa',
                             estado: status,
-                            fecha: new Date(fechaStr)
+                            fecha: fechaReal, // ← null si no hay fecha
+                            hora: doc.hora || new Date(fechaStr).toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'}) + ' H',
+                            createdAt: doc.createdAt || null,
+                            fechaRegistro: doc.fechaRegistro || null,
+                            tipo: doc.tipo || inferDocumentTypeFromCode(codigo)
                         });
                     } else {
                         todosLosDocs.push(normalizeDocument(doc, index));
                     }
                 });
             }
-            // Caso 2: es un objeto mapa { codigo: detalle } (detalles de fichas)
             else if (parsed && typeof parsed === 'object') {
                 Object.entries(parsed).forEach(([codigo, detail], index) => {
                     if (!detail) return;
                     const item = detail.fichaData || detail;
-                    
-                    // Extraer estado
+
                     const rawEstado = item.estado || item.status || detail.estado || 'pendiente';
                     const status = normalizeEstado(rawEstado);
-                    
-                    // Extraer fecha
+
+                    // ✅ FIX: Usar parsePeruDate en vez de lógica manual con fallback a "ahora"
                     const fechaCandidatos = [
                         item.fechaRegistro, item.fechaActualizacion, item.updatedAt,
                         item.fecha, item.createdAt, item.fechaCreacion, detail.fecha
                     ];
-                    let fecha = new Date();
+                    let fecha = null;
                     for (const c of fechaCandidatos) {
-                        if (c) { const d = new Date(c); if (!isNaN(d)) { fecha = d; break; } }
+                        const d = parsePeruDate(c);
+                        if (d) { fecha = d; break; }
                     }
-                    
+
+                    const finalCodigo = item.codigo || item.code || codigo;
+                    const tipoExplicito = item.tipo || item.docType || item.tipoDocumento;
+                    const tipoInferido = inferDocumentTypeFromCode(finalCodigo);
+                    const isGeneric = !tipoExplicito || tipoExplicito === 'documento' || tipoExplicito === 'reporte';
+
                     todosLosDocs.push({
                         id: item.id || codigo,
-                        codigo: item.codigo || item.code || codigo,
+                        codigo: finalCodigo,
                         descripcion: item.descripcion || item.titulo || item.nombreIndicador || item.name || `Documento ${codigo}`,
                         facultad: item.nombreFacultad || item.facultad || item.unidadResponsable || detail.generadoPor || 'Facultad',
                         unidad: item.unidadResponsable || item.unidad || item.area || 'Unidad administrativa',
                         estado: status,
-                        fecha: fecha
+                        fecha: fecha, // ← null si no hay fecha real
+                        tipo: isGeneric ? tipoInferido : tipoExplicito
                     });
                 });
             }
@@ -648,18 +779,31 @@ function loadLocalDocuments() {
             console.warn(`Error leyendo ${clave}:`, error);
         }
     }
-    
-    // Eliminar duplicados por código, manteniendo el más reciente
+
+    // Eliminar duplicados por código, manteniendo el más reciente (solo si tienen fecha)
     const porCodigo = new Map();
     todosLosDocs.forEach(doc => {
         const key = doc.codigo || doc.id;
         if (!key) return;
         const existente = porCodigo.get(key);
-        if (!existente || (doc.fecha && existente.fecha && doc.fecha > existente.fecha)) {
+        if (!existente) {
             porCodigo.set(key, doc);
+        } else if (doc.fecha && existente.fecha) {
+            const docTime = doc.fecha instanceof Date ? doc.fecha.getTime() : new Date(doc.fecha).getTime();
+            const existenteTime = existente.fecha instanceof Date ? existente.fecha.getTime() : new Date(existente.fecha).getTime();
+            const docHasHora = Boolean(doc.hora);
+            const existenteHasHora = Boolean(existente.hora);
+
+            if (docHasHora && !existenteHasHora) {
+                porCodigo.set(key, doc);
+            } else if (docTime > existenteTime) {
+                porCodigo.set(key, doc);
+            }
+        } else if (doc.fecha && !existente.fecha) {
+            porCodigo.set(key, doc); // preferir el que SÍ tiene fecha
         }
     });
-    
+
     return Array.from(porCodigo.values());
 }
 
@@ -952,6 +1096,18 @@ function renderAccessRequests(requests) {
     }).join("");
 }
 
+function getDocumentTypeConfig(tipo) {
+    const map = {
+        indicador:      { label: 'Indicador',       icon: 'monitoring',      color: 'sky' },
+        flujograma:     { label: 'Flujograma',      icon: 'account_tree',    color: 'indigo' },
+        caracterizacion:{ label: 'Caracterización', icon: 'assignment',      color: 'amber' },
+        inventario:     { label: 'Inventario',      icon: 'inventory_2',     color: 'emerald' },
+        reporte:        { label: 'Hoja de reporte', icon: 'description',     color: 'violet' },
+    };
+    const key = String(tipo || 'reporte').toLowerCase();
+    return map[key] || { label: 'Ficha técnica', icon: 'feed', color: 'slate' };
+}
+
 function getNotificationStyle(status) {
 	if (status === "completado") {
 		return {
@@ -982,92 +1138,157 @@ function getNotificationStyle(status) {
 	};
 }
 
-// Mostrar notificaciones de documentos y correcciones recientes
+// ✅ NUEVA: Formatea fecha fija del documento (ej: "4 ago. 2026" o "04/08/2026")
+function formatDocumentDate(date) {
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) return "—";
+    
+    const now = new Date();
+    const isSameYear = date.getFullYear() === now.getFullYear();
+    
+    // Si es del año actual: "4 ago." (sin año)
+    // Si es de otro año: "4 ago. 2025"
+    return new Intl.DateTimeFormat("es-PE", {
+        day: "2-digit",
+        month: "short",
+        year: isSameYear ? undefined : "numeric"
+    }).format(date).replace('.', ''); // quita punto del mes si quieres, o déjalo
+}
+
+// ✅ CORREGIDA: Notificaciones con fecha fija de creación
 function renderNotifications(documents) {
-	const list = document.getElementById("notifications-list");
-	const status = document.getElementById("notifications-status");
-	if (!list) return;
+    const list = document.getElementById("notifications-list");
+    const status = document.getElementById("notifications-status");
+    if (!list) return;
 
-	// Leer correcciones recientes (en proceso) de sigpro_correcciones_solicitudes
-	let correcciones = [];
-	try {
-		correcciones = JSON.parse(localStorage.getItem('sigpro_correcciones_solicitudes')) || [];
-	} catch {}
-	// Solo mostrar las que están en proceso
-	correcciones = correcciones.filter(c => (c.estado || '').toLowerCase().includes('proceso'));
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.gap = '12px';
 
-	// Normalizar fechas
-	correcciones = correcciones.map(c => ({
-		...c,
-		fechaObj: new Date(c.fecha),
-		descripcion: c.asunto || 'Corrección',
-		facultad: c.correoInstitucional || 'Facultad',
-		estado: c.estado || 'en_proceso',
-		codigo: c.codigo || '',
-	}));
+    let correcciones = [];
+    try {
+        correcciones = JSON.parse(localStorage.getItem('sigpro_correcciones_solicitudes')) || [];
+    } catch {}
+    correcciones = correcciones.filter(c => (c.estado || '').toLowerCase().includes('proceso'));
 
-	// Dar prioridad a pendientes y en proceso para que las notificaciones reflejen actividad real
-	const prioritizedDocuments = [...documents]
-		.sort((a, b) => {
-			const rank = (doc) => (doc.estado === "pendiente" ? 0 : doc.estado === "en_proceso" ? 1 : 2);
-			return rank(a) - rank(b) || ((b.fechaObj || b.fecha)?.getTime?.() || 0) - ((a.fechaObj || a.fecha)?.getTime?.() || 0);
-		});
+    correcciones = correcciones.map(c => ({
+        ...c,
+        fechaObj: parsePeruDate(c.fecha), // ← también corregido
+        descripcion: c.asunto || 'Corrección solicitada',
+        facultad: c.correoInstitucional || 'Facultad',
+        unidad: c.correoInstitucional || 'Unidad',
+        estado: 'en_proceso',
+        codigo: c.codigo || '',
+        progreso: 50,
+        tipo: inferDocumentTypeFromCode(c.codigo)
+    }));
 
-	// Unir documentos y correcciones
-	const all = [...prioritizedDocuments, ...correcciones].sort((a, b) => {
-		const da = a.fechaObj || a.fecha;
-		const db = b.fechaObj || b.fecha;
-		return (db?.getTime?.() || 0) - (da?.getTime?.() || 0);
-	});
-	const latest = all;
+    const prioritizedDocuments = [...documents]
+        .filter(d => d.estado !== 'completado')
+        .sort((a, b) => {
+            const rank = (doc) => (doc.estado === "pendiente" ? 0 : doc.estado === "en_proceso" ? 1 : 2);
+            return rank(a) - rank(b) || ((b.fecha?.getTime?.() || 0) - (a.fecha?.getTime?.() || 0));
+        });
 
-	if (!latest.length) {
-		if (status) status.textContent = "Sin notificaciones recientes";
-		list.innerHTML = `
-			<div class="notification-card flex gap-4 p-4 border border-gray-100 rounded-xl bg-gray-50/50 md:col-span-3">
-				<div class="flex-shrink-0">
-					<div class="notification-icon w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center">
-						<span class="material-symbols-outlined text-xl">hourglass_empty</span>
-					</div>
-				</div>
-				<div class="flex-grow">
-					<div class="flex justify-between items-start">
-						<h4 class="text-sm font-semibold text-gray-900">Sin documentos todavia</h4>
-						<span class="text-[10px] text-gray-400 font-medium">--</span>
-					</div>
-					<p class="text-xs text-gray-500 mt-1 mb-2 line-clamp-2">Las notificaciones se activaran cuando las facultades envien documentos al sistema.</p>
-					<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 uppercase">Sin actividad</span>
-				</div>
-			</div>
-		`;
-		return;
-	}
+    const all = [...prioritizedDocuments, ...correcciones].sort((a, b) => {
+        const da = a.fechaObj || a.fecha;
+        const db = b.fechaObj || b.fecha;
+        return (db?.getTime?.() || 0) - (da?.getTime?.() || 0);
+    });
+    const latest = all.slice(0, 10);
 
-	if (status) status.textContent = `Mostrando ${latest.length} notificacion(es) mas reciente(s)`;
+    if (!latest.length) {
+        if (status) status.textContent = "Sin notificaciones recientes";
+        list.innerHTML = `
+            <div class="rounded-xl border border-gray-100 bg-gray-50/50 p-8 text-center">
+                <span class="material-symbols-outlined text-4xl text-gray-300 mb-2">hourglass_empty</span>
+                <p class="text-sm text-gray-500 font-medium">Sin documentos todavía</p>
+                <p class="text-xs text-gray-400 mt-1">Las notificaciones se activarán cuando las facultades envíen documentos al sistema.</p>
+            </div>
+        `;
+        return;
+    }
 
-	list.innerHTML = latest.map((doc) => {
-		const style = getNotificationStyle(doc.estado);
-		const relativeTime = toRelativeTime(doc.fecha instanceof Date ? doc.fecha : new Date(doc.fecha));
-		// Si es corrección, ir a racio-expedientes con el código
-		const detailUrl = doc.codigo ? `racio-expedientes.html?codigo=${encodeURIComponent(doc.codigo)}` : buildExpedienteDetailUrl(doc);
-		return `
-			<a class="notification-card flex gap-4 p-4 border border-gray-100 rounded-xl bg-gray-50/50 hover-lift cursor-pointer" href="${detailUrl}" title="Abrir expediente ${doc.codigo}">
-				<div class="flex-shrink-0">
-					<div class="notification-icon w-10 h-10 rounded-full ${style.iconClass} flex items-center justify-center">
-						<span class="material-symbols-outlined text-xl">${style.icon}</span>
-					</div>
-				</div>
-				<div class="flex-grow">
-					<div class="flex justify-between items-start gap-2">
-						<h4 class="text-sm font-semibold text-gray-900">${style.title}</h4>
-						<span class="text-[10px] text-gray-400 font-medium whitespace-nowrap">${relativeTime}</span>
-					</div>
-					<p class="text-xs text-gray-500 mt-1 mb-2 line-clamp-2">${doc.facultad} envio ${doc.codigo} (${doc.descripcion}).</p>
-					<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${style.tagClass}">${style.tagLabel}</span>
-				</div>
-			</a>
-		`;
-	}).join("");
+    if (status) status.textContent = `Mostrando ${latest.length} notificación(es) más reciente(s)`;
+
+    list.innerHTML = latest.map((doc) => {
+        const typeCfg = getDocumentTypeConfig(doc.tipo);
+        
+        // ✅ FIX: Manejar fecha null
+        const docDate = (doc.fecha instanceof Date && !isNaN(doc.fecha)) ? doc.fecha : 
+                        (doc.fechaObj instanceof Date && !isNaN(doc.fechaObj)) ? doc.fechaObj : null;
+
+        const fechaCreacion = formatDocumentDate(docDate);
+        const horaCreacion = formatStoredHour(doc.hora) || formatTime(docDate);
+        const detailUrl = buildExpedienteDetailUrl(doc);
+
+        // 🐛 DEBUG TEMPORAL: Abre la consola (F12) y verás qué fecha tiene cada documento
+        console.log(`📅 ${doc.codigo}: fecha=${docDate?.toISOString?.() || 'NULL'} | mostrando="${fechaCreacion} ${horaCreacion}" | rawFields=`, {
+            fecha: doc.fecha,
+            hora: doc.hora,
+            fechaRegistro: doc.fechaRegistro,
+            createdAt: doc.createdAt,
+            fechaCreacion: doc.fechaCreacion
+        });
+
+        const statusConfig = {
+            pendiente:   { label: 'Pendiente de revisión', dot: 'bg-orange-500', bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-100' },
+            en_proceso:  { label: 'En proceso',            dot: 'bg-blue-500',   bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-100' },
+            completado:  { label: 'Publicado',             dot: 'bg-green-500',  bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-100' }
+        };
+        const st = statusConfig[doc.estado] || statusConfig.pendiente;
+
+        return `
+            <a class="group block w-full p-5 border border-gray-100 rounded-xl bg-white hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer" 
+               href="${detailUrl}" title="Abrir expediente ${doc.codigo}">
+                
+                <div class="flex items-start justify-between gap-4 mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-${typeCfg.color}-50 text-${typeCfg.color}-600 flex items-center justify-center border border-${typeCfg.color}-100 flex-shrink-0">
+                            <span class="material-symbols-outlined text-[20px]">${typeCfg.icon}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-${typeCfg.color}-50 text-${typeCfg.color}-700 border border-${typeCfg.color}-100 w-fit">
+                                ${typeCfg.label}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end text-right flex-shrink-0">
+                        <!-- ✅ FIX: Fecha real o "Sin fecha" -->
+                        <span class="text-[11px] text-gray-500 font-semibold whitespace-nowrap">${escapeHtml(fechaCreacion)}</span>
+                        ${horaCreacion ? `<span class="text-[11px] text-gray-400 font-medium whitespace-nowrap">${escapeHtml(horaCreacion)}</span>` : ''}
+                    </div>
+                </div>
+
+                <h4 class="text-[15px] font-semibold text-gray-900 leading-snug mb-3 truncate">
+                    ${escapeHtml(doc.descripcion || 'Documento sin descripción')}
+                </h4>
+
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-gray-600 mb-4">
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-gray-400">school</span>
+                        ${escapeHtml(doc.facultad || 'Facultad')}
+                    </span>
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-gray-400">person</span>
+                        ${escapeHtml(doc.unidad || 'Unidad administrativa')}
+                    </span>
+                    <span class="font-mono text-[12px] px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                        ${escapeHtml(doc.codigo || '-')}
+                    </span>
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-gray-50">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[12px] font-semibold ${st.bg} ${st.text} border ${st.border}">
+                        <span class="w-1.5 h-1.5 rounded-full ${st.dot}"></span>
+                        ${st.label}
+                    </span>
+                    <span class="text-[12px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+                        Ver expediente →
+                    </span>
+                </div>
+            </a>
+        `;
+    }).join("");
 }
 
 function extractFacultyRows(payload) {
@@ -1092,10 +1313,11 @@ function formatAdminFacultyDate(value) {
 	if (Number.isNaN(date.getTime())) return "-";
 
 	return new Intl.DateTimeFormat("es-PE", {
-		year: "numeric",
-		month: "2-digit",
-		day: "2-digit"
-	}).format(date);
+
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+    }).format(date);
 }
 
 function renderAdminFacultiesTable(rows) {
@@ -1241,53 +1463,32 @@ async function loadAdminFacultiesTable() {
 }
 
 async function loadDashboardData() {
-	const [apiDocuments] = await Promise.all([loadApiDocuments()]);
+    const [apiDocuments] = await Promise.all([loadApiDocuments()]);
+    const localDocuments = loadLocalDocuments();
+    
+    // Merge API + local
+    let merged = mergeDocuments(apiDocuments, localDocuments);
+    
+    // ✅ FIX: Descartar documentos con códigos basura (fantasmas)
+    merged = merged.filter(doc => {
+        const cod = String(doc.codigo || '');
+        // Un código SIGPRO válido tiene letras y guiones, nunca es puro número
+        return cod.length > 3 && (/[a-zA-Z]/.test(cod) || cod.includes('-'));
+    });
+    
+    dashboardDocuments = merged;
+    dashboardAccessRequests = await loadAccessRequests();
 
-	const localDocuments = loadLocalDocuments();
-	// Cargar documentos detallados guardados por las facultades (sigpro_documentos_detalle)
-	let localDetailDocs = [];
-        const clavesDetalle = [
-            'sigpro_documentos_detalle',
-            'local_sigpro_documentos_detalle',
-            'remote_sigpro_documentos_detalle'
-        ];
+    if (dashboardDocuments.length > 0) {
+        updateCounters(dashboardDocuments);
+    }
 
-        for (const claveDetalle of clavesDetalle) {
-            try {
-                const rawDetail = localStorage.getItem(claveDetalle);
-                if (rawDetail) {
-                    const detailMap = JSON.parse(rawDetail) || {};
-                    const docs = Object.entries(detailMap).map(([codigo, detail]) => {
-                        const item = detail || {};
-                        const ficha = item.fichaData || {};
-                        return {
-                            codigo: item.codigo || ficha.codigo || codigo,
-                            descripcion: item.titulo || ficha.descripcion || item.descripcion || `Documento ${codigo}`,
-                            facultad: ficha.facultad || item.nombreFacultad || item.facultad || '',
-                            estado: normalizeEstado(item.estado || ficha.estado || 'pendiente'),
-                            fecha: parseDocumentDate(item) || parseDocumentDate(ficha) || new Date(),
-                            fechaObj: parseDocumentDate(item) || parseDocumentDate(ficha) || new Date(),
-                            descripcionRaw: item,
-                        };
-                    });
-                    localDetailDocs = localDetailDocs.concat(docs);
-                }
-            } catch (e) {
-                console.warn(`No se pudo parsear ${claveDetalle}:`, e);
-            }
-        }
-
-	// Merge: api <- local list <- local detail (detail should override summaries)
-	dashboardDocuments = mergeDocuments(apiDocuments, mergeDocuments(localDocuments, localDetailDocs));
-	dashboardAccessRequests = await loadAccessRequests();
-
-	if (dashboardDocuments.length > 0) {
-		updateCounters(dashboardDocuments);
-	}
-
-	renderNotifications(dashboardDocuments);
-	renderAccessRequests(dashboardAccessRequests);
-	updateLastRefreshLabel();
+    const docsParaNotificaciones = dashboardDocuments.filter(
+        doc => doc.estado !== "completado"
+    );
+    renderNotifications(docsParaNotificaciones);
+    renderAccessRequests(dashboardAccessRequests);
+    updateLastRefreshLabel();
 }
 
 // Cargar y renderizar estadísticas administrativas (contador de documentos)

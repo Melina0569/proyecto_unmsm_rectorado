@@ -1420,6 +1420,7 @@ function sincronizarClavesNeutras(doc) {
         localStorage.setItem('sigpro_documentos_lista', JSON.stringify(neutral));
 
         // 2) Reportes (para que el dashboard siempre cuente)
+        // ✅ FIX: Incluir createdAt y fechaRegistro para que el dashboard lea la hora real
         const reportesRaw = localStorage.getItem('sigpro_reportes');
         const reportes = reportesRaw ? JSON.parse(reportesRaw) : [];
         const idxR = reportes.findIndex(r => r.codigo === doc.codigo);
@@ -1430,6 +1431,8 @@ function sincronizarClavesNeutras(doc) {
             descripcion: doc.descripcion,
             fecha: doc.fecha,
             hora: doc.hora,
+            createdAt: doc.createdAt,           // ← ✅ NUEVO
+            fechaRegistro: doc.fechaRegistro,   // ← ✅ NUEVO
             estado: doc.estado,
             generadoPor: doc.generadoPor,
             progreso: doc.progreso,
