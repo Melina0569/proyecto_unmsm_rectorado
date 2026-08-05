@@ -250,8 +250,11 @@ function safeArray(value) {
 }
 
 function readLocalRepositorySource() {
-	const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
-	const detailRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
+	// Leer tanto con prefijo de modo (local_) como sin prefijo
+	const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA) 
+		|| localStorage.getItem("local_sigpro_documentos_lista");
+	const detailRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE)
+		|| localStorage.getItem("local_sigpro_documentos_detalle");
 	let docs = [];
 	let detailMap = {};
 
@@ -269,6 +272,39 @@ function readLocalRepositorySource() {
 	}
 
 	return { docs, detailMap };
+}
+
+function readExpedientesAsRepositoryDocs() {
+	try {
+		const raw = localStorage.getItem("sigpro_expedientes_lista");
+		if (!raw) return [];
+		const expedientes = JSON.parse(raw);
+		if (!Array.isArray(expedientes)) return [];
+
+		return expedientes
+			.filter((doc) => {
+				const status = normalizeText(doc.estado || doc.status);
+				return status.includes("aprob") || status.includes("complet");
+			})
+			.map((doc) => {
+				const code = doc.codigo || doc.code || doc.id || "DOC-SIN-CODIGO";
+				return {
+					id: doc.id || code,
+					codigo: code,
+					descripcion: doc.nombre || doc.descripcion || doc.title || `Documento ${code}`,
+					facultad: doc.facultad || doc.nombreFacultad || doc.responsable || "Facultad no registrada",
+					unidad: doc.responsable || doc.unidad || "Oficina responsable",
+					tipo: normalizeRepositoryType(doc.tipo, code),
+					estado: statusLabel(doc.estado || doc.status || "aprobado"),
+					fecha: parseDate(doc.fechaAprobacion || doc.fecha || doc.updatedAt),
+					detail: doc
+				};
+			})
+			.sort((a, b) => b.fecha - a.fecha);
+	} catch (e) {
+		console.warn("Error leyendo sigpro_expedientes_lista:", e);
+		return [];
+	}
 }
 
 function mapLocalApprovedDocuments(docs, detailMap) {
@@ -507,14 +543,31 @@ async function loadRepositoryDocuments(options = {}) {
 	const { includeRemote = true, facultyId = "" } = options;
 	const previousCode = state.selectedCode;
 	let approved = [];
+
 	if (includeRemote) {
 		const remoteResult = await loadRemoteRepositoryDocuments(facultyId);
 		if (remoteResult.success) {
 			approved = remoteResult.docs;
 		}
-	} else {
+	}
+
+	// Si no hay remoto o está vacío, leer fuentes locales tradicionales
+	if (approved.length === 0) {
 		const { docs, detailMap } = readLocalRepositorySource();
 		approved = mapLocalApprovedDocuments(docs, detailMap);
+	}
+
+	// 🔥 LEER desde sigpro_expedientes_lista (facultades-expedientes)
+	const expedientesDocs = readExpedientesAsRepositoryDocs();
+	if (expedientesDocs.length > 0) {
+		const existingCodes = new Set(approved.map((d) => d.codigo));
+		for (const doc of expedientesDocs) {
+			if (!existingCodes.has(doc.codigo)) {
+				approved.push(doc);
+				existingCodes.add(doc.codigo);
+			}
+		}
+		approved.sort((a, b) => b.fecha - a.fecha);
 	}
 
 	state.documents = approved;
@@ -951,7 +1004,8 @@ function setupRealTimeSync() {
 			key === STORAGE_KEYS.DOCUMENTOS_LISTA
 			|| key === STORAGE_KEYS.DOCUMENTOS_DETALLE
 			|| key.startsWith(`${STORAGE_KEYS.HISTORIAL_DATOS}_`)
-			|| key === "sigpro_approved_docs"  // ← AGREGAR ESTA LÍNEA
+			|| key === "sigpro_approved_docs"
+			|| key === "sigpro_expedientes_lista"  // ← AGREGAR ESTA LÍNEA
 		) {
 			void refreshRacioViewFromStorage(true);
 		}

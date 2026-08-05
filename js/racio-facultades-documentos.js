@@ -806,7 +806,7 @@ function applyFilters() {
 
     state.filteredDocuments.sort((a, b) => {
         if (state.sortBy === "newest") return b.date - a.date;
-        if (state.sortBy === "progress-desc") return b.progress - b.progress;
+        if (state.sortBy === "progress-desc") return b.progress - a.progress;
         if (state.sortBy === "progress-asc") return a.progress - b.progress;
         return a.date - b.date;
     });

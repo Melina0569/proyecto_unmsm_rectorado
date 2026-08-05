@@ -350,11 +350,45 @@ async function cargarExpedientes() {
         // Guardar en localStorage
         localStorage.setItem(STORAGE_KEYS.EXPEDIENTES_LISTA, JSON.stringify(expedientes));
 
+        sincronizarExpedientesADocumentosLista(expedientes);
+
         const desdeDocumentos = obtenerExpedientesDesdeDocumentos();
         expedientes = fusionarExpedientes(expedientes, desdeDocumentos);
     }
     
     renderizarExpedientes();
+}
+
+function sincronizarExpedientesADocumentosLista(expedientes) {
+	try {
+		const docsLista = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+		const existingCodes = new Set(docsLista.map(d => d.codigo));
+		
+		for (const exp of expedientes) {
+			if (!existingCodes.has(exp.codigo)) {
+				docsLista.unshift({
+					id: exp.id || exp.codigo,
+					codigo: exp.codigo,
+					tipo: exp.tipo || 'reporte',
+					estado: exp.estado || 'aprobado',
+					descripcion: exp.nombre || `Expediente ${exp.codigo}`,
+					nombre: exp.nombre || `Expediente ${exp.codigo}`,
+					fecha: exp.fechaAprobacion || new Date().toISOString().split('T')[0],
+					fechaAprobacion: exp.fechaAprobacion,
+					nombreFacultad: exp.responsable || 'UNMSM',
+					facultad: exp.responsable || 'UNMSM',
+					responsable: exp.responsable,
+					macroProceso: exp.macroProceso,
+					origen: 'expediente'
+				});
+				existingCodes.add(exp.codigo);
+			}
+		}
+		
+		localStorage.setItem('sigpro_documentos_lista', JSON.stringify(docsLista));
+	} catch (e) {
+		console.warn('Error sincronizando expedientes a documentos_lista:', e);
+	}
 }
 
 // ==========================================
