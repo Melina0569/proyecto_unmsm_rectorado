@@ -1359,3 +1359,366 @@ header nav a.border-primary {
     transform: translateY(0);
 }
 
+/* ==========================================
+   CORRECCIONES - Modo Oscuro & Botón Revisar
+   Añadir al final del archivo CSS existente
+   ========================================== */
+
+/* ------------------------------------------
+   1. BOTÓN "REVISAR" EN TABLA RECTIFICACIONES
+   ------------------------------------------ */
+.btn-revisar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    border: 1.5px solid #1e40af;
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(30, 64, 175, 0.35);
+    white-space: nowrap;
+}
+
+.btn-revisar:hover {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
+    box-shadow: 0 4px 16px rgba(30, 64, 175, 0.5);
+    transform: translateY(-1px);
+}
+
+.btn-revisar:active {
+    transform: translateY(0) scale(0.97);
+}
+
+.btn-revisar .material-symbols-outlined {
+    font-size: 1rem;
+}
+
+/* Modo oscuro */
+.dark .btn-revisar {
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+    border-color: #60a5fa;
+    color: #0f172a;
+    box-shadow: 0 2px 12px rgba(59, 130, 246, 0.45), 0 0 20px rgba(59, 130, 246, 0.15);
+}
+
+.dark .btn-revisar:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.6), 0 0 30px rgba(59, 130, 246, 0.25);
+}
+
+/* ------------------------------------------
+   2. TABLA RECTIFICACIONES - Modo Oscuro
+   ------------------------------------------ */
+.dark #rectificaciones-tabla-container,
+.dark #content-historial {
+    background: rgba(15, 23, 42, 0.85) !important;
+    border-color: rgba(96, 165, 250, 0.25) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(96, 165, 250, 0.1) !important;
+}
+
+.dark #rectificaciones-tabla-container:hover,
+.dark #content-historial:hover {
+    border-color: rgba(96, 165, 250, 0.4) !important;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(96, 165, 250, 0.15) !important;
+}
+
+.dark #rectificaciones-tabla-container table tbody tr,
+.dark #content-historial table tbody tr {
+    background: rgba(30, 41, 59, 0.7) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark #rectificaciones-tabla-container table tbody tr:hover,
+.dark #content-historial table tbody tr:hover {
+    background: rgba(51, 65, 85, 0.9) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dark #rectificaciones-tabla-container table tbody td,
+.dark #content-historial table tbody td {
+    color: #e2e8f0 !important;
+}
+
+.dark #rectificaciones-tabla-container table thead th,
+.dark #content-historial table thead th {
+    color: #94a3b8 !important;
+    background: rgba(30, 41, 59, 0.8) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ------------------------------------------
+   3. BADGES DE ESTADO - Enviado / Observado
+   ------------------------------------------ */
+.status-badge.enviado {
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.status-badge.observado {
+    background: #fffbeb;
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.dark .status-badge.enviado {
+    background: rgba(16, 185, 129, 0.15) !important;
+    color: #34d399 !important;
+    border-color: rgba(52, 211, 153, 0.3) !important;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+}
+
+.dark .status-badge.observado {
+    background: rgba(245, 158, 11, 0.15) !important;
+    color: #fbbf24 !important;
+    border-color: rgba(251, 191, 36, 0.3) !important;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+}
+
+.status-dot.enviado { background: #059669; }
+.status-dot.observado { background: #d97706; }
+.dark .status-dot.enviado { background: #34d399; box-shadow: 0 0 8px rgba(52, 211, 153, 0.6); }
+.dark .status-dot.observado { background: #fbbf24; box-shadow: 0 0 8px rgba(251, 191, 36, 0.6); }
+
+/* ------------------------------------------
+   4. PANEL DE DETALLE DE RECTIFICACIÓN
+   ------------------------------------------ */
+.dark #rectificaciones-detalle-panel {
+    background: rgba(15, 23, 42, 0.92) !important;
+    border-color: rgba(96, 165, 250, 0.2) !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dark #rectificaciones-detalle-panel:hover {
+    border-color: rgba(96, 165, 250, 0.4) !important;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.6) !important;
+}
+
+.dark #rectificaciones-detalle-panel .bg-white,
+.dark #rectificaciones-detalle-panel [class*="bg-white"] {
+    background: rgba(30, 41, 59, 0.8) !important;
+    border-color: rgba(96, 165, 250, 0.15) !important;
+}
+
+.dark #rectificaciones-detalle-panel .bg-white:hover,
+.dark #rectificaciones-detalle-panel [class*="bg-white"]:hover {
+    border-color: rgba(96, 165, 250, 0.35) !important;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.25) !important;
+}
+
+.dark #rectificaciones-detalle-panel,
+.dark #rectificaciones-detalle-panel p,
+.dark #rectificaciones-detalle-panel span:not(.material-symbols-outlined):not(.status-badge):not(.status-dot) {
+    color: #e2e8f0;
+}
+
+.dark #rectificaciones-detalle-panel h3,
+.dark #rectificaciones-detalle-panel h4 {
+    color: #f8fafc;
+}
+
+.dark #rectificaciones-detalle-panel .text-slate-500,
+.dark #rectificaciones-detalle-panel .text-slate-400 {
+    color: #94a3b8 !important;
+}
+
+/* ------------------------------------------
+   5. FORMULARIO DE RESPUESTA
+   ------------------------------------------ */
+.dark #formulario-respuesta {
+    background: rgba(15, 23, 42, 0.9) !important;
+    border-color: rgba(96, 165, 250, 0.2) !important;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark #formulario-respuesta:hover {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dark #formulario-respuesta textarea,
+.dark #formulario-respuesta input,
+.dark #formulario-respuesta select {
+    background: rgba(30, 41, 59, 0.8) !important;
+    border-color: rgba(96, 165, 250, 0.2) !important;
+    color: #e2e8f0 !important;
+}
+
+.dark #formulario-respuesta textarea::placeholder,
+.dark #formulario-respuesta input::placeholder {
+    color: #64748b !important;
+}
+
+/* ------------------------------------------
+   6. CAJA DETALLE (detalle-caja)
+   ------------------------------------------ */
+.dark .detalle-caja {
+    background: rgba(30, 41, 59, 0.8) !important;
+    border-color: rgba(96, 165, 250, 0.15) !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .detalle-caja:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* ------------------------------------------
+   7. DOCUMENTOS ADJUNTOS
+   ------------------------------------------ */
+.dark .documentos-adjuntos-panel,
+.dark [class*="documentos-adjuntos"] {
+    background: rgba(15, 23, 42, 0.9) !important;
+    border-color: rgba(96, 165, 250, 0.2) !important;
+}
+
+.dark .documentos-adjuntos-panel .text-slate-700,
+.dark .documentos-adjuntos-panel .text-slate-600,
+.dark [class*="documentos-adjuntos"] .text-slate-700,
+.dark [class*="documentos-adjuntos"] .text-slate-600 {
+    color: #e2e8f0 !important;
+}
+
+.dark .documentos-adjuntos-panel .text-slate-500,
+.dark [class*="documentos-adjuntos"] .text-slate-500 {
+    color: #94a3b8 !important;
+}
+
+.dark .doc-item,
+.dark [class*="doc-item"] {
+    background: rgba(30, 41, 59, 0.7) !important;
+    border-color: rgba(96, 165, 250, 0.1) !important;
+}
+
+.dark .doc-item:hover,
+.dark [class*="doc-item"]:hover {
+    background: rgba(51, 65, 85, 0.8) !important;
+    border-color: rgba(96, 165, 250, 0.25) !important;
+}
+
+/* ------------------------------------------
+   8. INFORMACIÓN TÉCNICA / FICHA
+   ------------------------------------------ */
+.dark .ficha-tecnica-card,
+.dark [class*="ficha-tecnica"] {
+    background: rgba(15, 23, 42, 0.9) !important;
+}
+
+.dark .ficha-tecnica-card .text-slate-800,
+.dark .ficha-tecnica-card .text-slate-700,
+.dark [class*="ficha-tecnica"] .text-slate-800,
+.dark [class*="ficha-tecnica"] .text-slate-700 {
+    color: #f1f5f9 !important;
+}
+
+.dark .ficha-tecnica-card .text-slate-500,
+.dark .ficha-tecnica-card .text-slate-400,
+.dark [class*="ficha-tecnica"] .text-slate-500,
+.dark [class*="ficha-tecnica"] .text-slate-400 {
+    color: #94a3b8 !important;
+}
+
+.dark .identificacion-grid-item,
+.dark [class*="identificacion"] [class*="bg-white"],
+.dark [class*="identificacion"] [class*="bg-slate-50"] {
+    background: rgba(30, 41, 59, 0.7) !important;
+    border-color: rgba(96, 165, 250, 0.15) !important;
+}
+
+/* ------------------------------------------
+   9. ENCABEZADO DE REPORTE (gradient-mesh)
+   ------------------------------------------ */
+.dark .gradient-mesh {
+    background-color: #0f172a;
+    background-image: 
+        radial-gradient(at 0% 0%, hsla(225, 70%, 35%, 1) 0, transparent 50%), 
+        radial-gradient(at 50% 0%, hsla(210, 60%, 30%, 1) 0, transparent 50%), 
+        radial-gradient(at 100% 0%, hsla(190, 70%, 25%, 1) 0, transparent 50%);
+}
+
+.dark .gradient-mesh h2,
+.dark .gradient-mesh .text-white {
+    color: #f8fafc !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.dark .gradient-mesh .text-white\/80,
+.dark .gradient-mesh .text-white\/70 {
+    color: rgba(226, 232, 240, 0.85) !important;
+}
+
+.dark .gradient-mesh .glass-card-detail {
+    background: rgba(15, 23, 42, 0.85) !important;
+    border-color: rgba(96, 165, 250, 0.2) !important;
+}
+
+.dark .gradient-mesh .glass-card-detail .text-slate-800,
+.dark .gradient-mesh .glass-card-detail .text-slate-700 {
+    color: #f1f5f9 !important;
+}
+
+.dark .gradient-mesh .glass-card-detail .text-slate-500,
+.dark .gradient-mesh .glass-card-detail .text-slate-400 {
+    color: #94a3b8 !important;
+}
+
+/* ------------------------------------------
+   10. TABS (DETALLES / RECTIFICACIONES)
+   ------------------------------------------ */
+.dark .tab-btn {
+    color: #94a3b8 !important;
+}
+
+.dark .tab-btn:hover {
+    color: #e2e8f0 !important;
+}
+
+.dark .tab-btn.active {
+    color: #60a5fa !important;
+    border-bottom-color: #60a5fa !important;
+}
+
+/* ------------------------------------------
+   11. PROGRESO Y ESTADOS
+   ------------------------------------------ */
+.dark .progress-bar {
+    background: rgba(30, 41, 59, 0.8) !important;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .estado-en-proceso {
+    color: #fbbf24 !important;
+}
+
+.dark .estado-activo {
+    color: #34d399 !important;
+}
+
+/* ------------------------------------------
+   12. FIXES GENERALES DE CONTRASTE OSCURO
+   ------------------------------------------ */
+.dark body {
+    background-color: #020617;
+}
+
+.dark main {
+    background-color: #020617;
+}
+
+.dark .text-slate-600 { color: #94a3b8 !important; }
+.dark .text-slate-700 { color: #cbd5e1 !important; }
+.dark .text-slate-800 { color: #e2e8f0 !important; }
+.dark .text-slate-900 { color: #f8fafc !important; }
+
+.dark .bg-slate-50 { background: rgba(30, 41, 59, 0.5) !important; }
+.dark .bg-slate-100 { background: rgba(30, 41, 59, 0.6) !important; }
+.dark .bg-slate-200 { background: rgba(51, 65, 85, 0.6) !important; }
+
+.dark .border-slate-200 { border-color: rgba(96, 165, 250, 0.15) !important; }
+.dark .border-slate-300 { border-color: rgba(96, 165, 250, 0.2) !important; }

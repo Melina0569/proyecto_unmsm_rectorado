@@ -1104,6 +1104,17 @@ function buildTechnicalInfoMarkup(doc) {
 	`;
 }
 
+function buildGenericDetailMarkup(doc) {
+    return `
+        <div class="detail-field detail-span-2"><p class="label">CÓDIGO</p><p class="value">${doc.codigo}</p></div>
+        <div class="detail-field detail-span-2"><p class="label">DESCRIPCIÓN</p><p class="value">${doc.descripcion}</p></div>
+        <div class="detail-field detail-span-1"><p class="label">FACULTAD</p><p class="value">${doc.facultad}</p></div>
+        <div class="detail-field detail-span-1"><p class="label">UNIDAD</p><p class="value">${doc.unidad}</p></div>
+        <div class="detail-field detail-span-1"><p class="label">TIPO</p><p class="value">${typeLabel(doc.tipo)}</p></div>
+        <div class="detail-field detail-span-1"><p class="label">ESTADO</p><p class="value">${doc.estado}</p></div>
+    `;
+}
+
 function renderDetail() {
 	const section = document.getElementById("detail-view");
 	if (!section) return;
@@ -1126,9 +1137,14 @@ function renderDetail() {
 
 	const detailBody = document.getElementById("detail-info-body");
 	if (detailBody) {
-		detailBody.classList.add("detail-info-body-grid");
-		detailBody.innerHTML = buildTechnicalInfoMarkup(doc);
-	}
+        detailBody.classList.add("detail-info-body-grid");
+        // Solo mostrar campos de indicador si realmente es un indicador
+        if (doc.tipo === 'indicador') {
+            detailBody.innerHTML = buildTechnicalInfoMarkup(doc);
+        } else {
+            detailBody.innerHTML = buildGenericDetailMarkup(doc);
+        }
+    }
 
 	const chartTitle = document.getElementById("detail-chart-title");
 	if (chartTitle) chartTitle.textContent = `Tendencia de Resultados - ${doc.codigo}`;

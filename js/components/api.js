@@ -3158,15 +3158,17 @@ window.registrarEnBandejaRacio = registrarEnBandejaRacio;
 
 (function setupFetchInterceptor() {
     const originalFetch = window.fetch;
-
-    // ✅ FUNCIÓN PÚBLICA: Hacer peticiones con auto-refresh
+    
     window.apiFetch = async function(url, options = {}) {
+        // Si estamos en modo remoto y el token está por expirar, renovarlo ANTES de la petición
+        if (CONFIG.MODE === 'remote' && RemoteAPI.auth.isTokenExpiringSoon?.(5)) {
+            console.log('🔄 Token expirando. Renovando...');
+            await RemoteAPI.auth.refresh().catch(() => {});
+        }
         return originalFetch.call(window, url, options);
     };
-
-    // ✅ REEMPLAZAR fetch global con el interceptor
-    window.fetch = window.apiFetch;
     
+    window.fetch = window.apiFetch;
     console.log('✅ Interceptor fetch con auto-refresh activado');
 })();
 

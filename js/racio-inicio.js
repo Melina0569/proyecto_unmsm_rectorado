@@ -872,7 +872,8 @@ async function loadApiDocuments() {
     }
 }
 
-function toRelativeTime(date) {
+
+/* function toRelativeTime(date) {
     if (!date || !(date instanceof Date)) return "--";
     
     const diffMs = Date.now() - date.getTime();
@@ -894,7 +895,7 @@ function toRelativeTime(date) {
         day: "2-digit",
         month: "short"
     }).format(date);
-}
+}  */
 
 async function loadAccessRequests() {
     let apiRequests = [];

@@ -138,27 +138,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     initEventListeners();
     initSorting();
     applyQueryDocId();
-
-    // Manejo de subida de archivo en formulario de respuesta de rectificación
-    const respFileInput = document.getElementById('resp-file-input');
-    if (respFileInput) {
-        respFileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                window.respuestaAdjuntoTemporal = {
-                    nombre: file.name,
-                    tipo: file.type,
-                    tamaño: file.size,
-                    fecha: new Date().toISOString(),
-                    contenido: event.target.result
-                };
-                showToast('Archivo listo para enviar', 'success');
-            };
-            reader.readAsDataURL(file);
-        });
-    }
+    initTabsNavegacion(); 
 
     // Agregar evento para el botón ENVIAR del formulario de respuesta
     const enviarBtn = document.querySelector('#formulario-respuesta button.bg-primary');
@@ -174,6 +154,18 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         }
 });
+
+function initTabsNavegacion() {
+    const tabHistorial = document.getElementById('tab-historial');
+    const tabRectificaciones = document.getElementById('tab-rectificaciones');
+    
+    if (tabHistorial) {
+        tabHistorial.addEventListener('click', () => mostrarTab('historial'));
+    }
+    if (tabRectificaciones) {
+        tabRectificaciones.addEventListener('click', () => mostrarTab('rectificaciones'));
+    }
+}
 
 function guardarAdjunto(detalle) {
     if (!window.archivoAdjuntoTemporal) {
@@ -566,8 +558,8 @@ async function loadDashboardData() {
                 backendId: backendId,  // ← Guardar explícitamente
                 fecha: createdAt ? createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
                 hora: createdAt 
-                    ? new Date(createdAt).toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit'}) + ' H'
-                    : '00:00 H',
+                    ? new Date(createdAt).toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit', hour12: true})
+                    : '12:00 a.m.',
                 codigo: doc.code || doc.codigo || doc.numeroExpediente || `DOC-${idx}`,
                 descripcion: doc.title || doc.nombre || doc.descripcion || doc.asunto || 'Documento',
                 generadoPor: doc.createdBy?.fullName || doc.createdBy?.email || doc.generadoPor || 'Facultad',
@@ -729,7 +721,7 @@ function loadMockData() {
         {
             id: 'doc-1',
             fecha: '2026-02-02',
-            hora: '10:30 H',
+            hora: '10:30 a.m.',
             codigo: 'PR-FM-26-01',
             descripcion: 'Proceso de matrícula 2026-I',
             generadoPor: 'Facultad',
@@ -741,7 +733,7 @@ function loadMockData() {
         {
             id: 'doc-2',
             fecha: '2026-02-02',
-            hora: '10:30 H',
+            hora: '10:30 a.m.',
             codigo: 'FL-FM-26-01',
             descripcion: 'Flujograma de admisión',
             generadoPor: 'Racionalización',
@@ -753,7 +745,7 @@ function loadMockData() {
         {
             id: 'doc-3',
             fecha: '2026-02-02',
-            hora: '10:30 H',
+            hora: '10:30 a.m.',
             codigo: 'IN-FM-26-01',
             descripcion: 'Indicador de graduación',
             generadoPor: 'Racionalización',
@@ -815,7 +807,16 @@ async function archivoAAdjunto(file) {
     });
 }
 
-// ✅ FUNCIÓN FALTANTE - Agregar esto:
+function applyFilters() {
+    if (currentFilter === 'todos') {
+        filteredDocuments = [...allDocuments];
+    } else {
+        filteredDocuments = allDocuments.filter(d => d.estado === currentFilter);
+    }
+    currentPage = 1;
+    updateStatsFromCurrentDocuments();
+    renderTable();
+}
 
 // ==========================================
 // ENVIAR RESPUESTA A OBSERVACIONES (CORREGIDO)
@@ -826,7 +827,6 @@ async function enviarRespuestaObservaciones() {
     const asunto = document.getElementById('resp-asunto')?.value.trim() || 'Respuesta a observaciones';
     const codigo = document.getElementById('detail-codigo')?.textContent;
     
-    // Validaciones
     if (!observaciones) {
         showToast('Por favor ingrese sus observaciones', 'warning');
         return;
@@ -836,31 +836,66 @@ async function enviarRespuestaObservaciones() {
         return;
     }
     
-    // 🔥 BUSCAR EL ID REAL DEL BACKEND (UUID)
     const doc = allDocuments.find(d => d.codigo === codigo);
-    let documentId = doc?.backendId || doc?.id;
+    let documentId = doc?.backendId || doc?.id || doc?.codigo;
     
-    // Validar que sea un UUID válido
-    const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    // Preparar adjunto: SIEMPRE usar IndexedDB, NUNCA base64 en localStorage
+    let attachmentRef = null;  // Solo metadata + referencia a IndexedDB
     
-    if (!isUUID(documentId)) {
-        console.error('❌ ID no es UUID válido:', documentId);
-        showToast('Error: Documento no tiene ID válido del servidor', 'error');
-        return;
-    }
-    
-    // Preparar attachments (nombres de archivos como strings)
-    let attachmentNames = [];
     if (window.archivoRespuestaActual) {
-        attachmentNames = [window.archivoRespuestaActual.name];
+        const file = window.archivoRespuestaActual;
+        
+        // Guardar en IndexedDB y obtener solo una referencia
+        try {
+            const db = await openAdjuntosIndexedDb();
+            const tx = db.transaction("adjuntos", "readwrite");
+            const store = tx.objectStore("adjuntos");
+            
+            // Key única por documento + timestamp
+            const storageKey = `resp_${codigo}_${Date.now()}`;
+            
+            await new Promise((resolve, reject) => {
+                const request = store.put({
+                    id: storageKey,
+                    codigo: codigo,
+                    name: file.name,
+                    nombre: file.name,
+                    type: file.type || file.tipo || 'application/octet-stream',
+                    size: file.size || file.tamaño || 0,
+                    // 🔥 Guardar contenido SOLO en IndexedDB, no en localStorage
+                    dataUrl: file.dataUrl || file.contenido || file.base64 || '',
+                    fecha: new Date().toISOString()
+                });
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+            
+            db.close();
+            
+            // Solo guardar la referencia ligera para localStorage
+            attachmentRef = {
+                name: file.name,
+                nombre: file.name,
+                type: file.type || file.tipo || 'application/octet-stream',
+                size: file.size || file.tamaño || 0,
+                indexedDbKey: storageKey,  // ← Referencia para recuperar
+                hasContent: true
+            };
+            
+            console.log('✅ Adjunto guardado en IndexedDB:', storageKey);
+        } catch (idbError) {
+            console.error('❌ IndexedDB falló:', idbError);
+            // Fallback: guardar metadata sin contenido
+            attachmentRef = {
+                name: file.name,
+                size: file.size || file.tamaño || 0,
+                indexedDbKey: null,
+                hasContent: false,
+                error: 'No se pudo almacenar el archivo localmente'
+            };
+            showToast('Advertencia: El archivo es muy grande y no se guardó localmente, pero se enviará a servidor si hay conexión', 'warning', 4000);
+        }
     }
-    
-    console.log('📤 Enviando respuesta:', {
-        documentId,
-        asunto,
-        observaciones: observaciones.substring(0, 50) + '...',
-        attachments: attachmentNames
-    });
     
     // Mostrar estado de carga
     const btnEnviar = document.querySelector('#formulario-respuesta button.bg-primary');
@@ -870,37 +905,113 @@ async function enviarRespuestaObservaciones() {
         btnEnviar.textContent = 'Enviando...';
     }
     
+    let apiSuccess = false;
+    let apiError = null;
+    
     try {
-        // 🔥 LLAMADA A API.JS — Token se maneja automáticamente, NO se expone
-        const result = await API.portal.responses.toObservations(
-            documentId,
-            asunto,
-            observaciones,
-            attachmentNames
-        );
+        // Intentar API si hay UUID válido
+        const esUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(documentId);
         
-        if (!result.success) {
-            throw new Error(result.error || `Error ${result.status}`);
+        if (esUUID && typeof API !== 'undefined' && API.portal?.responses?.toObservations) {
+            try {
+                const attachmentNames = attachmentRef ? [attachmentRef.name] : [];
+                const result = await API.portal.responses.toObservations(
+                    documentId,
+                    asunto,
+                    observaciones,
+                    attachmentNames
+                );
+                
+                if (result.success) {
+                    apiSuccess = true;
+                    console.log('✅ Respuesta enviada a API:', result.data);
+                } else {
+                    apiError = result.error || 'Error del servidor';
+                    console.warn('⚠️ API error:', apiError);
+                }
+            } catch (e) {
+                apiError = e.message;
+                console.warn('⚠️ API exception:', apiError);
+            }
+        } else {
+            console.log('ℹ️ Sin UUID válido para API, modo offline');
         }
         
-        // ✅ ÉXITO: Guardar en localStorage como backup/historial
+        // ==========================================
+        // GUARDAR EN LOCALSTORAGE (SOLO METADATA, NUNCA BASE64)
+        // ==========================================
         const correccion = {
             id: `resp_${Date.now()}`,
             codigoDocumento: codigo,
-            documentId: documentId,
+            documentId: doc?.backendId || doc?.id || codigo,
             fecha: new Date().toISOString(),
             asunto: asunto,
             observaciones: observaciones,
             estado: 'SUBSANADO',
             responsable: 'FACULTAD',
-            adjunto: window.respuestaAdjuntoTemporal || null
+            // 🔥 CRÍTICO: Solo guardar referencia ligera, NUNCA el base64 aquí
+            adjunto: attachmentRef,
+            adjuntos: attachmentRef ? [attachmentRef] : [],
+            apiSuccess: apiSuccess,
+            apiError: apiError
         };
         
-        let lista = JSON.parse(localStorage.getItem(STORAGE_KEYS.CORRECCIONES_LISTA)) || [];
-        lista.push(correccion);
-        localStorage.setItem(STORAGE_KEYS.CORRECCIONES_LISTA, JSON.stringify(lista));
+        // Guardar en clave de modo actual
+        let lista = [];
+        try {
+            const raw = localStorage.getItem(STORAGE_KEYS.CORRECCIONES_LISTA);
+            if (raw) lista = JSON.parse(raw);
+        } catch {}
+        if (!Array.isArray(lista)) lista = [];
         
-        showToast(result.data?.message || 'Respuesta enviada correctamente', 'success');
+        lista.push(correccion);
+        
+        // 🔥 Intentar guardar en localStorage (ahora es pequeño, debería caber)
+        try {
+            localStorage.setItem(STORAGE_KEYS.CORRECCIONES_LISTA, JSON.stringify(lista));
+        } catch (quotaError) {
+            // Si aún excede (muchos registros), eliminar adjuntos de los más antiguos
+            console.warn('⚠️ Cuota excedida, limpiando adjuntos antiguos...');
+            lista.forEach(item => {
+                if (item.adjunto && item.adjunto.dataUrl) {
+                    delete item.adjunto.dataUrl;
+                    delete item.adjunto.contenido;
+                    delete item.adjunto.base64;
+                }
+            });
+            localStorage.setItem(STORAGE_KEYS.CORRECCIONES_LISTA, JSON.stringify(lista));
+        }
+
+        // Guardar también en clave compartida
+        try {
+            const sharedKey = 'sigpro_correcciones_shared';
+            let sharedList = [];
+            const sharedRaw = localStorage.getItem(sharedKey);
+            if (sharedRaw) sharedList = JSON.parse(sharedRaw);
+            if (!Array.isArray(sharedList)) sharedList = [];
+            sharedList.push(correccion);
+            localStorage.setItem(sharedKey, JSON.stringify(sharedList));
+        } catch (e) {
+            console.warn('No se pudo guardar en clave compartida:', e);
+        }
+
+        // Actualizar estado del documento
+        const docIdx = allDocuments.findIndex(d => d.codigo === codigo);
+        if (docIdx !== -1) {
+            allDocuments[docIdx].estado = 'en_proceso';
+            allDocuments[docIdx].progreso = 50;
+            persistLocalDocuments();
+            applyFilters();
+        }
+        
+        // Mensaje final según resultado
+        if (apiSuccess) {
+            showToast('Respuesta enviada correctamente al servidor', 'success');
+        } else if (apiError) {
+            showToast(`Guardado localmente. Error servidor: ${apiError}`, 'warning', 5000);
+        } else {
+            showToast('Respuesta guardada localmente (sin conexión)', 'success');
+        }
         
         // Limpiar formulario
         document.getElementById('resp-observaciones').value = '';
@@ -910,15 +1021,24 @@ async function enviarRespuestaObservaciones() {
         const fileInput = document.getElementById('resp-file-input');
         if (fileInput) fileInput.value = '';
         
-        // Cerrar formulario y recargar
+        // Resetear UI
+        const fileNameDisplay = document.getElementById('resp-file-name');
+        if (fileNameDisplay) {
+            fileNameDisplay.innerHTML = `
+                <span class="text-slate-400 text-sm flex items-center gap-2">
+                    <span class="material-symbols-outlined text-base">upload_file</span>
+                    Sin archivo adjunto
+                </span>
+            `;
+        }
+        
         toggleFormularioRespuesta();
         cargarRectificaciones(codigo, document.getElementById('detail-estado')?.textContent);
         
     } catch (error) {
-        console.error('❌ Error enviando respuesta:', error);
+        console.error('❌ Error crítico:', error);
         showToast(`Error: ${error.message}`, 'error');
     } finally {
-        // Restaurar botón
         if (btnEnviar) {
             btnEnviar.disabled = false;
             btnEnviar.textContent = textoOriginal;
@@ -997,9 +1117,9 @@ function renderTable() {
     tbody.innerHTML = pageData.map(doc => `
         <tr class="group" data-id="${doc.id}">
             <td class="px-6 py-4">
-                <div class="flex flex-col">
+                <div class="flex flex-col gap-0.5">
                     <span class="text-sm font-semibold text-slate-900 dark:text-slate-200">${formatDate(doc.fecha)}</span>
-                    <span class="text-xs text-slate-500">${doc.hora}</span>
+                    <span class="text-xs text-slate-500">${formatTimeAMPM(doc.hora)}</span>
                 </div>
             </td>
             <td class="px-6 py-4">
@@ -1030,7 +1150,7 @@ function renderTable() {
                         <span class="material-symbols-outlined text-sm">visibility</span>
                         REVISAR
                     </button>
-                    ${doc.estado === 'pendiente' ? `
+                    ${(doc.estado === 'pendiente' || doc.estado === 'rechazado' || doc.estado === 'observado' || doc.estado === 'en_proceso' || doc.estado === 'completado') ? `
                         <button class="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-[11px] font-bold uppercase bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all"
                                 onclick="deleteDocument('${doc.id}')"
                                 title="Eliminar documento">
@@ -1047,8 +1167,43 @@ function renderTable() {
 }
 
 function formatDate(dateStr) {
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
+    if (!dateStr) return '--/--/----';
+    // Limpiar ISO string: 2026-08-07T19:02:29.679Z → 2026-08-07
+    const limpia = String(dateStr).split('T')[0];
+    const [year, month, day] = limpia.split('-');
+    if (year && month && day) {
+        return `${day}/${month}/${year}`;
+    }
+    return limpia;
+}
+
+function formatTimeAMPM(timeStr) {
+    if (!timeStr) return '--:--';
+    // Limpiar H al final y espacios extras
+    const str = String(timeStr).trim().replace(/\s*H$/i, '');
+    
+    // Extraer SIEMPRE la primera ocurrencia de HH:MM del string
+    const match = str.match(/(\d{1,2}):(\d{2})/);
+    if (!match) return str;
+    
+    let hour = parseInt(match[1], 10);
+    const minute = match[2];
+    
+    // Convertir a 12h con a.m./p.m. limpio
+    const ampm = hour >= 12 ? 'p.m.' : 'a.m.';
+    hour = hour % 12;
+    hour = hour ? hour : 12;
+    
+    return `${hour.toString().padStart(2, '0')}:${minute} ${ampm}`;
+}
+
+function sanitizeRelativeTime(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/\bHACE\s+\d+\s+(HORAS?|MINUTOS?|DÍAS?|SEMANAS?|MESES?|AÑOS?)\b/gi, '')
+        .replace(/\bhace\s+\d+\s+(horas?|minutos?|días?|semanas?|meses?|años?)\b/gi, '')
+        .replace(/\b(ayer|hoy|mañana|ahora|recientemente)\b/gi, '')
+        .trim();
 }
 
 function formatEstado(estado) {
@@ -1297,9 +1452,10 @@ window.deleteDocument = async function(docId) {
 
     // Solo PENDING puede eliminarse
     const estadoNormalizado = normalizeEstadoKey(doc.estado);
-    if (estadoNormalizado !== 'pendiente') {
+    const estadosPermitidos = ['pendiente', 'en_proceso', 'completado'];
+    if (!estadosPermitidos.includes(estadoNormalizado)) {
         showToast(
-            `No se puede eliminar: el documento está "${formatEstado(doc.estado)}". Solo PENDIENTES pueden eliminarse.`,
+            `No se puede eliminar: el documento está "${formatEstado(doc.estado)}".`,
             'warning', 4000
         );
         return;
@@ -1420,6 +1576,41 @@ function eliminarDelFrontend(doc) {
     if (doc.tipo === 'indicador') {
         localStorage.removeItem(`sigpro_historial_datos_${codigo}`);
     }
+
+    // ─── Limpiar correcciones y notificaciones asociadas al expediente ─────
+    console.log('🧹 Iniciando limpieza de correcciones para:', codigo);
+    
+    const correccionesClaves = [
+        STORAGE_KEYS.CORRECCIONES_LISTA,      // ej: local_sigpro_correcciones_solicitudes
+        'sigpro_correcciones_shared',
+        'sigpro_correcciones_solicitudes',
+        'local_sigpro_correcciones_solicitudes',
+        'remote_sigpro_correcciones_solicitudes'
+    ];
+    
+    for (const key of correccionesClaves) {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) continue;
+            
+            const list = JSON.parse(raw);
+            if (!Array.isArray(list)) continue;
+            
+            const filtrada = list.filter(item => {
+                const itemCodigo = String(item?.codigoDocumento || item?.codigo || "").trim();
+                return itemCodigo !== codigo;
+            });
+            
+            const eliminadas = list.length - filtrada.length;
+            if (eliminadas > 0) {
+                localStorage.setItem(key, JSON.stringify(filtrada));
+                console.log(`✅ ${eliminadas} corrección(es) eliminada(s) de ${key}`);
+            }
+        } catch (e) { 
+            console.error('❌ Error limpiando', key, e); 
+        }
+    }
+
     persistLocalDocuments();
     updateStatsFromCurrentDocuments();
     const maxPages = Math.max(1, Math.ceil(filteredDocuments.length / 10));
@@ -1456,8 +1647,8 @@ function loadLocalDocuments() {
                     id: doc.backendId || doc.apiId || doc.id || doc._id || `local-${doc.codigo || doc.code || index}`,
                     backendId: doc.backendId || doc.apiId || null,
                     // 🔥 FIX: soportar fecha en varios formatos
-                    fecha: fechaBase,
-                    hora: doc.hora || (fechaBase.includes('T') ? new Date(fechaBase).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H' : '00:00 H'),
+                    fecha: fechaBase.includes('T') ? fechaBase.split('T')[0] : fechaBase,
+                    hora: doc.hora ? formatTimeAMPM(doc.hora) : (fechaBase.includes('T') ? formatTimeAMPM(new Date(fechaBase).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true })) : '12:00 a.m.'),
                     createdAt: doc.createdAt || null,
                     fechaRegistro: doc.fechaRegistro || doc.createdAt || null,
                     // 🔥 FIX: soportar 'code' (usado por fichas) y 'codigo'
@@ -2377,9 +2568,10 @@ function showDetailView(detalle) {
     
     // Renderizar historial - Si es PENDIENTE, mostrar solo el primer registro
     const historialTbody = document.getElementById('detail-historial-tbody');
+        if (historialTbody) {
     const historial = Array.isArray(detalle.historial) ? detalle.historial : [];
     const historialAMostrar = normalizeEstadoKey(detalle.estado) === 'pendiente' ? historial.slice(0, 1) : historial;
-    
+
     historialTbody.innerHTML = historialAMostrar.map(h => {
             // Definir clases completas según el progreso
             const progressConfig = {
@@ -2416,6 +2608,8 @@ function showDetailView(detalle) {
                 </tr>
             `;
         }).join('');
+
+    }
     
     // ==========================================
     // AGREGAR AQUÍ: Cargar rectificaciones desde API
@@ -2467,7 +2661,7 @@ function showDetailView(detalle) {
             `;
         } else {
             adjuntosContainer.innerHTML = adjuntos.map((adj, idx) => `
-                <div class="grupo-adjunto group flex items-center justify-between p-4 ${adj.activo ? 'bg-primary/5 border border-primary/20' : 'border border-slate-100 dark:border-slate-800'} rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-all" data-adjunto-idx="${idx}" onclick="abrirPreviewPdf(${idx})">
+                <div class="grupo-adjunto group flex items-center justify-between p-4 ${adj.activo ? 'bg-primary/5 border border-primary/20' : 'border border-slate-100 dark:border-slate-800'} rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-all" data-adjunto-idx="${idx}" onclick="abrirPreviewPdf(${idx}, 'detalle')">
                     <div class="flex items-center gap-4">
                         <div class="w-10 h-10 ${adj.activo ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'} rounded-lg flex items-center justify-center">
                             <span class="material-symbols-outlined">${adj.icono}</span>
@@ -2502,6 +2696,7 @@ function escapeHtml(value) {
 // ==========================================
 
 let adjuntosActuales = [];
+let adjuntosRectificacionActuales = [];
 
 // Obtener el tipo MIME basado en la extensión del archivo
 function getMimeType(filename) {
@@ -2566,16 +2761,16 @@ function normalizarContenidoAdjunto(adjunto) {
     return source;
 }
 
-window.abrirPreviewPdf = async function(indiceAdjunto) {
-    console.log(`📁 Abriendo preview del adjunto índice:`, indiceAdjunto);
+window.abrirPreviewPdf = async function(indiceAdjunto, origen = 'detalle') {
+    const fuente = origen === 'rectificacion' ? adjuntosRectificacionActuales : adjuntosActuales;
 
-    if (!adjuntosActuales || indiceAdjunto >= adjuntosActuales.length) {
-        console.error('❌ Adjunto no encontrado. Length:', adjuntosActuales?.length);
+    if (!fuente || indiceAdjunto >= fuente.length) {
+        console.error('❌ Adjunto no encontrado. Length:', fuente?.length);
         showToast('No se pudo abrir el documento', 'error');
         return;
     }
 
-    const adjunto = adjuntosActuales[indiceAdjunto];
+    const adjunto = fuente[indiceAdjunto];
     const esTecnico = !!adjunto.generated || adjunto.generatedType === 'technical-pdf' || /ficha/i.test(String(adjunto.nombre || ''));
 
     try {
@@ -3323,9 +3518,9 @@ function getFileTypeFromName(name) {
 }
 
 // ==========================================
-// 🔥 FIX 1, 2, 3, 4: mapCorreccionRacioToRectificacion corregida
+// FIX: mapCorreccionRacioToRectificacion con recuperación de IndexedDB
 // ==========================================
-function mapCorreccionRacioToRectificacion(item) {
+async function mapCorreccionRacioToRectificacion(item) {
     // Buscar adjunto en TODAS las ubicaciones posibles
     let adjuntoRaw = item?.adjunto || (Array.isArray(item?.adjuntos) ? item.adjuntos[0] : null);
     
@@ -3339,63 +3534,64 @@ function mapCorreccionRacioToRectificacion(item) {
         adjuntoRaw = item.archivosEnviados[0];
     }
     
-    // 🔥 CRÍTICO: Extraer contenido de TODOS los campos posibles (inglés Y español)
+    // Extraer contenido de TODOS los campos posibles
     let rawContent = "";
-    const camposBuscar = [
-        'contenido', 'content',      // español + inglés
-        'base64', 'data',            // aliases
-        'url', 'ruta', 'src',        // URLs
-        'file', 'documento', 'archivo'  // otros
-    ];
+    const camposBuscar = ['contenido', 'content', 'base64', 'data', 'url', 'ruta', 'src', 
+                          'file', 'documento', 'archivo'];
     
-    // Buscar en adjuntoRaw
     if (adjuntoRaw && typeof adjuntoRaw === "object") {
         for (const campo of camposBuscar) {
             const valor = adjuntoRaw[campo];
             if (valor && typeof valor === "string" && valor.trim().length > 50) {
                 rawContent = valor.trim();
-                console.log(`✅ Contenido encontrado en campo: ${campo}`);
                 break;
             }
         }
     }
     
-    // Si no hay contenido, buscar directamente en item (por si acaso)
-    if (!rawContent) {
-        for (const campo of camposBuscar) {
-            const valor = item[campo];
-            if (valor && typeof valor === "string" && valor.trim().length > 50) {
-                rawContent = valor.trim();
-                console.log(`✅ Contenido encontrado en item.${campo}`);
-                break;
+    // 🔥 FIX CRÍTICO: Si no hay contenido pero hay indexedDbKey, recuperar de IndexedDB
+    if (!rawContent && adjuntoRaw?.indexedDbKey) {
+        try {
+            const db = await openAdjuntosIndexedDb();
+            const tx = db.transaction("adjuntos", "readonly");
+            const store = tx.objectStore("adjuntos");
+            const request = store.get(adjuntoRaw.indexedDbKey);
+            
+            const result = await new Promise((resolve, reject) => {
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+            
+            if (result?.dataUrl) {
+                rawContent = result.dataUrl;
+                console.log('✅ Recuperado de IndexedDB:', adjuntoRaw.indexedDbKey);
             }
+            db.close();
+        } catch (e) {
+            console.warn('⚠️ No se pudo recuperar de IndexedDB:', e);
         }
     }
 
-    // Extraer nombre (inglés o español)
     const fileName = adjuntoRaw?.name || adjuntoRaw?.nombre || item?.nombreArchivo || "Archivo adjunto";
-    
-    // Extraer tipo (inglés o español)
     const fileType = adjuntoRaw?.type || adjuntoRaw?.tipo || getFileTypeFromName(fileName);
-    
-    // Extraer tamaño (inglés o español)
     const fileSize = formatRectificacionSize(adjuntoRaw?.size || adjuntoRaw?.tamaño);
 
     // Normalizar a data URL si es base64 puro
     let normalizedUrl = rawContent;
-    
     if (rawContent) {
         const cleanedContent = rawContent.replace(/\s/g, "");
         
         if (!cleanedContent.startsWith("data:")) {
-            // Es base64 puro, agregar prefijo
             const isBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(cleanedContent) && cleanedContent.length > 100;
             if (isBase64) {
                 const ext = fileName.split(".").pop().toLowerCase();
                 const mimeMap = { 
                     pdf: "application/pdf", 
                     xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    xls: "application/vnd.ms-excel"
+                    xls: "application/vnd.ms-excel",
+                    jpg: "image/jpeg",
+                    jpeg: "image/jpeg",
+                    png: "image/png"
                 };
                 const mime = mimeMap[ext] || "application/octet-stream";
                 normalizedUrl = `data:${mime};base64,${cleanedContent}`;
@@ -3405,22 +3601,64 @@ function mapCorreccionRacioToRectificacion(item) {
         }
     }
 
-    console.log("🔍 mapCorreccion result:", {
-        fileName,
-        tieneContenido: !!normalizedUrl,
-        urlPreview: normalizedUrl ? normalizedUrl.substring(0, 80) + "..." : "VACÍO"
-    });
+    // 🔥 FIX: Mapear adjuntos del item a archivosEnviados para que se muestren en la UI
+    const archivosEnviadosMap = [];
+    const adjuntosArray = Array.isArray(item?.adjuntos) ? item.adjuntos : (item?.adjunto ? [item.adjunto] : []);
+    
+    for (const adj of adjuntosArray) {
+        if (!adj) continue;
+        let adjContent = "";
+        for (const campo of camposBuscar) {
+            if (adj[campo] && typeof adj[campo] === "string" && adj[campo].length > 50) {
+                adjContent = adj[campo];
+                break;
+            }
+        }
+        // Intentar recuperar de IndexedDB si aplica
+        if (!adjContent && adj.indexedDbKey) {
+            try {
+                const db = await openAdjuntosIndexedDb();
+                const tx = db.transaction("adjuntos", "readonly");
+                const store = tx.objectStore("adjuntos");
+                const req = store.get(adj.indexedDbKey);
+                const res = await new Promise((resolve, reject) => {
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+                if (res?.dataUrl) adjContent = res.dataUrl;
+                db.close();
+            } catch (e) {}
+        }
+        
+        // Normalizar
+        if (adjContent && !adjContent.startsWith('data:')) {
+            const cleaned = adjContent.replace(/\s/g, '');
+            if (/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) {
+                const ext = (adj.name || adj.nombre || 'pdf').split('.').pop().toLowerCase();
+                const mimeMap = { pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword' };
+                adjContent = `data:${mimeMap[ext] || 'application/octet-stream'};base64,${cleaned}`;
+            }
+        }
+        
+        archivosEnviadosMap.push({
+            nombre: adj.name || adj.nombre || 'Archivo',
+            tipo: adj.type || adj.tipo || 'PDF',
+            tamaño: formatRectificacionSize(adj.size || adj.tamaño),
+            contenido: adjContent,
+            url: adjContent
+        });
+    }
 
     return {
         id: item?.id || `corr_${Date.now()}`,
         fecha: formatRectificacionFecha(item?.fecha),
         observacion: item?.observaciones || item?.asunto || "Corrección solicitada",
-        estado: "OBSERVADO",
-        responsable: "RACIONALIZACIÓN",
+        estado: item?.estadoDestino === "en_proceso" ? "OBSERVADO" : (item?.estado || "OBSERVADO"),
+        responsable: item?.responsable || "RACIONALIZACIÓN",
         asunto: item?.asunto || "Solicitud de rectificación",
         descripcion: item?.observaciones || item?.asunto || "Corrección solicitada",
-        email: item?.correoInstitucional || "racionalizacion@unmsm.edu.pe",
-        documentos: [{
+        email: item?.correoInstitucional || item?.email || "racionalizacion@unmsm.edu.pe",
+        documentos: normalizedUrl ? [{
             nombre: fileName,
             tipo: fileType,
             tamaño: fileSize,
@@ -3429,38 +3667,72 @@ function mapCorreccionRacioToRectificacion(item) {
             url: normalizedUrl,
             path: normalizedUrl,
             raw: rawContent
-        }],
-        archivosEnviados: []
+        }] : [],
+        archivosEnviados: archivosEnviadosMap  // ← AHORA sí tiene los archivos enviados por la facultad
     };
 }
+
+// Al inicio del archivo, agrega esta clave compartida (sin prefijo de modo)
+const SHARED_KEYS = {
+    CORRECCIONES: 'sigpro_correcciones_shared'
+};
 
 // 🔥 FIX: cargarRectificacionesSincronizadas ahora es async
 async function cargarRectificacionesSincronizadas(expedienteId) {
     const codigo = String(expedienteId || "").trim();
     if (!codigo) return [];
 
-    const raw = localStorage.getItem(STORAGE_KEYS.CORRECCIONES_LISTA);
-    if (!raw) return [];
-
-    try {
-        const list = JSON.parse(raw);
-        if (!Array.isArray(list)) return [];
-
-        const filtered = list
-            .filter((item) => String(item?.codigo || "").trim() === codigo)
-            .sort((a, b) => new Date(b?.fecha || 0) - new Date(a?.fecha || 0));
-        
-        const result = [];
-        for (const item of filtered) {
-            result.push(await mapCorreccionRacioToRectificacion(item));
+    const clavesBuscar = [
+        STORAGE_KEYS.CORRECCIONES_LISTA,
+        'sigpro_correcciones_shared',
+        'sigpro_correcciones_solicitudes',
+        'local_sigpro_correcciones_solicitudes',
+        'remote_sigpro_correcciones_solicitudes'
+    ];
+    
+    let todasLasCorrecciones = [];
+    
+    for (const clave of clavesBuscar) {
+        const raw = localStorage.getItem(clave);
+        if (!raw) continue;
+        try {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+                console.log(`📦 Clave ${clave}: ${list.length} correcciones`);
+                todasLasCorrecciones = todasLasCorrecciones.concat(list);
+            }
+        } catch (e) { 
+            console.warn(`Error leyendo ${clave}:`, e); 
         }
-        return result;
-        
-    } catch (error) {
-        console.error("Error leyendo rectificaciones sincronizadas:", error);
-        return [];
     }
+    
+    // Deduplicar por id
+    const vistas = new Set();
+    const unicas = [];
+    for (const item of todasLasCorrecciones) {
+        const key = item?.id || `${item?.codigoDocumento || item?.codigo}-${item?.fecha}`;
+        if (!vistas.has(key)) {
+            vistas.add(key);
+            unicas.push(item);
+        }
+    }
+    
+    const filtered = unicas
+        .filter(item => {
+            const itemCodigo = String(item?.codigoDocumento || item?.codigo || "").trim();
+            return itemCodigo === codigo;
+        })
+        .sort((a, b) => new Date(b?.fecha || 0) - new Date(a?.fecha || 0));
+    
+    console.log(`🔍 Correcciones locales filtradas para ${codigo}:`, filtered.length);
+    
+    // 🔥 FIX: Usar Promise.all con map ya que mapCorreccionRacioToRectificacion ahora es async
+    const result = await Promise.all(
+        filtered.map(item => mapCorreccionRacioToRectificacion(item))
+    );
+    return result;
 }
+
 
 async function cargarRectificaciones(expedienteId, estadoExpediente) {
     const tbody = document.getElementById("rectificaciones-tbody");
@@ -3475,13 +3747,16 @@ async function cargarRectificaciones(expedienteId, estadoExpediente) {
         <p class="text-sm text-slate-500 mt-2">Cargando rectificaciones...</p>
     </td></tr>`;
     
+    if (empty) empty.classList.add('hidden');
+    
+    let rectificacionesApi = [];
+    let rectificacionesLocal = [];
+    let apiOk = false;
+    
+    // ========== PASO 1: Intentar API ==========
     try {
-        const token = localStorage.getItem('token');
-        
-        // ✅ NUEVO: Buscar el documento y obtener el mejor ID para API
         const docObj = allDocuments.find(d => d.codigo === expedienteId || d.id === expedienteId);
         
-        // ← NUEVO: Determinar el ID correcto para la API
         const isBackendId = (str) => {
             if (!str || typeof str !== 'string') return false;
             if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)) return true;
@@ -3491,64 +3766,107 @@ async function cargarRectificaciones(expedienteId, estadoExpediente) {
             return false;
         };
         
-        let idReal = docObj?.backendId; // ← PRIORIDAD 1: backendId (UUID real)
-        let idSource = 'backendId';
-        
-        if (!idReal) {
-            idReal = docObj?.id;
-            idSource = 'id';
-        }
-        
-        // Si no es UUID válido, usar código como fallback
-        if (!isBackendId(idReal)) {
-            console.warn(`⚠️ ${idSource}=${idReal} no es UUID, usando código como fallback`);
-            idReal = docObj?.codigo || expedienteId;
-            idSource = 'codigo';
-        }
-        
-        console.log(`📋 getHistory: ID=${idReal} (source=${idSource}, backendId=${docObj?.backendId}, id=${docObj?.id}, código=${expedienteId})`);
+        let searchId = docObj?.backendId || docObj?.id || expedienteId;
+        if (!isBackendId(searchId)) searchId = expedienteId;
 
-        const rectResult = await API.portal.documents.getHistory(idReal);
+        const rectResult = await API.portal.documents.getHistory(searchId);
         
-        if (rectResult.success && rectResult.data) {
+        if (rectResult?.success && rectResult.data) {
             const data = rectResult.data;
-
-            rectificaciones = (data.rectifications || data.data || []).map(r => ({
-                id: r.id || r._id,
-                fecha: formatRectificacionFecha(r.createdAt || r.fecha),
-                observacion: r.observaciones || r.observacion || r.asunto || 'Corrección solicitada',
-                estado: r.status || r.estado || 'OBSERVADO',
-                responsable: r.createdBy?.fullName || r.responsable || r.createdBy?.role || 'RACIONALIZACIÓN',
-                asunto: r.asunto || r.title || 'Solicitud de rectificación',
-                descripcion: r.descripcion || r.observaciones || r.observacion,
-                email: r.email || r.correo || r.createdBy?.email || 'racionalizacion@unmsm.edu.pe',
-                documentos: (r.documentos || r.attachments || r.adjuntos || []).map(d => ({
-                    nombre: d.nombre || d.name || d.filename || 'Documento',
-                    tipo: d.tipo || d.type || 'PDF',
-                    tamaño: formatRectificacionSize(d.tamaño || d.size),
-                    estado: d.estado || d.status || 'por_corregir',
-                    contenido: d.url || d.contenido || d.path || ''
-                })),
-                archivosEnviados: (r.archivosEnviados || r.sentAttachments || []).map(a => ({
-                    nombre: a.nombre || a.name || a.filename,
-                    tipo: a.tipo || a.type || 'PDF',
-                    tamaño: formatRectificacionSize(a.tamaño || a.size)
-                }))
-            }));
-        } else {
-            // Fallback a localStorage
-            rectificaciones = await cargarRectificacionesSincronizadas(expedienteId);
+            const rawList = data.rectifications || data.data || [];
+            if (rawList.length > 0) {
+                rectificacionesApi = rawList.map(r => ({
+                    id: r.id || r._id || `rect-${Date.now()}-${Math.random()}`,
+                    fecha: formatRectificacionFecha(r.createdAt || r.fecha),
+                    observacion: r.observaciones || r.observacion || r.asunto || 'Corrección solicitada',
+                    estado: r.status || r.estado || 'OBSERVADO',
+                    responsable: r.createdBy?.fullName || r.responsable || 'RACIONALIZACIÓN',
+                    asunto: r.asunto || r.title || 'Solicitud de rectificación',
+                    descripcion: r.descripcion || r.observaciones || r.observacion,
+                    email: r.email || r.correo || r.correoInstitucional || 'racionalizacion@unmsm.edu.pe',
+                    documentos: (r.documentos || r.attachments || r.adjuntos || []).map(d => ({
+                        nombre: d.nombre || d.name || d.filename || 'Documento',
+                        tipo: d.tipo || d.type || d.extension?.toUpperCase() || 'PDF',
+                        tamaño: formatRectificacionSize(d.tamaño || d.size || d.tamano),
+                        estado: d.estado || d.status || 'por_corregir',
+                        contenido: d.url || d.contenido || d.path || d.content || d.base64 || d.data || ''
+                    })),
+                    archivosEnviados: (r.archivosEnviados || []).map(a => ({
+                        nombre: a.nombre || a.name,
+                        tipo: a.tipo || a.type || 'PDF',
+                        tamaño: formatRectificacionSize(a.tamaño || a.size)
+                    }))
+                }));
+                apiOk = true;
+            }
         }
-        
-        rectificacionesActuales = rectificaciones;
-        // ... resto del renderizado (igual que tienes ahora)
-        
     } catch (error) {
-        console.error('Error:', error);
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-red-500">
-            Error al cargar rectificaciones.
-        </td></tr>`;
+        console.warn('API rectificaciones falló, usando localStorage:', error.message);
     }
+    
+    // ========== PASO 2: Siempre cargar locales (fallback + merge) ==========
+    rectificacionesLocal = await cargarRectificacionesSincronizadas(expedienteId);
+    
+    // ========== PASO 3: Mergear por ID (local complementa a API) ==========
+    const map = new Map();
+    rectificacionesApi.forEach(r => map.set(r.id, r));
+    rectificacionesLocal.forEach(r => map.set(r.id, r)); // local tiene prioridad si mismo ID
+    
+    rectificacionesActuales = Array.from(map.values())
+        .sort((a, b) => {
+            const fa = a.fecha?.split('\n')[0] || a.fecha || '';
+            const fb = b.fecha?.split('\n')[0] || b.fecha || '';
+            return new Date(fb) - new Date(fa);
+        });
+    
+    // ========== PASO 4: Actualizar UI ==========
+    if (countBadge) {
+        countBadge.textContent = rectificacionesActuales.length;
+        countBadge.classList.toggle('hidden', rectificacionesActuales.length === 0);
+    }
+    if (badgeTab) {
+        badgeTab.textContent = rectificacionesActuales.length;
+        badgeTab.classList.toggle('hidden', rectificacionesActuales.length === 0);
+    }
+    
+    if (rectificacionesActuales.length === 0) {
+        tbody.innerHTML = '';
+        if (empty) empty.classList.remove('hidden');
+        return;
+    }
+    
+    if (empty) empty.classList.add('hidden');
+    
+    tbody.innerHTML = rectificacionesActuales.map((rect, idx) => {
+        const isSubsanado = rect.estado === 'SUBSANADO' || rect.estado === 'RESUELTO' || rect.estado === 'COMPLETED';
+        const estadoClass = isSubsanado
+            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+        const estadoText = isSubsanado ? 'ENVIADO' : 'OBSERVADO';
+        
+        return `
+            <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
+                onclick="revisarRectificacion(${idx})">
+                <td class="px-6 py-4 text-xs font-medium text-slate-500 whitespace-pre-line">${rect.fecha}</td>
+                <td class="px-6 py-4">
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${estadoClass}">
+                        ${estadoText}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300 max-w-xs">
+                    <p class="truncate font-medium" title="${escapeHtml(rect.asunto || rect.observacion)}">${escapeHtml(rect.asunto || rect.observacion)}</p>
+                </td>
+                <td class="px-6 py-4 text-xs font-bold text-slate-500">${escapeHtml(rect.responsable)}</td>
+                <td class="px-6 py-4 text-center">
+                    <button class="btn-revisar"
+                            onclick="event.stopPropagation(); revisarRectificacion(${idx})">
+                        <span class="material-symbols-outlined text-sm">visibility</span>
+                        Revisar
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 // Simular carga de API (eliminar cuando esté la API real)
@@ -3662,7 +3980,7 @@ function simularCargaRectificaciones(expedienteId) {
 // ==========================================
 // 🔥 FIX 5 & 6: revisarRectificacion corregida
 // ==========================================
-function revisarRectificacion(index) {
+async function revisarRectificacion(index) {
     const rect = rectificacionesActuales[index];
     if (!rect) {
         console.error('❌ No se encontró rectificación en índice:', index);
@@ -3713,7 +4031,7 @@ function revisarRectificacion(index) {
 
         if (rect.estado === 'SUBSANADO') {
             btnResponder.disabled = true;
-            btnResponder.innerHTML = '<span class="material-symbols-outlined text-lg">check</span> SUBSANADO';
+            btnResponder.innerHTML = '<span class="material-symbols-outlined text-lg">check</span> ENVIADO';
         } else {
             btnResponder.disabled = false;
             btnResponder.innerHTML = '<span class="material-symbols-outlined text-lg">reply</span> RESPONDER';
@@ -3723,41 +4041,52 @@ function revisarRectificacion(index) {
     // ==========================================
     // 🔥 FIX 5: Función helper para extraer contenido de cualquier objeto
     // ==========================================
-    function extraerContenido(obj) {
+    async function extraerContenidoCompleto(obj) {
         if (!obj || typeof obj !== 'object') return '';
         
         const camposBuscar = ['contenido', 'url', 'path', 'raw', 'dataUrl', 'src', 
-                              'file', 'documento', 'archivo', 'base64', 'data', 'content'];
+                            'file', 'documento', 'archivo', 'base64', 'data', 'content'];
         
         for (const campo of camposBuscar) {
             const valor = obj[campo];
             if (valor && typeof valor === 'string') {
                 const limpio = valor.trim();
-                // Aceptar data URLs o base64 con longitud mínima
-                if (limpio.startsWith('data:') && limpio.length > 200) {
-                    return limpio;
-                }
+                if (limpio.startsWith('data:') && limpio.length > 200) return limpio;
                 if (limpio.length > 100) {
-                    // Intentar normalizar si es base64 puro
                     const cleaned = limpio.replace(/\s/g, '');
                     if (/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) {
                         const ext = (obj.nombre || 'archivo.pdf').split('.').pop().toLowerCase();
-                        const mimeMap = { pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+                        const mimeMap = { pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword' };
                         return `data:${mimeMap[ext] || 'application/octet-stream'};base64,${cleaned}`;
                     }
                     return limpio;
                 }
             }
         }
+        
+        // 🔥 FIX: Recuperar de IndexedDB si hay indexedDbKey
+        if (obj.indexedDbKey) {
+            try {
+                const db = await openAdjuntosIndexedDb();
+                const tx = db.transaction("adjuntos", "readonly");
+                const store = tx.objectStore("adjuntos");
+                const req = store.get(obj.indexedDbKey);
+                const res = await new Promise((resolve, reject) => {
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+                db.close();
+                if (res?.dataUrl) return res.dataUrl;
+            } catch (e) {
+                console.warn('Error recuperando de IndexedDB:', e);
+            }
+        }
+        
         return '';
     }
 
-    // ==========================================
-    // PREPARAR ARCHIVOS ENVIADOS
-    // ==========================================
-    const archivosEnviados = (rect.archivosEnviados || []).map((arch, idx) => {
-        const contenido = extraerContenido(arch);
-        
+    const archivosEnviados = await Promise.all((rect.archivosEnviados || []).map(async (arch, idx) => {
+        const contenido = await extraerContenidoCompleto(arch);
         return {
             nombre: arch.nombre || arch.name || 'Archivo',
             tipo: arch.tipo || arch.type || 'PDF',
@@ -3770,19 +4099,16 @@ function revisarRectificacion(index) {
             path: contenido,
             raw: contenido
         };
-    });
+    }));
 
     // ==========================================
     // PREPARAR DOCUMENTOS EN CORRECCIÓN
     // ==========================================
-    const docsEnCorreccion = (rect.documentos || []).map((doc, idx) => {
-        let contenido = extraerContenido(doc);
-        
-        // Si no hay contenido en el doc, buscar en la rectificación completa
+    const docsEnCorreccion = await Promise.all((rect.documentos || []).map(async (doc, idx) => {
+        let contenido = await extraerContenidoCompleto(doc);
         if (!contenido) {
-            contenido = extraerContenido(rect);
+            contenido = await extraerContenidoCompleto(rect);
         }
-
         return {
             nombre: doc.nombre || doc.name || 'Documento',
             tipo: doc.tipo || doc.type || 'PDF',
@@ -3795,10 +4121,10 @@ function revisarRectificacion(index) {
             path: contenido,
             raw: contenido
         };
-    });
+    }));
 
     // Combinar arrays para la vista previa
-    adjuntosActuales = [...archivosEnviados, ...docsEnCorreccion];
+    adjuntosRectificacionActuales = [...archivosEnviados, ...docsEnCorreccion];
 
     // 🔥 FIX 6: Debug - Log para verificar qué adjuntos tienen contenido
     console.log('🔍 Adjuntos preparados para preview:', adjuntosActuales.map((a, i) => ({
@@ -3821,7 +4147,7 @@ function revisarRectificacion(index) {
             const tieneContenido = !!(adjuntoReal.contenido && adjuntoReal.contenido.length > 100);
 
             return `
-            <div onclick="abrirPreviewPdf(${offsetArchivos + idx})" 
+            <div onclick="abrirPreviewPdf(${offsetArchivos + idx}, 'rectificacion')"
                 class="group flex items-center justify-between p-4 ${doc.estado === 'por_corregir' ? 'bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30' : 'border border-slate-100 dark:border-slate-700'} rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
                 <div class="flex items-center gap-4">
                     <div class="w-10 h-10 ${doc.estado === 'por_corregir' ? 'bg-red-500' : 'bg-green-500'} text-white rounded-lg flex items-center justify-center ${doc.estado === 'por_corregir' ? 'shadow-md shadow-red-200' : ''}">
@@ -3868,7 +4194,7 @@ function revisarRectificacion(index) {
                     }
                 }
                 return `
-                <div onclick="abrirPreviewPdf(${idx})" 
+                <div onclick="abrirPreviewPdf(${idx}, 'rectificacion')" 
                     class="w-32 h-32 border-2 border-dashed ${tieneContenido ? 'border-slate-200 dark:border-slate-700' : 'border-amber-200 dark:border-amber-800'} rounded-xl flex flex-col items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer group overflow-hidden">
                     ${previewHtml || `<span class=\"material-symbols-outlined ${tieneContenido ? 'text-slate-400' : 'text-amber-400'} text-3xl group-hover:text-amber-600 transition-colors\">description</span>`}
                     <span class="text-[10px] font-bold ${tieneContenido ? 'text-slate-400' : 'text-amber-500'} text-center px-2 truncate w-full">${escapeHtml(arch.nombre)}</span>
@@ -4385,7 +4711,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Restaurar texto del botón
             if (btnResponder) {
                 if (btnResponder.disabled) {
-                    btnResponder.innerHTML = '<span class="material-symbols-outlined text-lg">check</span> SUBSANADO';
+                    btnResponder.innerHTML = '<span class="material-symbols-outlined text-lg">check</span> ENVIADO';
                 } else {
                     btnResponder.innerHTML = '<span class="material-symbols-outlined text-lg">reply</span> RESPONDER';
                 }
@@ -4447,109 +4773,121 @@ document.addEventListener('DOMContentLoaded', async function() {
     inicializarGestorArchivosRespuesta();
     let archivoRespuestaActual = null;
 
-function inicializarGestorArchivosRespuesta() {
-    const fileInput = document.getElementById('resp-file-input');
-    const fileNameDisplay = document.getElementById('resp-file-name');
-    const filePreview = document.getElementById('resp-file-preview');
-    const btnRemoveFile = document.getElementById('resp-file-remove');
-    
-    if (!fileInput) {
-        console.warn('⚠️ No se encontró #resp-file-input');
-        return;
-    }
-
-    fileInput.addEventListener('change', function(e) {
-        const file = e.target.files?.[0];
-        if (!file) {
-            archivoRespuestaActual = null;
-            actualizarUIArchivo(null);
-            return;
-        }
-
-        const tiposPermitidos = [
-            'application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-excel'
-        ];
-        const extensionesPermitidas = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'xlsx', 'xls'];
-        const extension = file.name.split('.').pop().toLowerCase();
+        function inicializarGestorArchivosRespuesta() {
+        const fileInput = document.getElementById('resp-file-input');
+        const fileNameDisplay = document.getElementById('resp-file-name');
+        const filePreview = document.getElementById('resp-file-preview');
+        const btnRemoveFile = document.getElementById('resp-file-remove');
         
-        if (!tiposPermitidos.includes(file.type) && !extensionesPermitidas.includes(extension)) {
-            showToast('Tipo de archivo no permitido. Use: PDF, JPG, PNG, GIF, WEBP, XLSX', 'error');
-            fileInput.value = '';
-            archivoRespuestaActual = null;
-            actualizarUIArchivo(null);
+        if (!fileInput) {
+            console.warn('⚠️ No se encontró #resp-file-input');
             return;
         }
 
-        const MAX_SIZE = 10 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-            showToast(`Archivo muy grande (${(file.size / 1024 / 1024).toFixed(1)} MB). Máximo: 10 MB`, 'error');
-            fileInput.value = '';
-            archivoRespuestaActual = null;
-            actualizarUIArchivo(null);
-            return;
-        }
+        window.archivoRespuestaActual = null;
 
-        archivoRespuestaActual = file;
-        actualizarUIArchivo(file);
-    });
+        fileInput.addEventListener('change', async function(e) {
+            const file = e.target.files?.[0];
+            if (!file) {
+                window.archivoRespuestaActual = null;
+                actualizarUIArchivo(null);
+                return;
+            }
 
-    if (btnRemoveFile) {
-        btnRemoveFile.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            fileInput.value = '';
-            archivoRespuestaActual = null;
-            actualizarUIArchivo(null);
+            // Validar tipo
+            const extensionesPermitidas = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'xlsx', 'xls', 'doc', 'docx'];
+            const extension = file.name.split('.').pop().toLowerCase();
+            
+            if (!extensionesPermitidas.includes(extension)) {
+                showToast('Tipo no permitido. Use: PDF, JPG, PNG, XLSX, DOCX', 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            // Validar tamaño (máx 15MB para IndexedDB)
+            const MAX_SIZE = 15 * 1024 * 1024;
+            if (file.size > MAX_SIZE) {
+                showToast(`Máximo 15 MB. Tu archivo: ${(file.size/1024/1024).toFixed(1)} MB`, 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            // Leer como base64 para envío inmediato y guardar en memoria
+            try {
+                const dataUrl = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                window.archivoRespuestaActual = {
+                    name: file.name,
+                    nombre: file.name,
+                    type: file.type,
+                    tipo: file.type,
+                    size: file.size,
+                    tamaño: file.size,
+                    dataUrl: dataUrl,      // ← En memoria para envío API
+                    contenido: dataUrl,
+                    base64: dataUrl,
+                    fecha: new Date().toISOString()
+                };
+                
+                window.respuestaAdjuntoTemporal = window.archivoRespuestaActual;
+                actualizarUIArchivo(file);
+                showToast('Archivo listo. Se guardará al enviar.', 'success');
+                
+            } catch (err) {
+                showToast('Error leyendo archivo', 'error');
+                window.archivoRespuestaActual = null;
+            }
         });
-    }
 
-    function actualizarUIArchivo(file) {
-        if (!fileNameDisplay) return;
-        
-        if (!file) {
+        if (btnRemoveFile) {
+            btnRemoveFile.addEventListener('click', function(e) {
+                e.preventDefault();
+                fileInput.value = '';
+                window.archivoRespuestaActual = null;
+                window.respuestaAdjuntoTemporal = null;
+                actualizarUIArchivo(null);
+            });
+        }
+
+        function actualizarUIArchivo(file) {
+            if (!fileNameDisplay) return;
+            
+            if (!file) {
+                fileNameDisplay.innerHTML = `
+                    <span class="text-slate-400 text-sm flex items-center gap-2">
+                        <span class="material-symbols-outlined text-base">upload_file</span>
+                        Sin archivo adjunto
+                    </span>
+                `;
+                if (filePreview) filePreview.classList.add('hidden');
+                if (btnRemoveFile) btnRemoveFile.classList.add('hidden');
+                return;
+            }
+
+            const sizeFormatted = file.size >= 1024 * 1024 
+                ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
+                : `${Math.round(file.size / 1024)} KB`;
+
+            const icono = file.type?.startsWith('image/') ? 'image' : 
+                        file.type === 'application/pdf' ? 'picture_as_pdf' :
+                        file.type?.includes('excel') || file.type?.includes('sheet') ? 'table_chart' : 'description';
+
             fileNameDisplay.innerHTML = `
-                <span class="text-slate-400 text-sm flex items-center gap-2">
-                    <span class="material-symbols-outlined text-base">upload_file</span>
-                    Sin archivo adjunto
-                </span>
-            `;
-            if (filePreview) filePreview.classList.add('hidden');
-            if (btnRemoveFile) btnRemoveFile.classList.add('hidden');
-            return;
-        }
-
-        const sizeFormatted = file.size >= 1024 * 1024 
-            ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
-            : `${Math.round(file.size / 1024)} KB`;
-
-        const icono = file.type.startsWith('image/') ? 'image' : 
-                     file.type === 'application/pdf' ? 'picture_as_pdf' :
-                     file.type.includes('excel') || file.type.includes('sheet') ? 'table_chart' : 'description';
-
-        fileNameDisplay.innerHTML = `
-            <div class="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span class="material-symbols-outlined text-primary text-xl">${icono}</span>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">${escapeHtml(file.name)}</p>
-                    <p class="text-xs text-slate-500">${escapeHtml(file.type || extension.toUpperCase())} • ${sizeFormatted}</p>
+                <div class="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span class="material-symbols-outlined text-primary text-xl">${icono}</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">${escapeHtml(file.name)}</p>
+                        <p class="text-xs text-slate-500">${escapeHtml(extension.toUpperCase())} • ${sizeFormatted}</p>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
 
-        if (filePreview && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                filePreview.innerHTML = `<img src="${e.target.result}" alt="Preview" class="max-h-48 rounded-lg border border-slate-200 object-contain" />`;
-                filePreview.classList.remove('hidden');
-            };
-            reader.readAsDataURL(file);
-        } else if (filePreview) {
-            filePreview.classList.add('hidden');
+            if (btnRemoveFile) btnRemoveFile.classList.remove('hidden');
         }
-
-        if (btnRemoveFile) btnRemoveFile.classList.remove('hidden');
-    }
     }
     });

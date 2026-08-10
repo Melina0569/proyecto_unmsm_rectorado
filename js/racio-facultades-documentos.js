@@ -469,7 +469,10 @@ async function loadApiDocuments(facultyId = "", faculties = state.faculties) {
     // ESTRATEGIA 1: Filtro específico facultyId + apiStatus
     // ESTE es el único endpoint que funciona sin 500
     // ═══════════════════════════════════════════════════════════
-    if (facultyId && facultyId !== "all" && state.apiStatus && state.apiStatus !== "all") {
+    if (state.apiStatus && state.apiStatus !== "all") {
+        const fid = facultyId && facultyId !== "all" ? facultyId : "";
+        console.log(`🔄 /admin/documents?facultyId=${fid || '(todas)'}&status=${state.apiStatus}`);
+        const result = await API.admin.documents.getFiltered(fid, state.apiStatus, 1, 100);
         try {
             console.log(`🔄 /admin/documents?facultyId=${facultyId}&status=${state.apiStatus}`);
             const result = await API.admin.documents.getFiltered(facultyId, state.apiStatus, 1, 100);

@@ -390,7 +390,6 @@
                         <div class="glass-card-detail rounded-xl p-5 shadow-sm">
                             <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Actualización</p>
                             <p class="text-xl font-black text-slate-900 dark:text-white" id="detail-fecha">--</p>
-                            <p class="text-blue-600 text-[10px] mt-2 font-bold">HACE 2 HORAS</p>
                         </div>
                         <div class="glass-card-detail rounded-xl p-5 shadow-sm">
                             <div class="flex justify-between items-start mb-2">
@@ -409,33 +408,12 @@
             <!-- Tab Navigation -->
             <div class="flex items-center gap-8 mb-6 border-b border-slate-200 dark:border-slate-700 px-2">
                 <button id="tab-historial" onclick="mostrarTab('historial')" class="py-3 px-1 text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition-all relative">
-                    HISTORIAL
+                    DETALLES
                 </button>
                 <button id="tab-rectificaciones" onclick="mostrarTab('rectificaciones')" class="py-3 px-1 text-sm font-bold text-slate-400 hover:text-slate-600 border-b-2 border-transparent transition-all">
                     RECTIFICACIONES
                     <span id="badge-rectificaciones" class="hidden ml-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full">3</span>
                 </button>
-            </div>
-
-            <!-- HISTORIAL TABLE (visible by default) -->
-            <div id="content-historial" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mb-8">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-slate-50 dark:bg-slate-700/50">
-                            <tr>
-                                <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">FECHA</th>
-                                <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">PROGRESO</th>
-                                <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">ESTADO</th>
-                                <th class="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">GENERADO POR</th>
-                                <th class="px-6 py-4 text-center">
-                                    <div class="text-[10px] font-black text-slate-500 uppercase tracking-widest">ARCHIVOS</div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-700" id="detail-historial-tbody">
-                        </tbody>
-                    </table>
-                </div>
             </div>
 
             <!-- RECTIFICACIONES TABLE (hidden by default) -->
@@ -527,12 +505,6 @@
                                             Seleccione una rectificación para ver los detalles.
                                         </div>
                                     </div>
-                                    <div>
-                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">ARCHIVOS ENVIADOS</label>
-                                        <div id="rect-detalle-archivos" class="flex gap-4 flex-wrap">
-                                            <!-- Se carga dinámicamente -->
-                                        </div>
-                                    </div>
                                     <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl p-4 flex items-center gap-3 shadow-lg shadow-blue-200/40 dark:shadow-blue-900/40 ring-1 ring-blue-100 dark:ring-blue-900/40">
                                         <span class="material-symbols-outlined text-blue-600">mail</span>
                                         <p class="text-xs text-slate-600 dark:text-slate-400">
@@ -595,7 +567,9 @@
             </div>
            
 
-            <!-- SECCIÓN DE DOCUMENTOS - Oculta inicialmente -->
+            <!-- CONTENIDO: DETALLES (tab activo por defecto) -->
+            <div id="content-historial">
+                <!-- SECCIÓN DE DOCUMENTOS -->
                 <div id="seccion-documentos" class="hidden">
                     <div class="grid grid-cols-12 gap-6">
                         <!-- Panel lateral de documentos -->
@@ -649,6 +623,7 @@
                         </div>
                     </div>
                 </div>
+            </div>
         </div>
 
     </main>

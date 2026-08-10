@@ -393,6 +393,8 @@ function calcularContadoresDesdeLocalStorage() {
         pendientes, enProceso, completados, totalUnicos: procesados.size
     });
 
+    window._sigproDocumentosCodes = procesados;
+
     return {
         pendingCount: pendientes,
         inProgressCount: enProceso,
@@ -426,13 +428,79 @@ function normalizarEstado(estado) {
 
 let notificacionesData = [];
 
+// ==========================================
+// PERSISTENCIA: IDs de notificaciones leídas (modo offline)
+// ==========================================
+const NOTIF_LEIDAS_KEY = 'sigpro_notificaciones_leidas';
+
+function getNotificacionesLeidas() {
+    try {
+        const raw = localStorage.getItem(NOTIF_LEIDAS_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? new Set(arr) : new Set();
+    } catch (e) {
+        return new Set();
+    }
+}
+
+function guardarNotificacionLeida(id) {
+    const set = getNotificacionesLeidas();
+    set.add(id);
+    localStorage.setItem(NOTIF_LEIDAS_KEY, JSON.stringify(Array.from(set)));
+}
+
+function esNotificacionLeida(id) {
+    return getNotificacionesLeidas().has(id);
+}
+
+// ==========================================
+// FILTRO: Solo notificaciones enviadas por Racionalización
+// ==========================================
+function esNotificacionDeRacio(notif) {
+    // 1) Detectar si es explícitamente una respuesta de la facultad
+    const responsable = String(notif.responsable || notif.generadoPor || '').toLowerCase().trim();
+    if (responsable === 'facultad') return false;
+
+    const remitente = String(
+        notif.from || notif.sender || notif.creadoPor ||
+        notif.createdBy?.fullName || notif.createdBy?.email ||
+        notif.author || ''
+    ).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Si el remitente explícito es facultad, descartar
+    if (remitente.includes('facultad')) return false;
+
+    // Si el remitente explícito es racio/admin, incluir
+    if (remitente.includes('racionalizacion') || remitente.includes('racio') ||
+        remitente.includes('admin') || remitente.includes('sistema') ||
+        remitente.includes('ogp')) {
+        return true;
+    }
+
+    // Si responsable explícito es racio/admin, incluir
+    if (responsable.includes('racionalizacion') || responsable.includes('racio') ||
+        responsable.includes('admin') || responsable.includes('sistema')) {
+        return true;
+    }
+
+    // Si no hay remitente definido pero es una corrección/observación del sistema,
+    // y NO está marcada como facultad, asumimos que viene de Racionalización
+    const tipo = String(notif.type || '').toUpperCase();
+    if (!responsable && !remitente &&
+        (tipo === 'CORRECTION' || tipo === 'APPROVAL' || tipo === 'REJECTION')) {
+        return true;
+    }
+
+    return false;
+}
+
 async function cargarNotificacionesDashboard() {
     const tbody = document.getElementById('notifications-tbody');
     const empty = document.getElementById('notif-empty');
     const badge = document.getElementById('notif-badge-header');
-    
+
     if (!tbody) return;
-    
+
     tbody.innerHTML = `
         <tr id="notif-loading">
             <td colspan="5" class="text-center py-8 text-slate-400">
@@ -442,59 +510,198 @@ async function cargarNotificacionesDashboard() {
         </tr>
     `;
     if (empty) empty.classList.add('hidden');
-    
+
+    let notificaciones = [];
+    let apiOk = false;
+
+    // 1) Intentar API
     try {
         const resultado = await API.portal.notifications.getAll('UNREAD', 10);
-        
-        let notificaciones = [];
-        
+        console.log('🔍 API notificaciones raw:', resultado);
+
         if (resultado.success && Array.isArray(resultado.data)) {
             notificaciones = resultado.data;
+            apiOk = true;
+            console.log('✅ Notificaciones desde API (array directo):', notificaciones.length);
+        } else if (resultado.success && resultado.data && Array.isArray(resultado.data.notifications)) {
+            // Formato alternativo: { data: { notifications: [...] } }
+            notificaciones = resultado.data.notifications;
+            apiOk = true;
+            console.log('✅ Notificaciones desde API (nested):', notificaciones.length);
         } else {
-            console.warn('Fallback a READ por error en UNREAD');
-            const fallback = await API.portal.notifications.getAll('READ', 50);
-            if (fallback.success && Array.isArray(fallback.data)) {
-                notificaciones = fallback.data.filter(n => 
-                    n.status === 'UNREAD' || n.read === false
-                );
-            }
+            console.warn('⚠️ API respondió pero sin array válido:', resultado);
         }
-        
-        notificacionesData = notificaciones;
-        
-        const noLeidas = notificaciones.filter(n => n.status === 'UNREAD' || !n.read);
-        if (badge) {
-            if (noLeidas.length > 0) {
-                badge.textContent = noLeidas.length > 9 ? '9+' : noLeidas.length;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
-        }
-        
-        const loading = document.getElementById('notif-loading');
-        if (loading) loading.remove();
-        
-        if (notificaciones.length === 0) {
-            tbody.innerHTML = '';
-            if (empty) empty.classList.remove('hidden');
-            return;
-        }
-        
-        renderizarNotificacionesTabla(notificaciones, tbody);
-        
-    } catch (error) {
-        console.error('Error cargando notificaciones:', error);
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="text-center py-8 text-amber-500">
-                    <span class="material-symbols-outlined text-2xl">warning</span>
-                    <p class="text-sm mt-2">No se pudieron cargar las notificaciones</p>
-                    <p class="text-xs text-slate-400">Error: ${error.message}</p>
-                </td>
-            </tr>
-        `;
+    } catch (e) {
+        console.warn('API notificaciones falló:', e);
     }
+
+    // 2) Fallback si la API no devolvió nada
+    if (!apiOk || notificaciones.length === 0) {
+        console.log('🔄 Fallback a localStorage...');
+        notificaciones = generarNotificacionesDesdeCorrecciones();
+    }
+
+    // 3) 🔥 FILTRAR: solo las que envió Racionalización (API + fallback)
+    const notificacionesRacio = notificaciones.filter(n => esNotificacionDeRacio(n));
+    console.log('📊 Notificaciones de RACIO finales:', notificacionesRacio.length);
+
+    notificacionesData = notificacionesRacio;
+
+    // 4) Badge
+    const noLeidas = notificacionesRacio.filter(n => n.status === 'UNREAD' || !n.read);
+    if (badge) {
+        if (noLeidas.length > 0) {
+            badge.textContent = noLeidas.length > 9 ? '9+' : noLeidas.length;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    // 5) Renderizar
+    const loading = document.getElementById('notif-loading');
+    if (loading) loading.remove();
+
+    if (notificacionesRacio.length === 0) {
+        tbody.innerHTML = '';
+        if (empty) empty.classList.remove('hidden');
+        return;
+    }
+
+    if (empty) empty.classList.add('hidden');
+    renderizarNotificacionesTabla(notificacionesRacio, tbody);
+}
+
+// 🔥 NUEVA FUNCIÓN: Crear notificaciones desde correcciones locales
+function generarNotificacionesDesdeCorrecciones() {
+    const claves = [
+        'sigpro_correcciones_shared',
+        'sigpro_correcciones_solicitudes',
+        'local_sigpro_correcciones_solicitudes',
+        'remote_sigpro_correcciones_solicitudes',
+        'sigpro_correcciones',
+        'sigpro_observaciones',
+        'local_sigpro_observaciones',
+        'remote_sigpro_observaciones'
+    ];
+
+    let correcciones = [];
+    for (const clave of claves) {
+        const raw = localStorage.getItem(clave);
+        if (!raw) continue;
+        try {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) correcciones = correcciones.concat(list);
+        } catch (e) {}
+    }
+
+    console.log('📦 Correcciones totales en localStorage:', correcciones.length);
+
+    // Deduplicar
+    const vistas = new Set();
+    const unicas = [];
+    for (const c of correcciones) {
+        const key = c.id || `${c.codigoDocumento || c.codigo}-${c.fecha}`;
+        if (!vistas.has(key)) {
+            vistas.add(key);
+            unicas.push(c);
+        }
+    }
+
+    // Construir set de documentos existentes
+    const docsExistentes = new Set();
+    if (window._sigproDocumentosCodes && window._sigproDocumentosCodes.size > 0) {
+        window._sigproDocumentosCodes.forEach(c => docsExistentes.add(c));
+    }
+
+    const docClaves = [
+        'sigpro_documentos_lista',
+        'local_sigpro_documentos_lista',
+        'remote_sigpro_documentos_lista',
+        'sigpro_reportes',
+        'sigpro_user_documents',
+        'local_sigpro_user_documents'
+    ];
+    for (const dk of docClaves) {
+        try {
+            const raw = localStorage.getItem(dk);
+            if (!raw) continue;
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+                list.forEach(d => docsExistentes.add(String(d.codigo || d.code || '').trim()));
+            }
+        } catch (e) {}
+    }
+
+    console.log('📋 Documentos existentes encontrados:', docsExistentes.size);
+
+    // Filtrar por documento existente
+    const debeFiltrarPorDoc = docsExistentes.size > 0;
+    let correccionesValidas = unicas.filter(c => {
+        const codigo = String(c.codigoDocumento || c.codigo || '').trim();
+        if (!codigo) return false;
+        if (!debeFiltrarPorDoc) return true;
+        return docsExistentes.has(codigo);
+    });
+
+    console.log('✅ Correcciones con documento existente:', correccionesValidas.length);
+
+    // 🔥 FIX PRINCIPAL: Excluir explícitamente las respuestas de la facultad.
+    // Cuando la facultad responde, se guarda con responsable: 'FACULTAD'.
+    // Cuando Racionalización envía, responsable suele ser '', 'RACIONALIZACIÓN' o similar.
+    const correccionesRacio = correccionesValidas.filter(c => {
+        const resp = String(c.responsable || c.generadoPor || '').toLowerCase().trim();
+        const from = String(c.from || c.sender || c.creadoPor || '').toLowerCase();
+
+        // EXCLUIR: respuestas/envíos hechos por la facultad
+        if (resp === 'facultad') {
+            console.log('  - Excluida (respuesta de facultad):', c.codigoDocumento || c.codigo);
+            return false;
+        }
+        if (from.includes('facultad')) {
+            console.log('  - Excluida (from/sender facultad):', c.codigoDocumento || c.codigo);
+            return false;
+        }
+
+        // INCLUIR: todo lo demás (racionalización, admin, vacío, etc.)
+        return true;
+    });
+
+    console.log('🔍 Correcciones de RACIO (sin facultad):', correccionesRacio.length);
+
+    // Limpiar correcciones huérfanas
+    for (const clave of claves) {
+        try {
+            const raw = localStorage.getItem(clave);
+            if (!raw) continue;
+            const list = JSON.parse(raw);
+            if (!Array.isArray(list)) continue;
+            const limpia = list.filter(item => {
+                const cod = String(item?.codigoDocumento || item?.codigo || '').trim();
+                return !cod || docsExistentes.has(cod);
+            });
+            if (limpia.length !== list.length) {
+                localStorage.setItem(clave, JSON.stringify(limpia));
+            }
+        } catch (e) {}
+    }
+
+    return correccionesRacio.map((c, i) => ({
+        id: c.id || `notif-local-${i}`,
+        type: 'CORRECTION',
+        message: c.asunto || c.observaciones || c.message || 'Nueva corrección de Racionalización',
+        status: 'UNREAD',
+        read: false,
+        createdAt: c.fecha || new Date().toISOString(),
+        documentCode: c.codigoDocumento || c.codigo,
+        documentId: c.documentId || c.codigoDocumento || c.codigo,
+        // Mostrar siempre como remitente a Racionalización, ya que filtramos las de facultad arriba
+        responsable: (() => {
+            const r = String(c.responsable || c.generadoPor || '').trim();
+            if (!r || r.toLowerCase() === 'facultad') return 'Racionalización';
+            return r;
+        })()
+    })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
 function renderizarNotificacionesTabla(notificaciones, tbody) {
@@ -503,7 +710,7 @@ function renderizarNotificacionesTabla(notificaciones, tbody) {
         const fechaFormateada = formatearFechaNotif(fecha);
         const tipo = n.type || n.tipo || 'INFO';
         const mensaje = n.message || n.mensaje || n.title || n.asunto || 'Sin mensaje';
-        const estaLeida = n.status === 'READ' || n.read === true;
+        const estaLeida = n.status === 'READ' || n.read === true || esNotificacionLeida(n.id);
         
         const tipoConfig = {
             'CORRECTION': { icono: 'edit_note', color: 'text-amber-600', bg: 'bg-amber-50', label: 'Corrección' },
@@ -539,16 +746,19 @@ function renderizarNotificacionesTabla(notificaciones, tbody) {
                     </span>
                 </td>
                 <td class="py-4 px-4 text-center rounded-r-xl">
-                    ${!estaLeida ? `
-                        <button class="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors" 
-                                onclick="marcarNotificacionLeida('${n.id}')" title="Marcar como leída">
-                            <span class="material-symbols-outlined text-lg">check</span>
+                    <div class="flex items-center justify-center gap-2">
+                        ${!estaLeida ? `
+                            <button class="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors" 
+                                    onclick="marcarNotificacionLeida('${n.id}')" title="Marcar como leída">
+                                <span class="material-symbols-outlined text-lg">check</span>
+                            </button>
+                        ` : ''}
+                        <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all" 
+                                onclick="verNotificacionDetalle('${n.id}')" title="Revisar documento">
+                            <span class="material-symbols-outlined text-sm">visibility</span>
+                            Revisar
                         </button>
-                    ` : ''}
-                    <button class="p-2 rounded-lg text-accent hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors" 
-                            onclick="verNotificacionDetalle('${n.id}')" title="Ver detalle">
-                        <span class="material-symbols-outlined text-lg">visibility</span>
-                    </button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -573,13 +783,49 @@ function formatearFechaNotif(fechaStr) {
 }
 
 async function marcarNotificacionLeida(id) {
-    try {
-        await API.portal.notifications.updateStatus(id, 'READ');
-        showToast('Notificación marcada como leída', 'success');
-        cargarNotificacionesDashboard();
-    } catch (error) {
-        console.error('Error:', error);
-        showToast('Error al marcar como leída', 'error');
+    let apiOk = false;
+
+    // 1) Intentar API (solo si el ID parece real, no local)
+    if (!String(id).startsWith('notif-local-') && typeof API !== 'undefined') {
+        try {
+            await API.portal.notifications.updateStatus(id, 'READ');
+            apiOk = true;
+            showToast('Notificación marcada como leída', 'success');
+        } catch (error) {
+            console.warn('API marcar leída falló, usando localStorage:', error.message);
+        }
+    }
+
+    // 2) Fallback: persistir en localStorage y actualizar UI inmediatamente
+    guardarNotificacionLeida(id);
+
+    // Actualizar en memoria
+    const notif = notificacionesData.find(n => n.id === id);
+    if (notif) {
+        notif.status = 'READ';
+        notif.read = true;
+    }
+
+    // Re-renderizar solo la tabla (más rápido que recargar todo)
+    const tbody = document.getElementById('notifications-tbody');
+    if (tbody) {
+        renderizarNotificacionesTabla(notificacionesData, tbody);
+    }
+
+    // Actualizar badge
+    const badge = document.getElementById('notif-badge-header');
+    const noLeidas = notificacionesData.filter(n => n.status === 'UNREAD' || !n.read);
+    if (badge) {
+        if (noLeidas.length > 0) {
+            badge.textContent = noLeidas.length > 9 ? '9+' : noLeidas.length;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    if (!apiOk) {
+        showToast('Marcada como leída (local)', 'success');
     }
 }
 
@@ -589,17 +835,37 @@ async function marcarTodasNotifLeidas() {
         showToast('No hay notificaciones pendientes', 'info');
         return;
     }
-    
-    try {
-        for (const n of noLeidas) {
-            await API.portal.notifications.updateStatus(n.id, 'READ');
+
+    let apiOk = true;
+
+    // 1) Intentar API para las que tienen ID real
+    for (const n of noLeidas) {
+        if (!String(n.id).startsWith('notif-local-') && typeof API !== 'undefined') {
+            try {
+                await API.portal.notifications.updateStatus(n.id, 'READ');
+            } catch (e) {
+                apiOk = false;
+            }
         }
-        showToast(`${noLeidas.length} notificaciones marcadas como leídas`, 'success');
-        cargarNotificacionesDashboard();
-    } catch (error) {
-        console.error('Error:', error);
-        showToast('Error al marcar notificaciones', 'error');
     }
+
+    // 2) Marcar todas como leídas en localStorage
+    for (const n of noLeidas) {
+        guardarNotificacionLeida(n.id);
+        n.status = 'READ';
+        n.read = true;
+    }
+
+    // 3) Re-renderizar
+    const tbody = document.getElementById('notifications-tbody');
+    if (tbody) {
+        renderizarNotificacionesTabla(notificacionesData, tbody);
+    }
+
+    const badge = document.getElementById('notif-badge-header');
+    if (badge) badge.classList.add('hidden');
+
+    showToast(`${noLeidas.length} notificaciones marcadas como leídas`, 'success');
 }
 
 function verNotificacionDetalle(id) {
