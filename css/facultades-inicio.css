@@ -960,3 +960,104 @@ footer .tracking-widest {
     transform: scale(1.15);
 }
 
+/* ==========================================
+   NOTIFICACIONES DE RACIONALIZACIÓN - DARK MODE
+   Añadir al final de facultades-inicio.css
+   ========================================== */
+
+/* ---------- Badge "Corrección" (columna TIPO) ---------- */
+.dark .glass-card td:nth-child(2) .bg-amber-50 {
+    background: rgba(245, 158, 11, 0.15) !important;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+}
+
+.dark .glass-card td:nth-child(2) .text-amber-600 {
+    color: #fbbf24 !important;
+}
+
+.dark .glass-card td:nth-child(2) .material-symbols-outlined {
+    color: #fbbf24 !important;
+}
+
+/* ---------- Badge "No leída" (columna ESTADO) ---------- */
+.dark .glass-card td:nth-child(4) .bg-amber-50 {
+    background: rgba(245, 158, 11, 0.15) !important;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+}
+
+.dark .glass-card td:nth-child(4) .text-amber-600 {
+    color: #fbbf24 !important;
+}
+
+/* Dot ámbar del badge "No leída" */
+.dark .glass-card td:nth-child(4) .bg-amber-500 {
+    background: #fbbf24 !important;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}
+
+/* ---------- Badge "Leída" (columna ESTADO) ---------- */
+.dark .glass-card td:nth-child(4) .bg-slate-100 {
+    background: rgba(100, 116, 139, 0.2) !important;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.dark .glass-card td:nth-child(4) .text-slate-400 {
+    color: #94a3b8 !important;
+}
+
+.dark .glass-card td:nth-child(4) .text-slate-400 .material-symbols-outlined {
+    color: #94a3b8 !important;
+}
+
+/* ---------- Botón "REVISAR" (modo oscuro) ---------- */
+.dark .glass-card td:last-child button.bg-blue-50 {
+    background: linear-gradient(135deg, #2563eb 0%, #232e41 100%) !important;
+    border-color: #3b82f6 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 12px rgba(59, 130, 246, 0.4), 0 0 20px rgba(59, 130, 246, 0.15);
+}
+
+.dark .glass-card td:last-child button.bg-blue-50:hover {
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%) !important;
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.6), 0 0 30px rgba(59, 130, 246, 0.25);
+    transform: translateY(-1px);
+}
+
+.dark .glass-card td:last-child button.bg-blue-50 .material-symbols-outlined {
+    color: #ffffff !important;
+}
+
+/* ---------- Botón check "Marcar como leída" ---------- */
+.dark .glass-card td:last-child button.text-blue-600 {
+    color: #60a5fa !important;
+}
+
+.dark .glass-card td:last-child button.text-blue-600:hover {
+    background: rgba(59, 130, 246, 0.15) !important;
+}
+
+/* ---------- Link "Marcar todas leídas" ---------- */
+.dark .glass-card button.text-primary.dark\:text-blue-300 {
+    color: #60a5fa !important;
+}
+
+.dark .glass-card button.text-primary.dark\:text-blue-300:hover {
+    color: #93c5fd !important;
+}
+
+/* ---------- Badge rojo del header ---------- */
+.dark #notif-badge-header {
+    background: rgba(239, 68, 68, 0.9) !important;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+/* ---------- Filas leídas (opacidad en dark) ---------- */
+.dark .glass-card tbody tr.opacity-60 {
+    opacity: 0.45 !important;
+}
+
+.dark .glass-card tbody tr.opacity-60:hover {
+    opacity: 0.75 !important;
+}

@@ -1,4 +1,23 @@
 /* ==========================================
+   FIX: Fondo oscuro igual a facultades-inicio
+   ========================================== */
+
+/* Modo claro: igual que inicio */
+body {
+    background-color: #ffffff; /* blanco puro, igual que facultades-inicio */
+}
+
+/* Modo oscuro: slate-900 exacto, igual que inicio */
+.dark body {
+    background-color: #0f172a !important; /* slate-900 */
+}
+
+/* Asegurar que main no tape el fondo */
+.dark main {
+    background-color: transparent !important;
+}
+
+/* ==========================================
    SIGPRO - Document Management Dashboard
    Stylesheet Unificado
    ========================================== */
@@ -1703,13 +1722,7 @@ header nav a.border-primary {
 /* ------------------------------------------
    12. FIXES GENERALES DE CONTRASTE OSCURO
    ------------------------------------------ */
-.dark body {
-    background-color: #020617;
-}
 
-.dark main {
-    background-color: #020617;
-}
 
 .dark .text-slate-600 { color: #94a3b8 !important; }
 .dark .text-slate-700 { color: #cbd5e1 !important; }
@@ -1722,3 +1735,463 @@ header nav a.border-primary {
 
 .dark .border-slate-200 { border-color: rgba(96, 165, 250, 0.15) !important; }
 .dark .border-slate-300 { border-color: rgba(96, 165, 250, 0.2) !important; }
+
+/* ==========================================
+   BOTÓN ELIMINAR - Versión Claro / Oscuro
+   ========================================== */
+
+.btn-eliminar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.6875rem; /* 11px */
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #dc2626;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-eliminar:hover {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+    transform: scale(1.05);
+}
+
+.btn-eliminar:active {
+    transform: scale(0.95);
+}
+
+.btn-eliminar .material-symbols-outlined {
+    font-size: 0.875rem; /* 14px */
+}
+
+/* ---------- MODO OSCURO ---------- */
+.dark .btn-eliminar {
+    background: rgba(220, 38, 38, 0.15);
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.3);
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
+}
+
+.dark .btn-eliminar:hover {
+    background: #ef4444;
+    color: #ffffff;
+    border-color: #ef4444;
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5), 0 0 20px rgba(239, 68, 68, 0.15);
+}
+
+/* ==========================================
+   FIX: text-primary en Modo Oscuro
+   ========================================== */
+
+.dark .text-primary {
+    color: #60a5fa !important;
+}
+
+/* Refuerzo específico para códigos en tabla */
+.dark .glass-card table tbody td .font-mono.text-primary,
+.dark .glass-card table tbody td .font-mono {
+    color: #60a5fa !important;
+}
+
+/* ==========================================
+   DARK MODE - VISTA DETALLE DE EXPEDIENTE
+   ========================================== */
+
+/* Fondo gradiente del header de detalle */
+.dark .gradient-mesh {
+    background-color: #0f172a;
+    background-image: 
+        radial-gradient(at 0% 0%, hsla(225, 70%, 35%, 1) 0, transparent 50%), 
+        radial-gradient(at 50% 0%, hsla(210, 60%, 30%, 1) 0, transparent 50%), 
+        radial-gradient(at 100% 0%, hsla(190, 70%, 25%, 1) 0, transparent 50%);
+}
+
+.dark .gradient-mesh h2,
+.dark .gradient-mesh .text-white {
+    color: #f8fafc !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.dark .gradient-mesh .text-white\/80,
+.dark .gradient-mesh .text-white\/70 {
+    color: rgba(226, 232, 240, 0.85) !important;
+}
+
+/* Breadcrumb en dark */
+.dark .gradient-mesh nav a,
+.dark .gradient-mesh nav span {
+    color: rgba(226, 232, 240, 0.7) !important;
+}
+
+.dark .gradient-mesh nav span.font-medium {
+    color: #f8fafc !important;
+}
+
+/* Cards de información (CÓDIGO, ASUNTO, ESTADO, etc.) */
+.dark .glass-card-detail {
+    background: rgba(30, 41, 59, 0.95) !important;
+    border-color: rgba(96, 165, 250, 0.2) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .glass-card-detail:hover {
+    border-color: rgba(96, 165, 250, 0.35) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Labels de las cards (CÓDIGO, ASUNTO, ESTADO, ACTUALIZACIÓN, PROGRESO) */
+.dark .glass-card-detail .text-slate-500 {
+    color: #94a3b8 !important;
+}
+
+/* Valores de las cards */
+.dark .glass-card-detail .text-blue-700 {
+    color: #60a5fa !important;
+}
+
+.dark .glass-card-detail .text-slate-900 {
+    color: #f1f5f9 !important;
+}
+
+.dark .glass-card-detail .text-amber-600 {
+    color: #fbbf24 !important;
+}
+
+/* Badge ACTIVO */
+.dark .glass-card-detail .bg-green-50 {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border: 1px solid rgba(52, 211, 153, 0.3) !important;
+}
+
+.dark .glass-card-detail .text-green-600 {
+    color: #34d399 !important;
+}
+
+.dark .glass-card-detail .text-green-600 .material-symbols-outlined {
+    color: #34d399 !important;
+}
+
+/* Subestado / descripción pequeña */
+.dark .glass-card-detail .text-slate-400 {
+    color: #94a3b8 !important;
+}
+
+.dark .glass-card-detail #detail-subestado {
+    color: #94a3b8 !important;
+}
+
+/* Barra de progreso en dark */
+.dark .glass-card-detail .bg-slate-200 {
+    background: rgba(51, 65, 85, 0.8) !important;
+}
+
+.dark .glass-card-detail .bg-blue-700 {
+    background: #3b82f6 !important;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+
+.dark #detail-progreso-text {
+    color: #60a5fa !important;
+}
+
+.dark #detail-etapa {
+    color: #94a3b8 !important;
+}
+
+/* Botón Descargar PDF (fallback por si no usas las clases dark: en HTML) */
+.dark #btn-descargar-reporte {
+    background: rgba(30, 41, 59, 0.95) !important;
+    color: #60a5fa !important;
+    border-color: rgba(96, 165, 250, 0.3) !important;
+}
+
+.dark #btn-descargar-reporte:hover {
+    background: rgba(51, 65, 85, 0.9) !important;
+    border-color: rgba(96, 165, 250, 0.5) !important;
+}
+
+.dark #btn-descargar-reporte .material-symbols-outlined {
+    color: #60a5fa !important;
+}
+
+/* Botón Atrás en dark */
+.dark .gradient-mesh a[href*="facultades-documentos"] {
+    background: rgba(30, 41, 59, 0.6) !important;
+    border-color: rgba(96, 165, 250, 0.2) !important;
+    color: #e2e8f0 !important;
+}
+
+.dark .gradient-mesh a[href*="facultades-documentos"]:hover {
+    background: rgba(51, 65, 85, 0.8) !important;
+    border-color: rgba(96, 165, 250, 0.4) !important;
+}
+
+/* Icono decorativo del header en dark */
+.dark .gradient-mesh .material-symbols-outlined.text-\[160px\] {
+    color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Fecha/hora en dark */
+.dark #detail-fecha {
+    color: #f1f5f9 !important;
+}
+
+/* ==========================================
+   DARK MODE - PANEL DOCUMENTOS ADJUNTOS
+   ========================================== */
+
+.dark #seccion-documentos .bg-white.dark\:bg-slate-800 {
+    background: rgba(30, 41, 59, 0.95) !important;
+    border-color: rgba(96, 165, 250, 0.2) !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark #seccion-documentos h3 {
+    color: #f1f5f9 !important;
+}
+
+.dark .grupo-adjunto {
+    background: rgba(51, 65, 85, 0.5) !important;
+    border-color: rgba(96, 165, 250, 0.15) !important;
+}
+
+.dark .grupo-adjunto:hover {
+    background: rgba(51, 65, 85, 0.8) !important;
+    border-color: rgba(96, 165, 250, 0.3) !important;
+}
+
+.dark .grupo-adjunto p:first-child {
+    color: #f1f5f9 !important;
+}
+
+.dark .grupo-adjunto p:last-child {
+    color: #94a3b8 !important;
+}
+
+.dark .grupo-adjunto .bg-primary {
+    background: #3b82f6 !important;
+}
+
+/* ==========================================
+   DARK MODE - FICHA TÉCNICA DEL INDICADOR
+   (se genera dinámicamente en JS)
+   ========================================== */
+
+/* Contenedor principal de la ficha */
+.dark #viewer-contenido > div > div {
+    border-color: rgba(96, 165, 250, 0.2) !important;
+    background: rgba(15, 23, 42, 0.6) !important;
+}
+
+/* Header institucional de la ficha (ya es oscuro, solo refuerzo) */
+.dark #viewer-contenido .bg-gradient-to-br {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f766e 100%) !important;
+}
+
+/* Contenido principal bg-slate-50/50 → oscuro */
+.dark #viewer-contenido .bg-slate-50\/50,
+.dark #viewer-contenido [class*="bg-slate-50"] {
+    background: rgba(15, 23, 42, 0.4) !important;
+}
+
+/* Cajas internas bg-white → slate-800 */
+.dark #viewer-contenido .bg-white,
+.dark #viewer-contenido [class*="rounded-2xl"][class*="border"][class*="bg-white"] {
+    background: rgba(30, 41, 59, 0.9) !important;
+    border-color: rgba(96, 165, 250, 0.2) !important;
+}
+
+.dark #viewer-contenido .bg-white:hover {
+    border-color: rgba(96, 165, 250, 0.35) !important;
+}
+
+/* Títulos de secciones dentro de la ficha */
+.dark #viewer-contenido h2,
+.dark #viewer-contenido h3,
+.dark #viewer-contenido h4 {
+    color: #f8fafc !important;
+}
+
+/* Textos normales */
+.dark #viewer-contenido p,
+.dark #viewer-contenido span:not(.material-symbols-outlined):not([class*="bg-"]) {
+    color: #e2e8f0 !important;
+}
+
+/* Labels grises (CÓDIGO, VERSIÓN, etc.) */
+.dark #viewer-contenido .text-slate-500,
+.dark #viewer-contenido .text-slate-400,
+.dark #viewer-contenido [class*="text-slate-500"] {
+    color: #94a3b8 !important;
+}
+
+/* Valores importantes */
+.dark #viewer-contenido .text-slate-800,
+.dark #viewer-contenido .text-slate-700,
+.dark #viewer-contenido .font-semibold {
+    color: #f1f5f9 !important;
+}
+
+/* Código del documento en badge */
+.dark #viewer-contenido .font-mono {
+    color: #60a5fa !important;
+}
+
+/* Badges de versión y fecha */
+.dark #viewer-contenido .rounded-full[class*="bg-white"] {
+    background: rgba(51, 65, 85, 0.8) !important;
+    border: 1px solid rgba(96, 165, 250, 0.25) !important;
+    color: #e2e8f0 !important;
+}
+
+/* Caja de fórmula */
+.dark #viewer-contenido .font-mono.text-slate-600 {
+    color: #cbd5e1 !important;
+}
+
+/* Caja de variables bg-slate-50 */
+.dark #viewer-contenido .bg-slate-50,
+.dark #viewer-contenido [class*="bg-slate-50"] {
+    background: rgba(30, 41, 59, 0.7) !important;
+    border-color: rgba(96, 165, 250, 0.15) !important;
+}
+
+/* Footer del documento */
+.dark #viewer-contenido .border-t {
+    border-color: rgba(96, 165, 250, 0.15) !important;
+}
+
+/* Info box (Identificación del Proceso) */
+.dark #viewer-contenido .rounded-xl.border {
+    background: rgba(30, 41, 59, 0.7) !important;
+    border-color: rgba(96, 165, 250, 0.15) !important;
+}
+
+.dark #viewer-contenido .rounded-xl.border p:first-child {
+    color: #94a3b8 !important;
+}
+
+.dark #viewer-contenido .rounded-xl.border p:last-child {
+    color: #f1f5f9 !important;
+}
+
+/* Sección Datos Técnicos (borde emerald) */
+.dark #viewer-contenido .border-emerald-100 {
+    border-color: rgba(52, 211, 153, 0.2) !important;
+    background: linear-gradient(to bottom right, rgba(6, 78, 59, 0.2), rgba(30, 41, 59, 0.5)) !important;
+}
+
+.dark #viewer-contenido .border-emerald-100 h4 {
+    color: #34d399 !important;
+}
+
+.dark #viewer-contenido .border-emerald-100 .text-emerald-600,
+.dark #viewer-contenido .border-emerald-100 .text-emerald-700 {
+    color: #34d399 !important;
+}
+
+/* Meta badge en dark */
+.dark #viewer-contenido .bg-emerald-100 {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(52, 211, 153, 0.3) !important;
+}
+
+.dark #viewer-contenido .text-emerald-700 {
+    color: #34d399 !important;
+}
+
+/* Sección Fórmula (borde blue) */
+.dark #viewer-contenido .border-blue-100 {
+    border-color: rgba(96, 165, 250, 0.2) !important;
+    background: linear-gradient(to bottom right, rgba(30, 58, 138, 0.15), rgba(30, 41, 59, 0.5)) !important;
+}
+
+.dark #viewer-contenido .border-blue-100 h4 {
+    color: #60a5fa !important;
+}
+
+/* Barra de progreso en ficha */
+.dark #viewer-contenido .bg-slate-200 {
+    background: rgba(51, 65, 85, 0.8) !important;
+}
+
+.dark #viewer-contenido .bg-blue-700,
+.dark #viewer-contenido .bg-blue-600 {
+    background: #3b82f6 !important;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+
+/* ==========================================
+   MODO CLARO - Bordes visibles en cards
+   (NUNCA afecta al modo oscuro)
+   ========================================== */
+
+html:not(.dark) #seccion-documentos .bg-white {
+    background: #ffffff !important;
+    border: 1.5px solid #cbd5e1 !important;
+    box-shadow: 0 4px 12px rgba(148, 163, 184, 0.15) !important;
+}
+
+html:not(.dark) #document-viewer {
+    background: #ffffff !important;
+    border: 1.5px solid #cbd5e1 !important;
+    box-shadow: 0 4px 12px rgba(148, 163, 184, 0.15) !important;
+}
+
+/* Cajas internas de Identificación del Proceso */
+html:not(.dark) #viewer-contenido .rounded-xl.border {
+    border-width: 1.5px !important;
+    border-color: #94a3b8 !important;
+    background: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(148, 163, 184, 0.12) !important;
+}
+
+/* 
+   🔥 FIX: Solo afectar bg-white SIN opacidad (excluye bg-white/10, /15, etc.)
+   Esto evita que los badges del header oscuro de la ficha técnica se vuelvan grises
+*/
+html:not(.dark) #viewer-contenido .bg-white,
+html:not(.dark) #viewer-contenido [class*="bg-white"]:not([class*="bg-white/"]) {
+    background: #f8fafc !important;
+    border: 1.5px solid #cbd5e1 !important;
+}
+
+/* Header de Información Técnica */
+html:not(.dark) #document-viewer .bg-slate-50 {
+    background: #f1f5f9 !important;
+    border-bottom: 1.5px solid #cbd5e1 !important;
+}
+
+/* Badge del código en el header */
+html:not(.dark) #viewer-version {
+    background: #eff6ff !important;
+    border: 1px solid #bfdbfe !important;
+    color: #1d4ed8 !important;
+}
+
+/* ==========================================
+   DARK MODE - Botón CANCELAR en formulario de respuesta
+   ========================================== */
+
+.dark #formulario-respuesta button.bg-slate-300,
+.dark #formulario-respuesta button[class*="bg-slate-300"] {
+    background: #334155 !important; /* slate-700 */
+    color: #e2e8f0 !important;    /* slate-200 */
+    border: 1px solid #475569 !important; /* slate-600 */
+}
+
+.dark #formulario-respuesta button.bg-slate-300:hover,
+.dark #formulario-respuesta button[class*="bg-slate-300"]:hover {
+    background: #475569 !important; /* slate-600 */
+    color: #ffffff !important;
+    border-color: #64748b !important; /* slate-500 */
+}

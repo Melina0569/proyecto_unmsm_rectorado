@@ -1151,10 +1151,10 @@ function renderTable() {
                         REVISAR
                     </button>
                     ${(doc.estado === 'pendiente' || doc.estado === 'rechazado' || doc.estado === 'observado' || doc.estado === 'en_proceso' || doc.estado === 'completado') ? `
-                        <button class="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-[11px] font-bold uppercase bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all"
+                        <button class="btn-eliminar"
                                 onclick="deleteDocument('${doc.id}')"
                                 title="Eliminar documento">
-                            <span class="material-symbols-outlined text-sm">delete</span>
+                            <span class="material-symbols-outlined">delete</span>
                             Eliminar
                         </button>
                     ` : ''}
@@ -3710,17 +3710,18 @@ async function cargarRectificacionesSincronizadas(expedienteId) {
     const vistas = new Set();
     const unicas = [];
     for (const item of todasLasCorrecciones) {
-        const key = item?.id || `${item?.codigoDocumento || item?.codigo}-${item?.fecha}`;
+        const key = item?.id || `${String(item?.codigoDocumento || item?.codigo || "").trim().toUpperCase()}-${item?.fecha}`;
         if (!vistas.has(key)) {
             vistas.add(key);
             unicas.push(item);
         }
     }
     
+    const normalizedCodigo = String(codigo || "").trim().toUpperCase();
     const filtered = unicas
         .filter(item => {
-            const itemCodigo = String(item?.codigoDocumento || item?.codigo || "").trim();
-            return itemCodigo === codigo;
+            const itemCodigo = String(item?.codigoDocumento || item?.codigo || "").trim().toUpperCase();
+            return itemCodigo === normalizedCodigo;
         })
         .sort((a, b) => new Date(b?.fecha || 0) - new Date(a?.fecha || 0));
     

@@ -788,6 +788,20 @@ function syncCorrectionToSharedStorages(doc, correctionRequest) {
     const nowIso = new Date().toISOString();
     const codigo = String(doc.codigo);
 
+    // 🔥 FIX: Si el documento estaba aprobado, quitarlo de approved_docs al enviar a corrección
+    try {
+        const approvedRaw = localStorage.getItem('sigpro_approved_docs');
+        if (approvedRaw) {
+            const approved = JSON.parse(approvedRaw);
+            const filtered = approved.filter(d => 
+                String(d?.codigo || d?.code || "").trim().toUpperCase() !== codigo.toUpperCase()
+            );
+            localStorage.setItem('sigpro_approved_docs', JSON.stringify(filtered));
+        }
+    } catch (e) {
+        console.warn("No se pudo limpiar sigpro_approved_docs:", e);
+    }
+
     // Actualizar documentos
     const documentos = parseJsonArray(localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA));
     localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(
@@ -828,6 +842,29 @@ function syncCorrectionToSharedStorages(doc, correctionRequest) {
     state.allDocuments = state.allDocuments.map((item) => item.codigo === codigo ? {
         ...item, estado: "en_proceso", progreso: 50, fecha: new Date(nowIso)
     } : item);
+
+    // 🔥 FIX: También actualizar sigpro_reportes (donde facultades-documentos lee)
+    try {
+        const reportesRaw = localStorage.getItem('sigpro_reportes');
+        const reportes = reportesRaw ? JSON.parse(reportesRaw) : [];
+        const reporteIdx = reportes.findIndex(r => String(r?.codigo || r?.code || "") === codigo);
+        const updatedReporte = {
+            ...(reporteIdx >= 0 ? reportes[reporteIdx] : {}),
+            codigo: codigo,
+            estado: "en_proceso",
+            progreso: 50,
+            fechaActualizacion: nowIso,
+            updatedAt: nowIso
+        };
+        if (reporteIdx >= 0) {
+            reportes[reporteIdx] = updatedReporte;
+        } else {
+            reportes.push(updatedReporte);
+        }
+        localStorage.setItem('sigpro_reportes', JSON.stringify(reportes));
+    } catch (e) {
+        console.warn("No se pudo actualizar sigpro_reportes:", e);
+    }
 }
 
 // ==========================================
@@ -1352,74 +1389,81 @@ function setupTabsAndCorrections() {
             const historial = parseJsonArray(localStorage.getItem(STORAGE_KEYS.CORRECCIONES_LISTA));
             historial.push(request);
             
-            // Intentar guardar en localStorage
+            // ==========================================
+            // GUARDAR EN LOCALSTORAGE (con manejo de cuota)
+            // ==========================================
+            let requestToSave = request;
+            let savedToPrimary = false;
+
             try {
                 localStorage.setItem(STORAGE_KEYS.CORRECCIONES_LISTA, JSON.stringify(historial));
-
-            // 2) 🔥 CRÍTICO: Guardar en clave SIN prefijo para que facultades-documentos lo vea siempre
-            try {
-                const sharedKey = 'sigpro_correcciones_solicitudes';
-                const sharedRaw = localStorage.getItem(sharedKey) || '[]';
-                const sharedList = JSON.parse(sharedRaw);
-                sharedList.push(request);
-                localStorage.setItem(sharedKey, JSON.stringify(sharedList));
-            } catch (e) {
-                console.warn('No se pudo guardar en clave compartida sin prefijo:', e);
-            }
-
-            // 3) Guardar en clave alternativa usada por facultades-inicio
-            try {
-                const sharedKey2 = 'sigpro_correcciones_shared';
-                const sharedRaw2 = localStorage.getItem(sharedKey2) || '[]';
-                const sharedList2 = JSON.parse(sharedRaw2);
-                sharedList2.push(request);
-                localStorage.setItem(sharedKey2, JSON.stringify(sharedList2));
-            } catch (e) {
-                console.warn('No se pudo guardar en sigpro_correcciones_shared:', e);
-            }
-
-            // 4) Sincronizar estado del documento
-            syncCorrectionToSharedStorages(doc, request);
-
-            // 5) Disparar evento para otras pestañas/vistas
-            window.dispatchEvent(new StorageEvent('storage', {
-                key: 'sigpro_correcciones_solicitudes',
-                newValue: JSON.stringify(request)
-            }));
-            document.dispatchEvent(new CustomEvent('historial-actualizado', {
-                detail: { codigo: doc.codigo, accion: 'correccion_enviada', correccionId: request.id }
-            }));
+                savedToPrimary = true;
             } catch (storageError) {
                 const isQuotaExceeded = storageError?.name === "QuotaExceededError" || [22, 1014].includes(storageError?.code);
-                if (!isQuotaExceeded) throw storageError;
-
-                // 🔥 Si excede cuota, guardar sin contenido base64 pero mantener referencia
-                reducedForStorageQuota = true;
-                const reducedAttachment = attachment ? {
-                    name: attachment.name,
-                    nombre: attachment.nombre,
-                    type: attachment.type,
-                    tipo: attachment.tipo,
-                    size: attachment.size,
-                    tamaño: attachment.tamaño,
-                    url: "",           // ← Vacío porque excedió cuota
-                    content: "",
-                    contenido: "",
-                    base64: "",
-                    data: "",
-                    reducedForStorage: true,
-                    // 🔥 Guardar referencia para recuperar de IndexedDB
-                    indexedDbKey: `${doc.codigo}::${attachment.name}`
-                } : null;
-                
-                historial[historial.length - 1] = { 
-                    ...request, 
-                    adjunto: reducedAttachment,
-                    adjuntos: reducedAttachment ? [reducedAttachment] : []
-                };
-                localStorage.setItem(STORAGE_KEYS.CORRECCIONES_LISTA, JSON.stringify(historial));
-                request.adjunto = reducedAttachment;
+                if (isQuotaExceeded) {
+                    // Reducir adjunto y reintentar
+                    const reducedAttachment = attachment ? {
+                        name: attachment.name,
+                        nombre: attachment.nombre,
+                        type: attachment.type,
+                        tipo: attachment.tipo,
+                        size: attachment.size,
+                        tamaño: attachment.tamaño,
+                        url: "",
+                        content: "",
+                        contenido: "",
+                        base64: "",
+                        data: "",
+                        reducedForStorage: true,
+                        indexedDbKey: `${doc.codigo}::${attachment.name}`
+                    } : null;
+                    
+                    requestToSave = { ...request, adjunto: reducedAttachment, adjuntos: reducedAttachment ? [reducedAttachment] : [] };
+                    historial[historial.length - 1] = requestToSave;
+                    
+                    try {
+                        localStorage.setItem(STORAGE_KEYS.CORRECCIONES_LISTA, JSON.stringify(historial));
+                        savedToPrimary = true;
+                    } catch (e2) {
+                        console.error("❌ No se pudo guardar ni siquiera sin adjunto:", e2);
+                    }
+                } else {
+                    throw storageError;
+                }
             }
+
+            // ==========================================
+            // 2) SIEMPRE guardar en clave SIN prefijo (para facultades)
+            // ==========================================
+            const saveToShared = (key) => {
+                try {
+                    const sharedRaw = localStorage.getItem(key) || '[]';
+                    const sharedList = JSON.parse(sharedRaw);
+                    sharedList.push(requestToSave);
+                    localStorage.setItem(key, JSON.stringify(sharedList));
+                } catch (e) {
+                    console.warn(`No se pudo guardar en ${key}:`, e);
+                }
+            };
+
+            saveToShared('sigpro_correcciones_solicitudes');
+            saveToShared('sigpro_correcciones_shared');
+
+            // ==========================================
+            // 3) Sincronizar estado del documento
+            // ==========================================
+            syncCorrectionToSharedStorages(doc, requestToSave);
+
+            // ==========================================
+            // 4) Disparar eventos
+            // ==========================================
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'sigpro_correcciones_solicitudes',
+                newValue: JSON.stringify(requestToSave)
+            }));
+            document.dispatchEvent(new CustomEvent('historial-actualizado', {
+                detail: { codigo: doc.codigo, accion: 'correccion_enviada', correccionId: requestToSave.id }
+            }));
 
             syncCorrectionToSharedStorages(doc, request);
             state.selectedCorrectionId = request.id;

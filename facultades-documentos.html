@@ -100,10 +100,10 @@
         }
     </style>
 </head>
-<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 min-h-screen flex flex-col font-sans transition-colors duration-200">
+<body class="text-slate-800 dark:text-slate-200 min-h-screen flex flex-col font-sans transition-colors duration-200">
     
     <!-- Background Effects -->
-    <div class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+    <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/20 rounded-full blur-[120px] animate-blob"></div>
         <div class="absolute top-[20%] right-[-10%] w-[30%] h-[50%] bg-purple-400/20 rounded-full blur-[120px] animate-blob" style="animation-delay: 2s;"></div>
         <div class="absolute bottom-[-10%] left-[20%] w-[40%] h-[40%] bg-indigo-400/20 rounded-full blur-[120px] animate-blob" style="animation-delay: 4s;"></div>
@@ -359,11 +359,11 @@
                         </div>
                         <div class="flex gap-3">
                             <a href="facultades-documentos.html" 
-                                class="bg-white/20 hover:bg-white/30 backdrop-blur-md px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 inline-flex">
-                                    <span class="material-symbols-outlined text-lg">arrow_back</span> Atrás
+                                class="bg-white/20 dark:bg-slate-800/60 hover:bg-white/30 dark:hover:bg-slate-700/80 backdrop-blur-md px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 inline-flex border border-white/10 dark:border-slate-600">
+                                <span class="material-symbols-outlined text-lg">arrow_back</span> Atrás
                             </a>
                             <button id="btn-descargar-reporte" onclick="descargarReporteCompletoPDF()"
-                                    class="bg-white hover:bg-blue-50 text-blue-700 px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 border-2 border-white/40 shadow-lg hover:shadow-xl hover:scale-105 transition-all">
+                                class="bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 text-blue-700 dark:text-blue-300 px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 border-2 border-white/40 dark:border-slate-600 shadow-lg hover:shadow-xl hover:scale-105 transition-all">
                                 <span class="material-symbols-outlined text-lg">picture_as_pdf</span>
                                 Descargar PDF
                             </button>
@@ -573,7 +573,7 @@
                 <div id="seccion-documentos" class="hidden">
                     <div class="grid grid-cols-12 gap-6">
                         <!-- Panel lateral de documentos -->
-                        <div class="col-span-12 lg:col-span-4 space-y-4">
+                        <div class="col-span-12 lg:col-span-4 space-y-4 lg:mt-6 lg:ml-6">
                             <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
                                 <div class="flex items-center justify-between mb-6">
                                     <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
