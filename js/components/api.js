@@ -709,26 +709,72 @@ const LocalAPI = {
 
         async getById(id) {
             await simulateDelay(200);
+            
+            // ✅ Buscar en los detalles técnicos guardados
+            const docsDetalle = JSON.parse(localStorage.getItem(this.db.documentosDetalle) || '{}');
+            const detalle = docsDetalle[id] || {};
+            
+            // ✅ Buscar en la lista general para metadata
+            const allDocs = await LocalAPI.documentos.getAll();
+            const docInfo = allDocs.data.find(d => d.id === id || d.codigo === id) || {};
+            
             return { 
                 success: true, 
                 data: { 
-                    id: id, 
-                    nombre: 'Documento ' + id,
-                    estado: 'pendiente'
+                    id: id,
+                    nombre: docInfo.descripcion || detalle.fichaData?.nombreIndicador || 'Documento ' + id,
+                    descripcion: docInfo.descripcion || detalle.fichaData?.descripcion || '',
+                    estado: docInfo.estado || detalle.fichaData?.estado || 'pendiente',
+                    // ✅ Campos críticos para el visor de PDF
+                    pdfUrl: detalle.pdfUrl || detalle.fichaData?.pdfUrl || null,
+                    pdfBase64: detalle.pdfBase64 || null,
+                    archivos: detalle.archivos || [],
+                    fichaData: detalle.fichaData || null,
+                    ...docInfo,
+                    ...detalle
                 } 
             };
         }
     },
 
-    // ========== REPOSITORIO ==========
     repositorio: {
         async getAprobados(filtros = {}) {
             await simulateDelay(400);
-            const docs = await LocalAPI.documentos.getAll(filtros);
-            return { 
-                success: true, 
-                data: docs.data.map(d => ({ ...d, estado: 'completado' }))
-            };
+            
+            // ✅ 1. Leer documentos EXPLÍCITAMENTE aprobados
+            let approvedDocs = [];
+            try {
+                approvedDocs = JSON.parse(localStorage.getItem('sigpro_approved_docs') || '[]');
+            } catch (e) {
+                approvedDocs = [];
+            }
+            
+            // ✅ 2. También buscar en la lista general los que tengan estado "aprobado"
+            const generalDocs = await LocalAPI.documentos.getAll(filtros);
+            const fromGeneral = generalDocs.data.filter(d => 
+                d.estado === 'aprobado' || d.status === 'APPROVED'
+            );
+            
+            // ✅ 3. Mergear y eliminar duplicados
+            const merged = [...approvedDocs, ...fromGeneral];
+            const seen = new Set();
+            const unique = merged.filter(d => {
+                const key = d.id || d.codigo || d.code;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            
+            // ✅ 4. Aplicar filtros
+            let data = unique;
+            if (filtros.facultyId) {
+                data = data.filter(d => String(d.facultyId) === String(filtros.facultyId));
+            }
+            if (filtros.estado) {
+                data = data.filter(d => d.estado === filtros.estado || d.status === filtros.estado);
+            }
+            
+            return { success: true, data };
         }
     },
 
@@ -928,6 +974,8 @@ const LocalAPI = {
         return { success: true, message: 'Base de datos reseteada' };
     }
 };
+
+
 
 // ============================================
 // MODO REMOTO - API REAL UNMSM

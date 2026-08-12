@@ -2715,49 +2715,207 @@ function getMimeType(filename) {
 // ==========================================
 // 🔥 FIX 7 & 8: Función helper para normalizar contenido base64
 // ==========================================
-function normalizarContenidoAdjunto(adjunto) {
-    if (!adjunto || typeof adjunto !== 'object') return '';
-    
-    // Buscar contenido en TODOS los campos posibles
-    const camposBuscar = ['contenido', 'url', 'path', 'raw', 'dataUrl', 'src', 
-                          'file', 'documento', 'archivo', 'base64', 'data', 'content'];
-    
+async function normalizarContenidoAdjunto(adjunto) {
+
+    if (!adjunto || typeof adjunto !== 'object') {
+        return '';
+    }
+
+    // =========================================================
+    // 1. BUSCAR CONTENIDO DIRECTO
+    // =========================================================
+
+    const camposBuscar = [
+        'contenido',
+        'url',
+        'path',
+        'raw',
+        'dataUrl',
+        'src',
+        'file',
+        'documento',
+        'archivo',
+        'base64',
+        'data',
+        'content'
+    ];
+
     let source = '';
+
     for (const campo of camposBuscar) {
+
         const valor = adjunto[campo];
-        if (valor && typeof valor === 'string') {
-            const limpio = valor.trim();
-            if (limpio.length > 100) {
-                source = limpio;
-                break;
+
+        if (
+            typeof valor === 'string' &&
+            valor.trim().length > 50
+        ) {
+            source = valor.trim();
+            break;
+        }
+    }
+
+
+    // =========================================================
+    // 2. SI NO HAY CONTENIDO, BUSCAR EN INDEXEDDB
+    // =========================================================
+
+    if (!source && adjunto.indexedDbKey) {
+
+        console.log(
+            '🔎 Buscando archivo en IndexedDB:',
+            adjunto.indexedDbKey
+        );
+
+        try {
+
+            const db = await openAdjuntosIndexedDb();
+
+            const tx = db.transaction(
+                'adjuntos',
+                'readonly'
+            );
+
+            const store =
+                tx.objectStore('adjuntos');
+
+            const request =
+                store.get(adjunto.indexedDbKey);
+
+            const resultado =
+                await new Promise((resolve, reject) => {
+
+                    request.onsuccess = () => {
+                        resolve(request.result);
+                    };
+
+                    request.onerror = () => {
+                        reject(request.error);
+                    };
+
+                });
+
+            db.close();
+
+
+            console.log(
+                '📦 Resultado IndexedDB:',
+                resultado
+            );
+
+
+            if (resultado) {
+
+                source =
+                    resultado.dataUrl ||
+                    resultado.url ||
+                    resultado.contenido ||
+                    resultado.content ||
+                    resultado.base64 ||
+                    resultado.data ||
+                    '';
+
             }
+
+
+        } catch (error) {
+
+            console.error(
+                '❌ Error recuperando archivo desde IndexedDB:',
+                error
+            );
+
         }
     }
-    
-    // Si el contenido es base64 puro sin prefijo, normalizarlo
-    if (source && !source.startsWith('data:') && source.length > 100) {
-        const cleaned = source.replace(/\s/g, '');
-        // Validar que sea base64 válido (con o sin padding)
-        if (/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned) && cleaned.length > 100) {
-            const ext = (adjunto.nombre || 'archivo.pdf').split('.').pop().toLowerCase();
-            const mimeMap = { 
-                pdf: 'application/pdf', 
-                xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                xls: 'application/vnd.ms-excel',
-                doc: 'application/msword',
-                docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                jpg: 'image/jpeg',
-                jpeg: 'image/jpeg',
-                png: 'image/png',
-                gif: 'image/gif',
-                webp: 'image/webp'
-            };
-            const mime = mimeMap[ext] || 'application/octet-stream';
-            source = `data:${mime};base64,${cleaned}`;
-            console.log('✅ Base64 normalizado a data URL');
-        }
+
+
+    // =========================================================
+    // 3. SI SIGUE SIN CONTENIDO, TERMINAR
+    // =========================================================
+
+    if (!source) {
+
+        console.warn(
+            '⚠️ El adjunto no tiene contenido:',
+            adjunto
+        );
+
+        return '';
     }
-    
+
+
+    // =========================================================
+    // 4. SI YA ES DATA URL
+    // =========================================================
+
+    if (source.startsWith('data:')) {
+        return source;
+    }
+
+
+    // =========================================================
+    // 5. CONVERTIR BASE64 PURO A DATA URL
+    // =========================================================
+
+    const cleaned =
+        source.replace(/\s/g, '');
+
+    if (
+        cleaned.length > 100 &&
+        /^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)
+    ) {
+
+        const nombre =
+            adjunto.nombre ||
+            adjunto.name ||
+            adjunto.fileName ||
+            'archivo.pdf';
+
+        const extension =
+            nombre
+                .split('.')
+                .pop()
+                .toLowerCase();
+
+        const mimeMap = {
+
+            pdf: 'application/pdf',
+
+            xlsx:
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+
+            xls:
+                'application/vnd.ms-excel',
+
+            docx:
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+
+            doc:
+                'application/msword',
+
+            jpg: 'image/jpeg',
+
+            jpeg: 'image/jpeg',
+
+            png: 'image/png',
+
+            gif: 'image/gif',
+
+            webp: 'image/webp',
+
+            txt: 'text/plain',
+
+            csv: 'text/csv'
+        };
+
+        const mime =
+            mimeMap[extension] ||
+            'application/octet-stream';
+
+        return `data:${mime};base64,${cleaned}`;
+    }
+
+
     return source;
 }
 
@@ -2851,16 +3009,53 @@ window.abrirPreviewPdf = async function(indiceAdjunto, origen = 'detalle') {
             }
         } else {
             // Archivo normal: crear embed dinámico
-            let source = adjunto.contenido || adjunto.url || adjunto.path || '';
-            
-            if (!source) {
-                source = normalizarContenidoAdjunto(adjunto);
-            }
-            
-            if (!source) {
-                mostrarModalDocumentoNoDisponible(adjunto);
-                return;
-            }
+            let source =
+            adjunto.contenido ||
+            adjunto.url ||
+            adjunto.path ||
+            '';
+
+
+        // Si no hay contenido directo,
+        // intentar recuperarlo desde IndexedDB
+        if (!source) {
+
+            source =
+                await normalizarContenidoAdjunto(
+                    adjunto
+                );
+        }
+
+
+        // Si se recuperó correctamente,
+        // guardar el contenido para futuras aperturas
+        if (source) {
+
+            adjunto.contenido = source;
+            adjunto.url = source;
+            adjunto.path = source;
+
+            console.log(
+                '✅ Documento recuperado correctamente:',
+                adjunto.nombre
+            );
+        }
+
+
+        // Si definitivamente no existe
+        if (!source) {
+
+            console.error(
+                '❌ No se pudo recuperar:',
+                adjunto
+            );
+
+            mostrarModalDocumentoNoDisponible(
+                adjunto
+            );
+
+            return;
+        }
 
             const embed = document.createElement('embed');
             embed.type = getMimeType(adjunto.nombre);
@@ -3521,154 +3716,318 @@ function getFileTypeFromName(name) {
 // FIX: mapCorreccionRacioToRectificacion con recuperación de IndexedDB
 // ==========================================
 async function mapCorreccionRacioToRectificacion(item) {
-    // Buscar adjunto en TODAS las ubicaciones posibles
-    let adjuntoRaw = item?.adjunto || (Array.isArray(item?.adjuntos) ? item.adjuntos[0] : null);
-    
-    if (!adjuntoRaw && Array.isArray(item?.documentos) && item.documentos.length > 0) {
-        adjuntoRaw = item.documentos[0];
-    }
-    if (!adjuntoRaw && Array.isArray(item?.archivos) && item.archivos.length > 0) {
-        adjuntoRaw = item.archivos[0];
-    }
-    if (!adjuntoRaw && Array.isArray(item?.archivosEnviados) && item.archivosEnviados.length > 0) {
-        adjuntoRaw = item.archivosEnviados[0];
-    }
-    
-    // Extraer contenido de TODOS los campos posibles
-    let rawContent = "";
-    const camposBuscar = ['contenido', 'content', 'base64', 'data', 'url', 'ruta', 'src', 
-                          'file', 'documento', 'archivo'];
-    
-    if (adjuntoRaw && typeof adjuntoRaw === "object") {
-        for (const campo of camposBuscar) {
-            const valor = adjuntoRaw[campo];
-            if (valor && typeof valor === "string" && valor.trim().length > 50) {
-                rawContent = valor.trim();
-                break;
-            }
-        }
-    }
-    
-    // 🔥 FIX CRÍTICO: Si no hay contenido pero hay indexedDbKey, recuperar de IndexedDB
-    if (!rawContent && adjuntoRaw?.indexedDbKey) {
-        try {
-            const db = await openAdjuntosIndexedDb();
-            const tx = db.transaction("adjuntos", "readonly");
-            const store = tx.objectStore("adjuntos");
-            const request = store.get(adjuntoRaw.indexedDbKey);
-            
-            const result = await new Promise((resolve, reject) => {
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-            });
-            
-            if (result?.dataUrl) {
-                rawContent = result.dataUrl;
-                console.log('✅ Recuperado de IndexedDB:', adjuntoRaw.indexedDbKey);
-            }
-            db.close();
-        } catch (e) {
-            console.warn('⚠️ No se pudo recuperar de IndexedDB:', e);
-        }
+
+    // ============================================================
+    // 1. OBTENER TODAS LAS POSIBLES FUENTES DE ARCHIVOS
+    // ============================================================
+
+    const fuentes = [];
+
+    if (item?.adjunto) {
+        fuentes.push(item.adjunto);
     }
 
-    const fileName = adjuntoRaw?.name || adjuntoRaw?.nombre || item?.nombreArchivo || "Archivo adjunto";
-    const fileType = adjuntoRaw?.type || adjuntoRaw?.tipo || getFileTypeFromName(fileName);
-    const fileSize = formatRectificacionSize(adjuntoRaw?.size || adjuntoRaw?.tamaño);
-
-    // Normalizar a data URL si es base64 puro
-    let normalizedUrl = rawContent;
-    if (rawContent) {
-        const cleanedContent = rawContent.replace(/\s/g, "");
-        
-        if (!cleanedContent.startsWith("data:")) {
-            const isBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(cleanedContent) && cleanedContent.length > 100;
-            if (isBase64) {
-                const ext = fileName.split(".").pop().toLowerCase();
-                const mimeMap = { 
-                    pdf: "application/pdf", 
-                    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    xls: "application/vnd.ms-excel",
-                    jpg: "image/jpeg",
-                    jpeg: "image/jpeg",
-                    png: "image/png"
-                };
-                const mime = mimeMap[ext] || "application/octet-stream";
-                normalizedUrl = `data:${mime};base64,${cleanedContent}`;
-            }
-        } else {
-            normalizedUrl = cleanedContent;
-        }
+    if (Array.isArray(item?.adjuntos)) {
+        fuentes.push(...item.adjuntos);
     }
 
-    // 🔥 FIX: Mapear adjuntos del item a archivosEnviados para que se muestren en la UI
-    const archivosEnviadosMap = [];
-    const adjuntosArray = Array.isArray(item?.adjuntos) ? item.adjuntos : (item?.adjunto ? [item.adjunto] : []);
-    
-    for (const adj of adjuntosArray) {
-        if (!adj) continue;
-        let adjContent = "";
-        for (const campo of camposBuscar) {
-            if (adj[campo] && typeof adj[campo] === "string" && adj[campo].length > 50) {
-                adjContent = adj[campo];
-                break;
+    if (Array.isArray(item?.documentos)) {
+        fuentes.push(...item.documentos);
+    }
+
+    if (Array.isArray(item?.archivos)) {
+        fuentes.push(...item.archivos);
+    }
+
+    if (Array.isArray(item?.archivosEnviados)) {
+        fuentes.push(...item.archivosEnviados);
+    }
+
+
+    // ============================================================
+    // 2. ELIMINAR DUPLICADOS
+    // ============================================================
+
+    const archivosUnicos = [];
+    const claves = new Set();
+
+    for (const archivo of fuentes) {
+
+        if (!archivo || typeof archivo !== 'object') continue;
+
+        const nombre =
+            archivo.name ||
+            archivo.nombre ||
+            archivo.fileName ||
+            archivo.filename ||
+            'Archivo adjunto';
+
+        const indexedKey =
+            archivo.indexedDbKey ||
+            '';
+
+        const clave = `${nombre}::${indexedKey}`;
+
+        if (claves.has(clave)) continue;
+
+        claves.add(clave);
+        archivosUnicos.push(archivo);
+    }
+
+
+    // ============================================================
+    // 3. FUNCIÓN PARA OBTENER EL CONTENIDO
+    // ============================================================
+
+    async function obtenerContenido(archivo) {
+
+        if (!archivo || typeof archivo !== 'object') {
+            return '';
+        }
+
+        const campos = [
+            'contenido',
+            'content',
+            'base64',
+            'data',
+            'url',
+            'ruta',
+            'path',
+            'src',
+            'dataUrl',
+            'raw',
+            'file',
+            'documento',
+            'archivo'
+        ];
+
+        // Buscar contenido directamente
+        for (const campo of campos) {
+
+            const valor = archivo[campo];
+
+            if (
+                typeof valor === 'string' &&
+                valor.trim().length > 50
+            ) {
+                let contenido = valor.trim();
+
+                // Ya es Data URL
+                if (contenido.startsWith('data:')) {
+                    return contenido;
+                }
+
+                // Puede ser Base64 puro
+                const limpio = contenido.replace(/\s/g, '');
+
+                if (
+                    limpio.length > 100 &&
+                    /^[A-Za-z0-9+/]*={0,2}$/.test(limpio)
+                ) {
+
+                    const nombre =
+                        archivo.name ||
+                        archivo.nombre ||
+                        archivo.fileName ||
+                        'archivo.pdf';
+
+                    const extension =
+                        nombre.split('.').pop().toLowerCase();
+
+                    const mimeMap = {
+                        pdf: 'application/pdf',
+                        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        xls: 'application/vnd.ms-excel',
+                        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        doc: 'application/msword',
+                        jpg: 'image/jpeg',
+                        jpeg: 'image/jpeg',
+                        png: 'image/png',
+                        gif: 'image/gif',
+                        csv: 'text/csv',
+                        txt: 'text/plain'
+                    };
+
+                    return `data:${mimeMap[extension] || 'application/octet-stream'};base64,${limpio}`;
+                }
+
+                return contenido;
             }
         }
-        // Intentar recuperar de IndexedDB si aplica
-        if (!adjContent && adj.indexedDbKey) {
+
+
+        // ========================================================
+        // RECUPERAR ARCHIVO GRANDE DESDE INDEXEDDB
+        // ========================================================
+
+        if (archivo.indexedDbKey) {
+
             try {
+
                 const db = await openAdjuntosIndexedDb();
-                const tx = db.transaction("adjuntos", "readonly");
+
+                const tx = db.transaction(
+                    "adjuntos",
+                    "readonly"
+                );
+
                 const store = tx.objectStore("adjuntos");
-                const req = store.get(adj.indexedDbKey);
-                const res = await new Promise((resolve, reject) => {
-                    req.onsuccess = () => resolve(req.result);
-                    req.onerror = () => reject(req.error);
-                });
-                if (res?.dataUrl) adjContent = res.dataUrl;
+
+                const request =
+                    store.get(archivo.indexedDbKey);
+
+                const resultado = await new Promise(
+                    (resolve, reject) => {
+
+                        request.onsuccess = () =>
+                            resolve(request.result);
+
+                        request.onerror = () =>
+                            reject(request.error);
+                    }
+                );
+
                 db.close();
-            } catch (e) {}
-        }
-        
-        // Normalizar
-        if (adjContent && !adjContent.startsWith('data:')) {
-            const cleaned = adjContent.replace(/\s/g, '');
-            if (/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) {
-                const ext = (adj.name || adj.nombre || 'pdf').split('.').pop().toLowerCase();
-                const mimeMap = { pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword' };
-                adjContent = `data:${mimeMap[ext] || 'application/octet-stream'};base64,${cleaned}`;
+
+                if (resultado) {
+
+                    return (
+                        resultado.dataUrl ||
+                        resultado.url ||
+                        resultado.content ||
+                        resultado.contenido ||
+                        resultado.base64 ||
+                        ''
+                    );
+                }
+
+            } catch (error) {
+
+                console.warn(
+                    '⚠️ No se pudo recuperar adjunto desde IndexedDB:',
+                    archivo.indexedDbKey,
+                    error
+                );
             }
         }
-        
-        archivosEnviadosMap.push({
-            nombre: adj.name || adj.nombre || 'Archivo',
-            tipo: adj.type || adj.tipo || 'PDF',
-            tamaño: formatRectificacionSize(adj.size || adj.tamaño),
-            contenido: adjContent,
-            url: adjContent
+
+        return '';
+    }
+
+
+    // ============================================================
+    // 4. NORMALIZAR TODOS LOS ARCHIVOS
+    // ============================================================
+
+    const documentosNormalizados = [];
+
+    for (const archivo of archivosUnicos) {
+
+        const contenido = await obtenerContenido(archivo);
+
+        const nombre =
+            archivo.name ||
+            archivo.nombre ||
+            archivo.fileName ||
+            archivo.filename ||
+            'Documento';
+
+        const tipo =
+            archivo.type ||
+            archivo.tipo ||
+            getFileTypeFromName(nombre);
+
+        const tamaño =
+            formatRectificacionSize(
+                archivo.size ||
+                archivo.tamaño ||
+                archivo.tamano
+            );
+
+        const estado =
+            archivo.estado ||
+            archivo.status ||
+            'por_corregir';
+
+        documentosNormalizados.push({
+
+            nombre,
+            tipo,
+            tamaño,
+
+            estado,
+
+            contenido,
+            url: contenido,
+            path: contenido,
+            raw: contenido,
+
+            // IMPORTANTE:
+            // conservar la referencia original
+            indexedDbKey:
+                archivo.indexedDbKey || null,
+
+            original: archivo
         });
     }
 
+
+    // ============================================================
+    // 5. DEVOLVER RECTIFICACIÓN COMPLETA
+    // ============================================================
+
     return {
-        id: item?.id || `corr_${Date.now()}`,
-        fecha: formatRectificacionFecha(item?.fecha),
-        observacion: item?.observaciones || item?.asunto || "Corrección solicitada",
-        estado: item?.estadoDestino === "en_proceso" ? "OBSERVADO" : (item?.estado || "OBSERVADO"),
-        responsable: item?.responsable || "RACIONALIZACIÓN",
-        asunto: item?.asunto || "Solicitud de rectificación",
-        descripcion: item?.observaciones || item?.asunto || "Corrección solicitada",
-        email: item?.correoInstitucional || item?.email || "racionalizacion@unmsm.edu.pe",
-        documentos: normalizedUrl ? [{
-            nombre: fileName,
-            tipo: fileType,
-            tamaño: fileSize,
-            estado: "por_corregir",
-            contenido: normalizedUrl,
-            url: normalizedUrl,
-            path: normalizedUrl,
-            raw: rawContent
-        }] : [],
-        archivosEnviados: archivosEnviadosMap  // ← AHORA sí tiene los archivos enviados por la facultad
+
+        id:
+            item?.id ||
+            `corr_${Date.now()}`,
+
+        fecha:
+            formatRectificacionFecha(
+                item?.fecha
+            ),
+
+        observacion:
+            item?.observaciones ||
+            item?.asunto ||
+            "Corrección solicitada",
+
+        estado:
+            item?.estadoDestino === "en_proceso"
+                ? "OBSERVADO"
+                : (
+                    item?.estado ||
+                    "OBSERVADO"
+                ),
+
+        responsable:
+            item?.responsable ||
+            "RACIONALIZACIÓN",
+
+        asunto:
+            item?.asunto ||
+            "Solicitud de rectificación",
+
+        descripcion:
+            item?.observaciones ||
+            item?.asunto ||
+            "Corrección solicitada",
+
+        email:
+            item?.correoInstitucional ||
+            item?.email ||
+            "racionalizacion@unmsm.edu.pe",
+
+        // ========================================================
+        // AHORA TODOS LOS ARCHIVOS APARECEN EN
+        // "DOCUMENTOS EN CORRECCIÓN"
+        // ========================================================
+
+        documentos: documentosNormalizados,
+
+        // Mantener también compatibilidad con la sección
+        // "Archivos enviados"
+        archivosEnviados: documentosNormalizados
     };
 }
 
@@ -4105,36 +4464,82 @@ async function revisarRectificacion(index) {
     // ==========================================
     // PREPARAR DOCUMENTOS EN CORRECCIÓN
     // ==========================================
-    const docsEnCorreccion = await Promise.all((rect.documentos || []).map(async (doc, idx) => {
-        let contenido = await extraerContenidoCompleto(doc);
-        if (!contenido) {
-            contenido = await extraerContenidoCompleto(rect);
-        }
-        return {
-            nombre: doc.nombre || doc.name || 'Documento',
-            tipo: doc.tipo || doc.type || 'PDF',
-            tamaño: doc.tamaño || doc.size || '-',
-            fecha: rect.fecha?.split('\n')[0] || '-',
-            activo: doc.estado === 'por_corregir',
-            icono: (doc.tipo || '').toUpperCase() === 'XLSX' ? 'table_chart' : 'description',
-            contenido: contenido,
-            url: contenido,
-            path: contenido,
-            raw: contenido
-        };
-    }));
+        const docsEnCorreccion = await Promise.all(
+        (rect.documentos || []).map(async (doc) => {
+
+            const contenido =
+                await extraerContenidoCompleto(doc);
+
+            return {
+                nombre:
+                    doc.nombre ||
+                    doc.name ||
+                    doc.fileName ||
+                    'Documento',
+
+                tipo:
+                    doc.tipo ||
+                    doc.type ||
+                    getFileTypeFromName(
+                        doc.nombre ||
+                        doc.name ||
+                        ''
+                    ),
+
+                tamaño:
+                    doc.tamaño ||
+                    doc.size ||
+                    doc.tamano ||
+                    '-',
+
+                fecha:
+                    rect.fecha?.split('\n')[0] ||
+                    '-',
+
+                activo:
+                    doc.estado === 'por_corregir',
+
+                icono:
+                    String(
+                        doc.tipo ||
+                        doc.type ||
+                        ''
+                    ).toUpperCase() === 'XLSX'
+                        ? 'table_chart'
+                        : 'description',
+
+                contenido: contenido,
+                url: contenido,
+                path: contenido,
+                raw: contenido,
+
+                indexedDbKey:
+                    doc.indexedDbKey || null
+            };
+        })
+    );
 
     // Combinar arrays para la vista previa
     adjuntosRectificacionActuales = [...archivosEnviados, ...docsEnCorreccion];
 
     // 🔥 FIX 6: Debug - Log para verificar qué adjuntos tienen contenido
-    console.log('🔍 Adjuntos preparados para preview:', adjuntosActuales.map((a, i) => ({
-        indice: i,
-        nombre: a.nombre,
-        tieneContenido: !!(a.contenido && a.contenido.length > 100),
-        esDataUrl: a.contenido?.startsWith('data:'),
-        contenidoPreview: a.contenido ? a.contenido.substring(0, 80) + '...' : 'VACÍO'
-    })));
+        console.log(
+        '🔍 Adjuntos preparados para preview:',
+        adjuntosRectificacionActuales.map((a, i) => ({
+            indice: i,
+            nombre: a.nombre,
+            tieneContenido: !!(
+                a.contenido &&
+                a.contenido.length > 100
+            ),
+            esDataUrl:
+                a.contenido?.startsWith('data:'),
+            contenidoPreview:
+                a.contenido
+                    ? a.contenido.substring(0, 80) + '...'
+                    : 'VACÍO'
+        }))
+    );
 
     // ==========================================
     // RENDERIZAR DOCUMENTOS EN CORRECCIÓN
