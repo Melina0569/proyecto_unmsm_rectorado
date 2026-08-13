@@ -1303,38 +1303,38 @@ function setupTabsAndCorrections() {
                     // 🔥 SIEMPRE leer como base64 completo
                     const dataUrl = await readFileAsDataUrl(attachmentFile);
                     
-                    // Guardar en IndexedDB para archivos grandes (backup)
-                    if (attachmentFile.size > MAX_INLINE_CORRECTION_ATTACHMENT_BYTES) {
-                        try {
-                            const db = await openAdjuntosIndexedDb();
-                            const tx = db.transaction("adjuntos", "readwrite");
-                            const store = tx.objectStore("adjuntos");
-                            const key = `${doc.codigo}::${attachmentFile.name}`;
-                            await new Promise((resolve, reject) => {
-                                const request = store.put({
-                                    id: key,
-                                    codigo: doc.codigo,
-                                    name: attachmentFile.name,
-                                    nombre: attachmentFile.name,
-                                    type: attachmentFile.type,
-                                    tipo: attachmentFile.type,
-                                    size: attachmentFile.size,
-                                    tamaño: attachmentFile.size,
-                                    url: dataUrl,
-                                    content: dataUrl,
-                                    contenido: dataUrl,
-                                    base64: dataUrl,
-                                    data: dataUrl,
-                                    fecha: new Date().toISOString()
-                                });
-                                request.onsuccess = () => resolve();
-                                request.onerror = () => reject(request.error);
+                    // 🔥 FIX: Guardar SIEMPRE en IndexedDB (sin importar el tamaño)
+                    // Esto garantiza que el indexedDbKey usado como fallback
+                    // ante cuota excedida en localStorage SIEMPRE apunte a un registro real.
+                    try {
+                        const db = await openAdjuntosIndexedDb();
+                        const tx = db.transaction("adjuntos", "readwrite");
+                        const store = tx.objectStore("adjuntos");
+                        const key = `${doc.codigo}::${attachmentFile.name}`;
+                        await new Promise((resolve, reject) => {
+                            const request = store.put({
+                                id: key,
+                                codigo: doc.codigo,
+                                name: attachmentFile.name,
+                                nombre: attachmentFile.name,
+                                type: attachmentFile.type,
+                                tipo: attachmentFile.type,
+                                size: attachmentFile.size,
+                                tamaño: attachmentFile.size,
+                                url: dataUrl,
+                                content: dataUrl,
+                                contenido: dataUrl,
+                                base64: dataUrl,
+                                data: dataUrl,
+                                fecha: new Date().toISOString()
                             });
-                            db.close();
-                            console.log("✅ Adjunto grande guardado en IndexedDB:", key);
-                        } catch (idbError) {
-                            console.warn("No se pudo guardar en IndexedDB:", idbError);
-                        }
+                            request.onsuccess = () => resolve();
+                            request.onerror = () => reject(request.error);
+                        });
+                        db.close();
+                        console.log("✅ Adjunto respaldado en IndexedDB:", key);
+                    } catch (idbError) {
+                        console.warn("No se pudo guardar en IndexedDB:", idbError);
                     }
 
                     attachment = {

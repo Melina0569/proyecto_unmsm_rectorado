@@ -1,6 +1,12 @@
 /**
- * FICHA DE CARACTERIZACIÓN - JavaScript
+ * FICHA DE CARACTERIZACIÓN - JavaScript (MODIFICADO)
  * Lógica específica del formulario de caracterización de procesos
+ * 
+ * CAMBIOS:
+ * 1. Soporte para enlace de Google Sheets como alternativa/complemento a archivos
+ * 2. Validación de URL de Google Sheets
+ * 3. Generación de URL embebida para previsualización
+ * 4. Guardado en localStorage del enlace
  */
 
 // ==========================================
@@ -17,7 +23,8 @@ const FICHA_CONFIG = {
         fileList: '#file-list',
         tipoProcesoSelect: '#tipo-proceso-select',
         macroProcesoSelect: '#macro-proceso-select',
-        codigoField: '#codigo-field'
+        codigoField: '#codigo-field',
+        googleSheetsInput: '#google-sheets-url'  // ← NUEVO: Input para enlace de Google Sheets
     },
     SHOW_DOCUMENTOS_BUTTON_DELAY_MS: 1400
 };
@@ -122,6 +129,51 @@ const TIPO_PROCESO_MAP = {
     'support': 'support'
 };
 
+// ==========================================
+// GOOGLE SHEETS HELPERS (NUEVO)
+// ==========================================
+
+/**
+ * Extrae el ID de un spreadsheet desde una URL de Google Sheets
+ * Soporta formatos:
+ * - https://docs.google.com/spreadsheets/d/1BxiMVs.../edit#gid=0
+ * - https://docs.google.com/spreadsheets/d/1BxiMVs.../edit
+ * - https://docs.google.com/spreadsheets/d/1BxiMVs...
+ */
+function extractGoogleSheetsId(url) {
+    if (!url || typeof url !== 'string') return null;
+    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    return match ? match[1] : null;
+}
+
+/**
+ * Valida si una URL es de Google Sheets
+ */
+function isValidGoogleSheetsUrl(url) {
+    if (!url) return false;
+    return /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]+/.test(url.trim());
+}
+
+/**
+ * Genera la URL embebida para previsualización en iframe
+ * Requiere que la hoja esté publicada o compartida públicamente
+ */
+function getGoogleSheetsEmbedUrl(url) {
+    const id = extractGoogleSheetsId(url);
+    if (!id) return null;
+    // Usamos pubhtml con parámetros de widget para embed limpio
+    return `https://docs.google.com/spreadsheets/d/${id}/pubhtml?widget=true&headers=false&chrome=false`;
+}
+
+/**
+ * Genera la URL de vista previa en modo presentación
+ */
+function getGoogleSheetsPreviewUrl(url) {
+    const id = extractGoogleSheetsId(url);
+    if (!id) return null;
+    return `https://docs.google.com/spreadsheets/d/${id}/htmlembed?single=true&widget=true&headers=false&chrome=false`;
+}
+
 function getApiMode() {
     return typeof API !== 'undefined' && typeof API.getMode === 'function'
         ? API.getMode()
@@ -193,8 +245,8 @@ function saveFichaToLocalStorage(payload) {
     const docs = safeParseJson(docsRaw, []);
 
     const docPendiente = {
-        id: payload.backendId || payload.codigo || Date.now().toString(),  // ← Usar backendId si existe
-        backendId: payload.backendId || null,  // ← Guardar explícitamente
+        id: payload.backendId || payload.codigo || Date.now().toString(),
+        backendId: payload.backendId || null,
         fecha: now.toISOString().split('T')[0],
         hora: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
         codigo: payload.codigo,
@@ -204,8 +256,10 @@ function saveFichaToLocalStorage(payload) {
         progreso: 5,
         facultadId: payload.facultadId || 1,
         tipo: 'caracterizacion',
-        // 🔥 FIX: Solo 'remote' si REALMENTE tenemos backendId
-        origen: payload.backendId ? 'hibrido' : 'local'
+        origen: payload.backendId ? 'hibrido' : 'local',
+        // ← NUEVO: Guardar referencia a Google Sheets
+        googleSheetsUrl: payload.googleSheetsUrl || null,
+        tieneGoogleSheets: Boolean(payload.googleSheetsUrl)
     };
 
     const idx = docs.findIndex(item => item.codigo === codigo);
@@ -228,7 +282,9 @@ function saveFichaToLocalStorage(payload) {
         resumenCampos: [
             { label: 'Tipo de Proceso', value: payload.tipoProcesoLabel || payload.tipoProceso || '-' },
             { label: 'Proceso', value: payload.macroProcesoNombre || payload.macroProceso || '-' },
-            { label: 'Archivo adjunto', value: (payload.adjuntos || []).map((adj) => adj.nombre).join(', ') || '-' }
+            { label: 'Archivo adjunto', value: (payload.adjuntos || []).map((adj) => adj.nombre).join(', ') || '-' },
+            // ← NUEVO: Mostrar enlace en resumen
+            { label: 'Google Sheets', value: payload.googleSheetsUrl || 'No vinculado' }
         ],
         adjuntos: payload.adjuntos || []
     };
@@ -290,7 +346,6 @@ function persistCaracterizacionLocal(payload, savedOrigin) {
         }
 
         try {
-            // Intentar liberar espacio de adjuntos antiguos para conservar preview del documento actual.
             compactEmbeddedAdjuntos(normalizedPayload.codigo);
             saveFichaToLocalStorage(normalizedPayload);
             showToast('Se liberó espacio local y se guardó el documento con vista previa.', 'warning', 4200);
@@ -299,7 +354,6 @@ function persistCaracterizacionLocal(payload, savedOrigin) {
             console.warn('No se pudo guardar conservando base64 tras compactar almacenamiento:', retryError);
         }
 
-        // Si el almacenamiento se llena, guardamos metadatos sin base64 embebido.
         const payloadSinContenido = {
             ...normalizedPayload,
             adjuntos: (normalizedPayload.adjuntos || []).map((adjunto) => {
@@ -361,13 +415,13 @@ function showToast(message, type = 'info', duration = 3000) {
 function initFileUpload() {
     const fileInput = document.querySelector(FICHA_CONFIG.selectors.fileInput);
     const fileList = document.querySelector(FICHA_CONFIG.selectors.fileList);
-    
+
     if (!fileInput || !fileList) return;
-    
+
     fileInput.addEventListener('change', (e) => {
         const files = Array.from(e.target.files);
         const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx'];
-        
+
         files.forEach(file => {
             const ext = String(file.name || '').split('.').pop().toLowerCase();
 
@@ -387,7 +441,7 @@ function initFileUpload() {
                 selectedFiles.push(file);
             }
         });
-        
+
         renderFileList();
         e.target.value = '';
 
@@ -400,17 +454,17 @@ function initFileUpload() {
 function renderFileList() {
     const fileList = document.querySelector(FICHA_CONFIG.selectors.fileList);
     if (!fileList) return;
-    
+
     if (selectedFiles.length === 0) {
         fileList.classList.add('hidden');
         return;
     }
-    
+
     fileList.classList.remove('hidden');
     fileList.innerHTML = selectedFiles.map((file, index) => {
         const size = formatFileSize(file.size);
         const icon = getFileIcon(file.name);
-        
+
         return `
             <div class="file-item">
                 <span class="material-symbols-outlined text-purple-500">${icon}</span>
@@ -542,7 +596,7 @@ function resolveFacultyCode() {
 }
 
 function extractSequenceFromCode(code, facultyCode, year) {
-    const pattern = new RegExp(`^FC-${facultyCode}-${year}-(\\d+)$`);
+    const pattern = new RegExp(`^FC-${facultyCode}-${year}-(\d+)$`);
     const match = String(code || '').trim().match(pattern);
     return match ? Number(match[1]) : null;
 }
@@ -684,14 +738,30 @@ function initFormHandler() {
     const btnFinalizar = document.querySelector(FICHA_CONFIG.selectors.btnFinalizar);
     const btnExpedientes = document.querySelector(FICHA_CONFIG.selectors.btnExpedientes);
     const form = document.querySelector(FICHA_CONFIG.selectors.form);
-    
+
     if (!btnFinalizar || !form) return;
-    
+
     btnFinalizar.addEventListener('click', async (e) => {
         e.preventDefault();
 
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
+
+        // ← NUEVO: Leer y validar enlace de Google Sheets
+        const googleSheetsInput = form.querySelector(FICHA_CONFIG.selectors.googleSheetsInput);
+        const googleSheetsUrl = googleSheetsInput ? googleSheetsInput.value.trim() : '';
+
+        if (googleSheetsUrl && !isValidGoogleSheetsUrl(googleSheetsUrl)) {
+            showToast('El enlace de Google Sheets no es válido. Debe tener el formato: https://docs.google.com/spreadsheets/d/...', 'error', 5000);
+            if (googleSheetsInput) {
+                googleSheetsInput.classList.add('ring-2', 'ring-red-500', 'border-red-500');
+                googleSheetsInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => {
+                    googleSheetsInput.classList.remove('ring-2', 'ring-red-500', 'border-red-500');
+                }, 4000);
+            }
+            return;
+        }
 
         const emptyRequiredFields = getRequiredEmptyFields(form, data);
 
@@ -705,10 +775,10 @@ function initFormHandler() {
                     input.classList.remove('ring-2', 'ring-red-500', 'border-red-500');
                 }, 3000);
             });
-            
+
             return;
         }
-        
+
         // Mostrar carga
         const originalText = btnFinalizar.innerHTML;
         btnFinalizar.disabled = true;
@@ -716,7 +786,7 @@ function initFormHandler() {
             <span class="material-symbols-outlined animate-spin">refresh</span>
             GUARDANDO...
         `;
-        
+
         try {
             const codigo = data.codigo || `FC-${new Date().getFullYear()}-${Math.floor(Math.random() * 900) + 100}`;
             const tipoProcesoInput = form.querySelector(FICHA_CONFIG.selectors.tipoProcesoSelect);
@@ -739,11 +809,16 @@ function initFormHandler() {
                     tamaño: formatFileSize(f.size),
                     tipo: getFileIcon(f.name)
                 })),
-                adjuntos: []
+                adjuntos: [],
+                // ← NUEVO: Incluir datos de Google Sheets
+                googleSheetsUrl: googleSheetsUrl || null,
+                googleSheetsEmbedUrl: googleSheetsUrl ? getGoogleSheetsEmbedUrl(googleSheetsUrl) : null,
+                googleSheetsPreviewUrl: googleSheetsUrl ? getGoogleSheetsPreviewUrl(googleSheetsUrl) : null,
+                googleSheetsId: googleSheetsUrl ? extractGoogleSheetsId(googleSheetsUrl) : null
             };
-            
+
             console.log('Datos a enviar:', payload);
-            
+
             const adjuntosConBase64 = [];
             for (let file of selectedFiles) {
                 const base64 = await fileToBase64(file);
@@ -753,7 +828,7 @@ function initFormHandler() {
                 if (ext === 'pdf') tipo = 'PDF';
                 else if (ext === 'doc' || ext === 'docx') tipo = 'Word';
                 else if (ext === 'xls' || ext === 'xlsx') tipo = 'Excel';
-                
+
                 adjuntosConBase64.push({
                     nombre: file.name,
                     tipo: tipo,
@@ -764,7 +839,7 @@ function initFormHandler() {
                     contenido: base64
                 });
             }
-            
+
             payload.adjuntos = adjuntosConBase64;
 
             let result = null;
@@ -772,34 +847,29 @@ function initFormHandler() {
 
             if (canUseApiUpload()) {
                 try {
-                    // Obtener valores de los selects para los query params
                     const tipoProcesoInput = form.querySelector(FICHA_CONFIG.selectors.tipoProcesoSelect);
                     const macroProcesoInput = form.querySelector(FICHA_CONFIG.selectors.macroProcesoSelect);
-                    
-                    // El backend espera: macroProcess (nombre del tipo) y process (nombre del macro proceso)
+
                     const macroProcess = tipoProcesoLabel || 'Estratégico';
                     const process = macroProcesoLabel || 'Gestión estratégica';
 
-                    // Tomar el PRIMER archivo PDF seleccionado (el backend solo acepta 1 PDF)
                     const pdfFile = selectedFiles.find(f => f.name.toLowerCase().endsWith('.pdf')) || selectedFiles[0];
-                    
+
                     if (!pdfFile) {
                         throw new Error('No se seleccionó ningún archivo PDF');
                     }
 
-                    // ✅ USAR EL ENDPOINT CORRECTO DEL BACKEND
                     result = await API.portal.characterizations.upload(pdfFile, macroProcess, process);
 
                     if (result && result.success) {
                         savedOrigin = 'remote';
-                        // ✅ GUARDAR EL CÓDIGO DEL BACKEND (UUID o CAR-YYYY-...)
                         const backendCode = result.data?.code || result.data?.id;
-                        payload.codigo = backendCode;           // "CAR-2024-1782320546390"
-                        payload.id = backendCode;                // Usar el mismo para API calls
-                        payload.backendId = backendCode;         // ← CLAVE: Guardar como backendId para delete
-                        
+                        payload.codigo = backendCode;
+                        payload.id = backendCode;
+                        payload.backendId = backendCode;
+
                         console.log('✅ Ficha subida con backendId:', backendCode);
-                        
+
                         showToast(`Ficha subida: ${backendCode}`, 'success', 3000);
                     }
                 } catch (apiError) {
@@ -809,16 +879,12 @@ function initFormHandler() {
             }
 
             if (!result || !result.success) {
-                // Fallback: guardar solo local
                 persistCaracterizacionLocal(payload, 'local');
                 result = { success: true, data: { id: payload.codigo, code: payload.codigo } };
                 showToast('Sin conexión a API. Se guardó localmente.', 'warning', 4000);
             } else {
-                // ✅ API exitosa: guardar localmente también con el código del servidor
                     payload.codigo = result.data?.code || payload.codigo;
                     payload.id = result.data?.id || result.data?.code;
-                    // 🔥 FIX: Mantener origen 'local' para que aparezca el botón Eliminar
-                    // El backendId se guarda separado para operaciones API
                     payload.backendId = result.data?.id || result.data?.code || null;
                     persistCaracterizacionLocal(payload, 'local');
             }
@@ -832,7 +898,9 @@ function initFormHandler() {
                     docName: payload.nombreProceso || payload.macroProcesoNombre || `Caracterización ${payload.codigo}`,
                     docType: 'caracterizacion',
                     docStatus: 'pendiente',
-                    facultyId: payload.facultadId || resolveFacultyId()
+                    facultyId: payload.facultadId || resolveFacultyId(),
+                    // ← NUEVO: Notificar al padre sobre Google Sheets
+                    googleSheetsUrl: payload.googleSheetsUrl
                 }, '*');
             }
 
@@ -850,13 +918,12 @@ function initFormHandler() {
             } else {
                 guardarFichaYRedirigir(codigo);
             }
-            
+
         } catch (error) {
             console.error('Error:', error);
             const detail = error?.message ? ` (${error.message})` : '';
             showToast(`Error al guardar${detail}`, 'error');
-            
-            // Restaurar botón
+
             btnFinalizar.disabled = false;
             btnFinalizar.innerHTML = originalText;
         }
@@ -971,7 +1038,7 @@ function initKeyboardShortcuts() {
             e.preventDefault();
             document.querySelector(FICHA_CONFIG.selectors.btnFinalizar)?.click();
         }
-        
+
         // Escape para volver
         if (e.key === 'Escape') {
             if (confirm('¿Desea salir? Los cambios no guardados se perderán.')) {
@@ -986,8 +1053,8 @@ function initKeyboardShortcuts() {
 // ==========================================
 
 function init() {
-    console.log('🚀 Ficha de Caracterización cargada');
-    
+    console.log('🚀 Ficha de Caracterización cargada (v2 - Google Sheets support)');
+
     initTheme();
     initFileUpload();
     initFormHandler();
@@ -996,8 +1063,7 @@ function init() {
     loadUserData()
         .then(() => refreshGeneratedCode())
         .catch(() => refreshGeneratedCode());
-    
-    // Cargar procesos y después configurar cascada
+
     cargarProcesosDesdeAPI().then(() => {
         initCascadaSelects();
         rehydrateCascadaFromCurrentSelection();
@@ -1008,7 +1074,7 @@ function init() {
         refreshGeneratedCode();
         rehydrateCascadaFromCurrentSelection();
     });
-    
+
     showToast('Formulario listo', 'info', 2000);
 }
 
@@ -1020,12 +1086,10 @@ if (document.readyState === 'loading') {
 }
 
 // ==========================================
-// SYNC MODO-AGNÓSTICO: Guarda en claves sin prefijo
-// para que funcione al cambiar local ↔ remote
+// SYNC MODO-AGNÓSTICO
 // ==========================================
 function sincronizarClavesNeutras(doc) {
     try {
-        // 1) Lista neutral de documentos (sin prefijo local/remote)
         const neutralRaw = localStorage.getItem('sigpro_documentos_lista');
         const neutral = neutralRaw ? JSON.parse(neutralRaw) : [];
         const idx = neutral.findIndex(d => d.codigo === doc.codigo);
@@ -1036,7 +1100,6 @@ function sincronizarClavesNeutras(doc) {
         }
         localStorage.setItem('sigpro_documentos_lista', JSON.stringify(neutral));
 
-        // 2) Reportes (para que el dashboard siempre cuente)
         const reportesRaw = localStorage.getItem('sigpro_reportes');
         const reportes = reportesRaw ? JSON.parse(reportesRaw) : [];
         const idxR = reportes.findIndex(r => r.codigo === doc.codigo);
@@ -1052,7 +1115,8 @@ function sincronizarClavesNeutras(doc) {
             progreso: doc.progreso,
             facultadId: doc.facultadId,
             tipo: doc.tipo,
-            origen: doc.origen
+            origen: doc.origen,
+            googleSheetsUrl: doc.googleSheetsUrl || null
         };
         if (idxR >= 0) {
             reportes[idxR] = { ...reportes[idxR], ...reporteDoc };

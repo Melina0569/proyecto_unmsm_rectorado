@@ -2016,7 +2016,20 @@ function getLocalDocumentDetail(codigo, doc) {
 
     try {
         const map = JSON.parse(raw);
-        const item = map?.[codigo];
+        let item = map?.[codigo];
+
+        // ✅ Si no encuentra por código, buscar dentro del mapa por fichaData.codigo o item.codigo
+        if (!item) {
+            const allKeys = Object.keys(map);
+            const matchKey = allKeys.find(k => {
+                const entry = map[k];
+                return entry?.fichaData?.codigo === codigo 
+                    || entry?.codigo === codigo
+                    || entry?.fichaData?.codigoProceso === codigo;
+            });
+            if (matchKey) item = map[matchKey];
+        }
+
         if (!item) {
             console.warn(`No se encontró detalle para código: ${codigo}`);
             return null;
@@ -2083,14 +2096,42 @@ function getLocalDocumentDetail(codigo, doc) {
             adjuntosFinales = item.adjuntos;
         }
 
+        // 1b) Buscar en item.archivos (donde api.js guarda los attachments)
+        if (adjuntosFinales.length === 0 && Array.isArray(item.archivos) && item.archivos.length > 0) {
+            console.log(`📎 Usando item.archivos (${item.archivos.length})`);
+            adjuntosFinales = item.archivos.map(a => ({
+                nombre: a.name || a.nombre || 'Archivo adjunto',
+                tipo: (a.type || a.tipo || 'PDF').toUpperCase(),
+                tamaño: a.size || a.tamaño || '-',
+                fecha: formatDate(fechaBase),
+                activo: true,
+                icono: 'picture_as_pdf',
+                contenido: a.base64 || a.contenido || a.dataUrl || a.url || ''
+            }));
+        }
+
+        // 1c) Buscar pdfBase64 directo (donde api.js guarda el PDF del reporte)
+        if (adjuntosFinales.length === 0 && item.pdfBase64) {
+            console.log(`📎 Usando item.pdfBase64`);
+            adjuntosFinales = [{
+                nombre: `${codigo}.pdf`,
+                tipo: 'PDF',
+                tamaño: '-',
+                fecha: formatDate(fechaBase),
+                activo: true,
+                icono: 'picture_as_pdf',
+                contenido: item.pdfBase64
+            }];
+        }
+
         // 2) Buscar en fichaData.adjuntos (donde guarda el formulario de indicadores)
-        else if (item.fichaData && Array.isArray(item.fichaData.adjuntos) && item.fichaData.adjuntos.length > 0) {
+        if (adjuntosFinales.length === 0 && item.fichaData && Array.isArray(item.fichaData.adjuntos) && item.fichaData.adjuntos.length > 0) {
             console.log(`📎 Usando fichaData.adjuntos (${item.fichaData.adjuntos.length})`);
             adjuntosFinales = item.fichaData.adjuntos;
         }
 
         // 3) Buscar campo "archivo" suelto en fichaData
-        else if (item.fichaData?.archivo) {
+        if (adjuntosFinales.length === 0 && item.fichaData?.archivo) {
             console.log(`📎 Usando fichaData.archivo`);
             adjuntosFinales = [{
                 nombre: item.fichaData.archivo.name || item.fichaData.archivo.nombre || 'Archivo adjunto',
@@ -2104,7 +2145,7 @@ function getLocalDocumentDetail(codigo, doc) {
         }
 
         // 4) Buscar en item.archivo (otra ubicación posible)
-        else if (item.archivo) {
+        if (adjuntosFinales.length === 0 && item.archivo) {
             console.log(`📎 Usando item.archivo`);
             const arch = typeof item.archivo === 'string' ? { nombre: item.archivo } : item.archivo;
             adjuntosFinales = [{
@@ -2207,6 +2248,18 @@ function getLocalIndicatorDetail(codigo, doc) {
         const map = JSON.parse(raw);
         const ficha = map?.[codigo];
         if (!ficha) return null;
+
+        // ✅ Si no encuentra por código, buscar dentro del mapa por fichaData.codigo o item.codigo
+        if (!item) {
+            const allKeys = Object.keys(map);
+            const matchKey = allKeys.find(k => {
+                const entry = map[k];
+                return entry?.fichaData?.codigo === codigo 
+                    || entry?.codigo === codigo
+                    || entry?.fichaData?.codigoProceso === codigo;
+            });
+            if (matchKey) item = map[matchKey];
+        }
 
         const fechaBase = doc?.fecha || new Date().toISOString().split('T')[0];
         const horaBase = doc?.hora || '00:00 H';
@@ -2712,6 +2765,35 @@ function getMimeType(filename) {
     return mimeTypes[ext] || 'application/octet-stream';
 }
 
+async function buscarAdjuntoEnIndexedDBPorNombre(codigo, nombre) {
+    try {
+        const db = await openAdjuntosIndexedDb();
+        const tx = db.transaction("adjuntos", "readonly");
+        const store = tx.objectStore("adjuntos");
+        const registros = await new Promise((resolve, reject) => {
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+        db.close();
+
+        // Coincidencia exacta por código + nombre
+        let match = registros.find(r =>
+            (r.codigo === codigo) && (r.nombre === nombre || r.name === nombre)
+        );
+
+        // Si no hay coincidencia exacta, buscar solo por nombre
+        if (!match) {
+            match = registros.find(r => r.nombre === nombre || r.name === nombre);
+        }
+
+        return match || null;
+    } catch (error) {
+        console.error('❌ Error escaneando IndexedDB por nombre:', error);
+        return null;
+    }
+}
+
 // ==========================================
 // 🔥 FIX 7 & 8: Función helper para normalizar contenido base64
 // ==========================================
@@ -2828,18 +2910,30 @@ async function normalizarContenidoAdjunto(adjunto) {
         }
     }
 
+    // FALLBACK: si el id exacto no existe, escanear el store por nombre/código
+    if (!source) {
+        const codigoActual = document.getElementById('detail-codigo')?.textContent || '';
+        const nombreBuscar = adjunto.nombre || adjunto.name || '';
+        const registroEncontrado = await buscarAdjuntoEnIndexedDBPorNombre(codigoActual, nombreBuscar);
+        if (registroEncontrado) {
+            source =
+                registroEncontrado.dataUrl ||
+                registroEncontrado.url ||
+                registroEncontrado.contenido ||
+                registroEncontrado.content ||
+                registroEncontrado.base64 ||
+                registroEncontrado.data ||
+                '';
+            console.log('✅ Recuperado por escaneo IndexedDB (id real):', registroEncontrado.id);
+        }
+    }
 
     // =========================================================
     // 3. SI SIGUE SIN CONTENIDO, TERMINAR
     // =========================================================
 
     if (!source) {
-
-        console.warn(
-            '⚠️ El adjunto no tiene contenido:',
-            adjunto
-        );
-
+        console.warn('⚠️ El adjunto no tiene contenido:', adjunto);
         return '';
     }
 
@@ -2918,6 +3012,92 @@ async function normalizarContenidoAdjunto(adjunto) {
 
     return source;
 }
+
+// === AGREGAR ESTA FUNCIÓN COMPLETA (ej. línea 2750, antes de buscarEnIndexedDB) ===
+async function recuperarAdjuntoDesdeFallback(docCode, adjunto) {
+    try {
+        const detalleRaw = localStorage.getItem('local_sigpro_documentos_detalle') 
+                        || localStorage.getItem('sigpro_documentos_detalle') 
+                        || '{}';
+        const detalles = JSON.parse(detalleRaw);
+        
+        // Buscar directo por clave
+        let detalleDoc = detalles[docCode] || detalles[adjunto?.id] || {};
+        
+        // Si no, buscar por código dentro de los valores
+        if (!detalleDoc || Object.keys(detalleDoc).length === 0) {
+            const matchKey = Object.keys(detalles).find(k => {
+                const entry = detalles[k];
+                return entry?.fichaData?.codigo === docCode 
+                    || entry?.codigo === docCode
+                    || entry?.fichaData?.codigoProceso === docCode;
+            });
+            if (matchKey) detalleDoc = detalles[matchKey];
+        }
+        
+        // 1. Buscar en adjuntos (guardados desde facultades-documentos.js)
+        if (Array.isArray(detalleDoc.adjuntos) && detalleDoc.adjuntos.length > 0) {
+            const primeroConContenido = detalleDoc.adjuntos.find(a => {
+                const c = a.contenido || a.base64 || a.dataUrl || '';
+                return c.length > 50;
+            });
+            if (primeroConContenido) {
+                let base64 = primeroConContenido.contenido || primeroConContenido.base64 || primeroConContenido.dataUrl;
+                if (base64.startsWith('data:')) base64 = base64.split(',')[1];
+                const byteCharacters = atob(base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                return new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+            }
+        }
+        
+        // 2. Buscar pdfBase64 directo
+        if (detalleDoc.pdfBase64) {
+            const byteCharacters = atob(detalleDoc.pdfBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            return new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+        }
+        
+        // 3. Buscar en archivos (guardados desde api.js)
+        if (Array.isArray(detalleDoc.archivos) && detalleDoc.archivos.length > 0) {
+            const primero = detalleDoc.archivos.find(a => a.base64 || a.contenido);
+            if (primero) {
+                const base64 = primero.base64 || primero.contenido;
+                const byteCharacters = atob(base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                return new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+            }
+        }
+        
+        // 4. Buscar en fichaData.adjuntos
+        if (detalleDoc.fichaData && Array.isArray(detalleDoc.fichaData.adjuntos) && detalleDoc.fichaData.adjuntos.length > 0) {
+            const primero = detalleDoc.fichaData.adjuntos.find(a => a.contenido || a.base64);
+            if (primero) {
+                let base64 = primero.contenido || primero.base64;
+                if (base64.startsWith('data:')) base64 = base64.split(',')[1];
+                const byteCharacters = atob(base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                return new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+            }
+        }
+        
+    } catch (e) {
+        console.warn('Fallback falló:', e);
+    }
+    return null;
+}
+
 
 window.abrirPreviewPdf = async function(indiceAdjunto, origen = 'detalle') {
     const fuente = origen === 'rectificacion' ? adjuntosRectificacionActuales : adjuntosActuales;
@@ -3009,53 +3189,31 @@ window.abrirPreviewPdf = async function(indiceAdjunto, origen = 'detalle') {
             }
         } else {
             // Archivo normal: crear embed dinámico
-            let source =
-            adjunto.contenido ||
-            adjunto.url ||
-            adjunto.path ||
-            '';
+            let source = adjunto.contenido || adjunto.url || adjunto.path || '';
 
+            // Si no hay contenido directo, intentar recuperarlo desde IndexedDB
+            if (!source) {
+                source = await normalizarContenidoAdjunto(adjunto);
+            }
 
-        // Si no hay contenido directo,
-        // intentar recuperarlo desde IndexedDB
-        if (!source) {
+            // === FALLBACK ÚNICO: Si IndexedDB está vacío, buscar en localStorage ===
+            if (!source) {
+                console.warn('⚠️ IndexedDB vacío, intentando fallback localStorage...');
+                const docCode = document.getElementById('detail-codigo')?.textContent || adjunto.id || '';
+                const blobFallback = await recuperarAdjuntoDesdeFallback(docCode, adjunto);
+                if (blobFallback) {
+                    source = URL.createObjectURL(blobFallback);
+                    window._currentPreviewBlobUrl = source;
+                    console.log('✅ Documento recuperado desde fallback localStorage');
+                }
+            }
 
-            source =
-                await normalizarContenidoAdjunto(
-                    adjunto
-                );
-        }
-
-
-        // Si se recuperó correctamente,
-        // guardar el contenido para futuras aperturas
-        if (source) {
-
-            adjunto.contenido = source;
-            adjunto.url = source;
-            adjunto.path = source;
-
-            console.log(
-                '✅ Documento recuperado correctamente:',
-                adjunto.nombre
-            );
-        }
-
-
-        // Si definitivamente no existe
-        if (!source) {
-
-            console.error(
-                '❌ No se pudo recuperar:',
-                adjunto
-            );
-
-            mostrarModalDocumentoNoDisponible(
-                adjunto
-            );
-
-            return;
-        }
+            // Si definitivamente no existe
+            if (!source) {
+                console.error('❌ No se pudo recuperar:', adjunto);
+                mostrarModalDocumentoNoDisponible(adjunto);
+                return;
+            }
 
             const embed = document.createElement('embed');
             embed.type = getMimeType(adjunto.nombre);

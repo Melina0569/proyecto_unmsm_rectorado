@@ -710,11 +710,11 @@ const LocalAPI = {
         async getById(id) {
             await simulateDelay(200);
             
-            // ✅ Buscar en los detalles técnicos guardados
+            // Buscar detalle técnico donde se guardan pdfBase64 y archivos
             const docsDetalle = JSON.parse(localStorage.getItem(this.db.documentosDetalle) || '{}');
             const detalle = docsDetalle[id] || {};
             
-            // ✅ Buscar en la lista general para metadata
+            // Buscar en lista general
             const allDocs = await LocalAPI.documentos.getAll();
             const docInfo = allDocs.data.find(d => d.id === id || d.codigo === id) || {};
             
@@ -723,15 +723,13 @@ const LocalAPI = {
                 data: { 
                     id: id,
                     nombre: docInfo.descripcion || detalle.fichaData?.nombreIndicador || 'Documento ' + id,
-                    descripcion: docInfo.descripcion || detalle.fichaData?.descripcion || '',
-                    estado: docInfo.estado || detalle.fichaData?.estado || 'pendiente',
-                    // ✅ Campos críticos para el visor de PDF
-                    pdfUrl: detalle.pdfUrl || detalle.fichaData?.pdfUrl || null,
+                    estado: docInfo.estado || 'pendiente',
+                    // ✅ CRÍTICO: exponer los archivos para el fallback
+                    pdfUrl: detalle.pdfUrl || null,
                     pdfBase64: detalle.pdfBase64 || null,
                     archivos: detalle.archivos || [],
                     fichaData: detalle.fichaData || null,
-                    ...docInfo,
-                    ...detalle
+                    ...docInfo
                 } 
             };
         }
