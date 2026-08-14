@@ -1075,43 +1075,113 @@ function getTechnicalDetail(doc) {
 	};
 }
 
-function buildTechnicalInfoMarkup(doc) {
-	const technical = getTechnicalDetail(doc);
-	const code = doc.codigo || "-";
-	const variables = Array.isArray(technical.variables)
-		? technical.variables.join("\n")
-		: String(technical.variables || "-");
-	const rawFormula = String(technical.formula || "").replace(/\s+/g, " ").trim();
-	const multMatch = rawFormula.match(/^(.*?)(?:\s*[×x*]\s*)(.+)$/i);
-	const mainFormula = (multMatch ? multMatch[1] : rawFormula) || "Admitidos / Matriculados";
-	const multiplierValue = multMatch?.[2]?.trim() || "100%";
-	const slashParts = mainFormula.split("/");
-	const formulaLeft = slashParts[0]?.trim() || "Admitidos";
-	const formulaRight = slashParts.slice(1).join("/").trim() || "Matriculados";
-	const showMultiplier = Boolean(multMatch);
-	return `
-		<div class="detail-field detail-span-1"><p class="label">VERSIÓN</p><p class="value">${technical.version}</p></div>
-		<div class="detail-field detail-span-1"><p class="label">TIPO DE PROCESO</p><p class="value">${technical.tipoProceso}</p></div>
-		<div class="detail-field detail-span-1"><p class="label">PROCESO</p><p class="value">${technical.proceso}</p></div>
-		<div class="detail-field detail-span-1"><p class="label">OFICINA O UNIDAD RESPONSABLE</p><p class="value">${technical.unidad}</p></div>
-		<div class="detail-field detail-span-2"><p class="label">OBJETIVO DEL PROCESO</p><p class="value">${technical.objetivo}</p></div>
-		<div class="detail-field detail-span-2"><p class="label">NOMBRE DEL INDICADOR</p><p class="value">${technical.nombreIndicador}</p></div>
-		<div class="detail-field detail-span-1"><p class="label">FRECUENCIA</p><p class="value"><span class="detail-chip">${technical.frecuencia}</span></p></div>
-		<div class="detail-field detail-span-3"><p class="label">VARIABLES</p><p class="value detail-multiline">${variables}</p></div>
-		<div class="detail-field detail-span-2"><p class="label">FÓRMULA DEL INDICADOR</p><div class="formula-card"><div class="formula-main"><span>${formulaLeft}</span><span class="formula-divider"></span><span>${formulaRight}</span></div>${showMultiplier ? `<span class="formula-multiplier">× ${multiplierValue}</span>` : ""}</div></div>
-		<div class="detail-field detail-span-1"><p class="label">FUENTE</p><p class="value">${technical.fuente}</p></div>
-		<div class="detail-field detail-span-1"><p class="label">META</p><p class="value detail-meta">${technical.meta}</p></div>
-	`;
-}
+function buildDetailMarkupByType(doc) {
+    const detail = doc.detail || {};
+    const ficha = detail.fichaData || detail.indicadorData || detail || {};
+    const reporte = detail.reporteData || detail.reportData || {};
+    const resumenCampos = Array.isArray(detail.resumenCampos) ? detail.resumenCampos : [];
+    
+    const getResumenValue = (label, fallback = '-') => {
+        const wanted = String(label).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        const found = resumenCampos.find(item => 
+            String(item?.label || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() === wanted
+        );
+        return found?.value || fallback;
+    };
 
-function buildGenericDetailMarkup(doc) {
+    const safe = (val) => String(val || '-').trim() || '-';
+    const tipo = doc.tipo || inferType(doc.codigo);
+    const fechaElab = safe(doc.fecha ? new Date(doc.fecha).toLocaleDateString('es-PE', {day:'2-digit', month:'short', year:'numeric'}) : '-');
+
+    // Campos comunes reutilizables
+    const tipoProceso = safe(ficha.tipoProcesoLabel || ficha.tipoProceso || getResumenValue('Tipo de Proceso'));
+    const proceso     = safe(ficha.macroProcesoNombre || ficha.macroProceso || ficha.proceso || getResumenValue('Proceso') || getResumenValue('Macro Proceso') || doc.macroProceso);
+    const unidadResp  = safe(ficha.unidadResponsable || ficha.oficinaResponsable || ficha.areaResponsable || doc.unidad || doc.facultad);
+
+    if (tipo === 'indicador') {
+        const variables = Array.isArray(ficha.variables) ? ficha.variables.join('\n') : safe(ficha.variables || getResumenValue('Variables'));
+        const rawFormula = String(ficha.formulaDefinicion || ficha.formula || ficha.fórmula || getResumenValue('Formula del Indicador') || 'Admitidos / Matriculados × 100%').replace(/\s+/g, ' ').trim();
+        const multMatch = rawFormula.match(/^(.*?)(?:\s*[×x*]\s*)(.+)$/i);
+        const mainFormula = (multMatch ? multMatch[1] : rawFormula) || 'Admitidos / Matriculados';
+        const multiplierValue = multMatch?.[2]?.trim() || '100%';
+        const slashParts = mainFormula.split('/');
+        const formulaLeft = slashParts[0]?.trim() || 'Admitidos';
+        const formulaRight = slashParts.slice(1).join('/').trim() || 'Matriculados';
+        const showMultiplier = Boolean(multMatch);
+
+        return `
+            <div class="detail-field detail-span-1"><p class="label">VERSIÓN</p><p class="value">${safe(ficha.version)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">TIPO DE PROCESO</p><p class="value">${tipoProceso}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">PROCESO</p><p class="value">${proceso}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">OFICINA O UNIDAD RESPONSABLE</p><p class="value">${unidadResp}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">OBJETIVO DEL PROCESO</p><p class="value">${safe(ficha.objetivoProceso || getResumenValue('Objetivo del Proceso') || doc.descripcion)}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">NOMBRE DEL INDICADOR</p><p class="value">${safe(ficha.nombreIndicador || getResumenValue('Nombre del Indicador') || doc.descripcion)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">FRECUENCIA</p><p class="value"><span class="detail-chip">${safe(ficha.frecuencia || getResumenValue('Frecuencia'))}</span></p></div>
+            <div class="detail-field detail-span-3"><p class="label">VARIABLES</p><p class="value detail-multiline">${variables}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">FÓRMULA DEL INDICADOR</p><div class="formula-card"><div class="formula-main"><span>${formulaLeft}</span><span class="formula-divider"></span><span>${formulaRight}</span></div>${showMultiplier ? `<span class="formula-multiplier">× ${multiplierValue}</span>` : ""}</div></div>
+            <div class="detail-field detail-span-1"><p class="label">FUENTE</p><p class="value">${safe(ficha.fuente || getResumenValue('Fuente'))}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">META</p><p class="value detail-meta">${safe(ficha.meta || getResumenValue('Meta'))}</p></div>
+        `;
+    }
+
+    if (tipo === 'flujograma') {
+        return `
+            <div class="detail-field detail-span-1"><p class="label">TIPO DE PROCESO</p><p class="value">${tipoProceso}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">PROCESO</p><p class="value">${proceso}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">NOMBRE DE LA ACTIVIDAD</p><p class="value">${safe(ficha.proceso || ficha.actividad || getResumenValue('Nombre de la actividad') || doc.descripcion)}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">DESCRIPCIÓN</p><p class="value">${safe(doc.descripcion)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">CÓDIGO</p><p class="value">${safe(doc.codigo)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">FACULTAD</p><p class="value">${safe(doc.facultad)}</p></div>
+        `;
+    }
+
+    if (tipo === 'caracterizacion') {
+        return `
+            <div class="detail-field detail-span-1"><p class="label">TIPO DE PROCESO</p><p class="value">${tipoProceso}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">PROCESO</p><p class="value">${proceso}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">DESCRIPCIÓN</p><p class="value">${safe(doc.descripcion)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">CÓDIGO</p><p class="value">${safe(doc.codigo)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">FACULTAD</p><p class="value">${safe(doc.facultad)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">UNIDAD</p><p class="value">${safe(doc.unidad)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">ESTADO</p><p class="value">${safe(doc.estado)}</p></div>
+        `;
+    }
+
+    if (tipo === 'inventario') {
+        return `
+            <div class="detail-field detail-span-1"><p class="label">VERSIÓN</p><p class="value">${safe(doc.version || ficha.version || getResumenValue('Version'))}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">FECHA DE ELABORACIÓN</p><p class="value">${safe(ficha.fechaElaboracion || getResumenValue('Fecha de elaboracion') || fechaElab)}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">DESCRIPCIÓN</p><p class="value">${safe(doc.descripcion)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">CÓDIGO</p><p class="value">${safe(doc.codigo)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">FACULTAD</p><p class="value">${safe(doc.facultad)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">UNIDAD</p><p class="value">${safe(doc.unidad)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">ESTADO</p><p class="value">${safe(doc.estado)}</p></div>
+        `;
+    }
+
+    if (tipo === 'reporte') {
+        return `
+            <div class="detail-field detail-span-1"><p class="label">SEMESTRE</p><p class="value">${safe(reporte.semestre || ficha.semestreReporte || getResumenValue('Semestre'))}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">FECHA DE ELABORACIÓN</p><p class="value">${safe(reporte.fechaElaboracion || ficha.fechaElaboracion || getResumenValue('Fecha de elaboracion') || fechaElab)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">RESPONSABLE</p><p class="value">${safe(reporte.responsable || ficha.nombreResponsable || getResumenValue('Responsable'))}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">CARGO</p><p class="value">${safe(reporte.cargo || ficha.cargoResponsable || getResumenValue('Cargo'))}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">UNIDAD ORGÁNICA RESPONSABLE</p><p class="value">${safe(reporte.unidadOrganicaResponsable || reporte.unidadResponsable || ficha.unidadOrganicaResponsable || ficha.unidadResponsable || getResumenValue('Unidad organica Responsable') || getResumenValue('Unidad responsable'))}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">ACTIVIDADES REALIZADAS</p><p class="value detail-multiline">${safe(reporte.actividades || ficha.actividadesRealizadas || getResumenValue('Actividades realizadas'))}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">RESULTADOS OBTENIDOS</p><p class="value detail-multiline">${safe(reporte.resultados || ficha.resultadosObtenidos || getResumenValue('Resultados obtenidos'))}</p></div>
+            <div class="detail-field detail-span-2"><p class="label">OBSERVACIONES</p><p class="value detail-multiline">${safe(reporte.observaciones || ficha.observaciones || getResumenValue('Observaciones'))}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">CÓDIGO</p><p class="value">${safe(doc.codigo)}</p></div>
+            <div class="detail-field detail-span-1"><p class="label">FACULTAD</p><p class="value">${safe(doc.facultad)}</p></div>
+        `;
+    }
+
+    // Fallback genérico
     return `
-        <div class="detail-field detail-span-2"><p class="label">CÓDIGO</p><p class="value">${doc.codigo}</p></div>
-        <div class="detail-field detail-span-2"><p class="label">DESCRIPCIÓN</p><p class="value">${doc.descripcion}</p></div>
-        <div class="detail-field detail-span-1"><p class="label">FACULTAD</p><p class="value">${doc.facultad}</p></div>
-        <div class="detail-field detail-span-1"><p class="label">UNIDAD</p><p class="value">${doc.unidad}</p></div>
+        <div class="detail-field detail-span-2"><p class="label">CÓDIGO</p><p class="value">${safe(doc.codigo)}</p></div>
+        <div class="detail-field detail-span-2"><p class="label">DESCRIPCIÓN</p><p class="value">${safe(doc.descripcion)}</p></div>
+        <div class="detail-field detail-span-1"><p class="label">FACULTAD</p><p class="value">${safe(doc.facultad)}</p></div>
+        <div class="detail-field detail-span-1"><p class="label">UNIDAD</p><p class="value">${safe(doc.unidad)}</p></div>
         <div class="detail-field detail-span-1"><p class="label">TIPO</p><p class="value">${typeLabel(doc.tipo)}</p></div>
-        <div class="detail-field detail-span-1"><p class="label">ESTADO</p><p class="value">${doc.estado}</p></div>
+        <div class="detail-field detail-span-1"><p class="label">ESTADO</p><p class="value">${safe(doc.estado)}</p></div>
     `;
 }
 
@@ -1136,65 +1206,57 @@ function renderDetail() {
 	}
 
 	const detailBody = document.getElementById("detail-info-body");
-	if (detailBody) {
+    if (detailBody) {
         detailBody.classList.add("detail-info-body-grid");
-        // Solo mostrar campos de indicador si realmente es un indicador
-        if (doc.tipo === 'indicador') {
-            detailBody.innerHTML = buildTechnicalInfoMarkup(doc);
+        detailBody.innerHTML = buildDetailMarkupByType(doc);
+    }
+
+	const isIndicador = doc.tipo === 'indicador';
+    const chartTitle = document.getElementById("detail-chart-title");
+    if (chartTitle) chartTitle.textContent = isIndicador ? `Tendencia de Resultados - ${doc.codigo}` : '';
+
+    const historyRows = isIndicador ? buildHistoryRows(doc) : [];
+
+	const chartGrid = document.getElementById("detail-chart-grid");
+    if (chartGrid) {
+        if (!isIndicador) {
+            chartGrid.innerHTML = `<div class="flex h-full items-center justify-center text-slate-400 text-sm font-medium">No aplica seguimiento de indicador para documentos de tipo ${typeLabel(doc.tipo)}.</div>`;
+        } else if (!historyRows.length) {
+            chartGrid.innerHTML = `<div class="flex h-full items-center justify-center text-slate-400 text-sm font-medium">Sin datos de seguimiento registrados</div>`;
         } else {
-            detailBody.innerHTML = buildGenericDetailMarkup(doc);
+            const points = historyRows.map((row) => row.result);
+            const avgTarget = historyRows.reduce((sum, row) => sum + (Number.parseFloat(row.target) || 0), 0) / historyRows.length;
+            chartGrid.innerHTML = buildChartSvg(points, avgTarget || 60);
         }
     }
 
-	const chartTitle = document.getElementById("detail-chart-title");
-	if (chartTitle) chartTitle.textContent = `Tendencia de Resultados - ${doc.codigo}`;
+    const tableBody = document.getElementById("detail-table-body");
+    if (tableBody) {
+        if (!isIndicador) {
+            tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-slate-400 py-8">No aplica historial de indicador para documentos de tipo ${typeLabel(doc.tipo)}.</td></tr>`;
+        } else if (!historyRows.length) {
+            tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-slate-400 py-8">Sin datos de seguimiento registrados</td></tr>`;
+        } else {
+            const rows = historyRows
+                .map((row) => `
+                    <tr>
+                        <td>${row.number}</td>
+                        <td>${row.date}</td>
+                        <td>${formatCurrency(row.devengado)}</td>
+                        <td>${formatCurrency(row.pim)}</td>
+                        <td>${row.result}%</td>
+                        <td>${row.target}%</td>
+                        <td><span class="detail-badge ${row.stateClass}">${row.stateText}</span></td>
+                        <td>${row.analysis || row.note || "-"}</td>
+                        <td>${row.actions || "-"}</td>
+                    </tr>
+                `)
+                .join("");
+            tableBody.innerHTML = rows;
+        }
+    }
 
-	const historyRows = buildHistoryRows(doc);
-
-	const chartGrid = document.getElementById("detail-chart-grid");
-	if (chartGrid) {
-		if (!historyRows.length) {
-			chartGrid.innerHTML = `
-				<div class="flex h-full items-center justify-center text-slate-400 text-sm font-medium">
-					Sin datos de seguimiento registrados
-				</div>
-			`;
-		} else {
-			const points = historyRows.map((row) => row.result);
-			const avgTarget = historyRows.reduce((sum, row) => sum + (Number.parseFloat(row.target) || 0), 0) / historyRows.length;
-			chartGrid.innerHTML = buildChartSvg(points, avgTarget || 60);
-		}
-	}
-
-	const tableBody = document.getElementById("detail-table-body");
-	if (tableBody) {
-		if (!historyRows.length) {
-			tableBody.innerHTML = `
-				<tr>
-					<td colspan="9" class="text-center text-slate-400 py-8">Sin datos de seguimiento registrados</td>
-				</tr>
-			`;
-		} else {
-			const rows = historyRows
-				.map((row) => `
-					<tr>
-						<td>${row.number}</td>
-						<td>${row.date}</td>
-						<td>${formatCurrency(row.devengado)}</td>
-						<td>${formatCurrency(row.pim)}</td>
-						<td>${row.result}%</td>
-						<td>${row.target}%</td>
-						<td><span class="detail-badge ${row.stateClass}">${row.stateText}</span></td>
-						<td>${row.analysis || row.note || "-"}</td>
-						<td>${row.actions || "-"}</td>
-					</tr>
-				`)
-				.join("");
-			tableBody.innerHTML = rows;
-		}
-	}
-
-	renderEstadoGauge(historyRows);
+    renderEstadoGauge(isIndicador ? historyRows : []);
 }
 
 

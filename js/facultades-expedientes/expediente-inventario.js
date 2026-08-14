@@ -1,392 +1,600 @@
+/**
+ * EXPEDIENTE DE INVENTARIO - Vista de detalle
+ * Con soporte para Google Sheets embed + IndexedDB adjuntos
+ */
+
 const STORAGE_KEYS = {
-	EXPEDIENTE_ACTUAL: 'sigpro_expediente_actual',
-	DOCUMENTOS_LISTA: 'sigpro_documentos_lista',
-	DOCUMENTOS_DETALLE: 'sigpro_documentos_detalle'
+    DOCUMENTOS_DETALLE: 'sigpro_documentos_detalle',
+    DOCUMENTOS_LISTA: 'sigpro_documentos_lista'
 };
 
-let expedienteActual = null;
-let adjuntosActuales = [];
+let currentExpediente = null;
+let currentAdjuntos = [];
+let currentPreviewUrl = null;
 
-document.addEventListener('DOMContentLoaded', () => {
-	initTheme();
-	initThemeToggle();
-	initProfileDropdown();
-	initLogoutModal();
-	cargarPerfil();
+// ==========================================
+// INICIALIZACIÓN
+// ==========================================
 
-	const urlParams = new URLSearchParams(window.location.search);
-	const codigo = urlParams.get('codigo') || urlParams.get('docCode');
-	cargarExpediente(codigo);
-	initPreviewControls();
+document.addEventListener('DOMContentLoaded', async () => {
+    initTheme();
+    initThemeToggle();
+    initProfileDropdown();
+    initLogoutModal();
+    await cargarPerfilDesdeBackend();
+    await cargarExpediente();
 });
 
+// ==========================================
+// TEMA
+// ==========================================
+
 function initTheme() {
-	const currentTheme = localStorage.getItem('theme') || 'light';
-	document.documentElement.classList.toggle('dark', currentTheme === 'dark');
+    const currentTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.classList.toggle('dark', currentTheme === 'dark');
 }
 
 function initThemeToggle() {
-	const toggle = document.getElementById('theme-toggle');
-	if (!toggle) return;
-
-	toggle.addEventListener('click', () => {
-		const isDark = document.documentElement.classList.toggle('dark');
-		localStorage.setItem('theme', isDark ? 'dark' : 'light');
-		showToast(`Modo ${isDark ? 'oscuro' : 'claro'} activado`, 'info');
-	});
+    const toggle = document.getElementById('theme-toggle');
+    if (!toggle) return;
+    toggle.addEventListener('click', () => {
+        const html = document.documentElement;
+        const isDark = html.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        showToast(`Modo ${isDark ? 'oscuro' : 'claro'} activado`, 'info');
+    });
 }
+
+// ==========================================
+// PERFIL DROPDOWN
+// ==========================================
 
 function initProfileDropdown() {
-	const profileBtn = document.getElementById('profile-btn');
-	const profileDropdown = document.getElementById('profile-dropdown');
-	if (!profileBtn || !profileDropdown) return;
+    const profileBtn = document.getElementById('profile-btn');
+    const profileDropdown = document.getElementById('profile-dropdown');
+    if (!profileBtn || !profileDropdown) return;
 
-	let hideTimer = null;
-	const open = () => { if (hideTimer) clearTimeout(hideTimer); profileDropdown.classList.remove('hidden', 'hide-profile'); void profileDropdown.offsetWidth; profileDropdown.classList.add('show-profile'); };
-	const close = (immediate = false) => {
-		if (hideTimer) clearTimeout(hideTimer);
-		if (immediate) { profileDropdown.classList.remove('show-profile', 'hide-profile'); profileDropdown.classList.add('hidden'); return; }
-		if (profileDropdown.classList.contains('hidden')) return;
-		profileDropdown.classList.remove('show-profile'); profileDropdown.classList.add('hide-profile');
-		hideTimer = setTimeout(() => { profileDropdown.classList.add('hidden'); profileDropdown.classList.remove('hide-profile'); }, 180);
-	};
+    let hideTimer = null;
 
-	profileBtn.addEventListener('click', (e) => { e.stopPropagation(); profileDropdown.classList.contains('hidden') ? open() : close(); });
-	document.addEventListener('click', () => close());
-	document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    function openProfileDropdown() {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        profileDropdown.classList.remove('hidden');
+    }
+
+    function closeProfileDropdown() {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        profileDropdown.classList.add('hidden');
+    }
+
+    profileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isHidden = profileDropdown.classList.contains('hidden');
+        if (isHidden) openProfileDropdown(); else closeProfileDropdown();
+    });
+
+    document.addEventListener('click', () => closeProfileDropdown());
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeProfileDropdown();
+    });
 }
+
+// ==========================================
+// LOGOUT MODAL
+// ==========================================
 
 function initLogoutModal() {
-	const logoutBtn = document.getElementById('logout-btn');
-	const logoutModal = document.getElementById('logout-modal');
-	const logoutCancel = document.getElementById('logout-cancel');
-	const logoutConfirm = document.getElementById('logout-confirm');
-	const profileDropdown = document.getElementById('profile-dropdown');
+    const logoutBtn = document.getElementById('logout-btn');
+    const logoutModal = document.getElementById('logout-modal');
+    const logoutCancel = document.getElementById('logout-cancel');
+    const logoutConfirm = document.getElementById('logout-confirm');
 
-	if (!logoutBtn || !logoutModal) return;
+    if (!logoutBtn || !logoutModal) return;
 
-	const abrir = () => {
-		logoutModal.classList.remove('hidden');
-		void logoutModal.offsetWidth;
-	};
+    function abrirModalLogout() {
+        logoutModal.classList.remove('hidden');
+    }
+    function cerrarModalLogout() {
+        logoutModal.classList.add('hidden');
+    }
+    function ejecutarLogout() {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace('portal-inicio-facultades.html');
+    }
 
-	const cerrar = () => {
-		logoutModal.classList.add('hidden');
-	};
-
-	const ejecutar = () => {
-		localStorage.clear();
-		sessionStorage.clear();
-		if (typeof API !== 'undefined' && API.auth && API.auth.logout) {
-			Promise.resolve(API.auth.logout()).catch(() => {});
-		}
-		window.location.href = 'portal-inicio.html';
-	};
-
-	logoutBtn.addEventListener('click', (e) => {
-		e.preventDefault();
-		e.stopPropagation();
-		profileDropdown?.classList.add('hidden');
-		abrir();
-	});
-
-	logoutCancel?.addEventListener('click', cerrar);
-	logoutConfirm?.addEventListener('click', ejecutar);
-	logoutModal.addEventListener('click', (e) => { if (e.target === logoutModal) cerrar(); });
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        abrirModalLogout();
+    });
+    if (logoutCancel) logoutCancel.addEventListener('click', cerrarModalLogout);
+    if (logoutConfirm) logoutConfirm.addEventListener('click', ejecutarLogout);
+    logoutModal.addEventListener('click', (e) => {
+        if (e.target === logoutModal) cerrarModalLogout();
+    });
 }
 
-function cargarPerfil() {
-	const raw = localStorage.getItem('usuario') || localStorage.getItem('sigpro_usuario') || localStorage.getItem('user');
-	let user = null;
-	try { user = raw ? JSON.parse(raw) : null; } catch { user = null; }
+// ==========================================
+// CARGAR EXPEDIENTE
+// ==========================================
 
-	const nombre = user?.nombre || user?.name || 'Usuario SIGPRO';
-	const email = user?.correo || user?.email || 'usuario@unmsm.edu.pe';
-	const rol = user?.rol || user?.role || 'Usuario';
-	const facultad = user?.facultad || user?.facultadNombre || 'UNMSM';
-	const iniciales = (nombre.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'US');
+async function cargarExpediente() {
+    const params = new URLSearchParams(window.location.search);
+    const codigo = params.get('codigo') || 'INV-2026-001';
 
-	document.getElementById('profile-iniciales').textContent = iniciales;
-	document.getElementById('profile-nombre').textContent = nombre;
-	document.getElementById('profile-email').textContent = email;
-	document.getElementById('profile-rol').textContent = rol;
-	document.getElementById('profile-facultad').textContent = facultad;
+    document.getElementById('codigo-display').textContent = codigo;
+
+    // 1. Intentar desde localStorage detalle
+    const detalleRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
+    const detalleMap = detalleRaw ? JSON.parse(detalleRaw) : {};
+    const detalle = detalleMap[codigo];
+
+    if (detalle && detalle.fichaData) {
+        currentExpediente = detalle;
+        renderizarInformacion(detalle.fichaData, codigo);
+        renderizarAdjuntos(detalle.fichaData.adjuntos || detalle.adjuntos || [], codigo);
+        renderizarGoogleSheets(detalle.fichaData);
+        return;
+    }
+
+    // 2. Fallback: buscar en lista y construir mínimo
+    const listaRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
+    const lista = listaRaw ? JSON.parse(listaRaw) : [];
+    const doc = lista.find(d => d.codigo === codigo);
+
+    if (doc) {
+        const fichaData = {
+            version: '1.0',
+            fechaElaboracion: doc.fecha || new Date().toISOString().split('T')[0],
+            facultad: doc.facultad || doc.nombreFacultad || 'UNMSM',
+            asunto: doc.asunto || 'Inventarios',
+            operacion: 'GESTIÓN DE INVENTARIO',
+            documentoTecnico: doc.descripcion || `Inventario ${codigo}`
+        };
+        renderizarInformacion(fichaData, codigo);
+        renderizarAdjuntos([], codigo);
+        renderizarGoogleSheets({});
+    } else {
+        // 3. Demo fallback
+        const demoData = {
+            version: '1.0',
+            fechaElaboracion: '2026-03-20',
+            facultad: 'UNMSM',
+            asunto: 'Inventarios',
+            operacion: 'GESTIÓN DE INVENTARIO',
+            documentoTecnico: 'Inventario Institucional de Procesos'
+        };
+        renderizarInformacion(demoData, codigo);
+        renderizarAdjuntos([], codigo);
+        renderizarGoogleSheets({});
+    }
 }
 
-function cargarExpediente(codigo) {
-	expedienteActual = obtenerInventario(codigo) || obtenerPrimeroInventario();
+// ==========================================
+// RENDERIZAR INFORMACIÓN TÉCNICA
+// ==========================================
 
-	if (!expedienteActual) {
-		showToast('No se encontró un inventario aprobado', 'warning');
-		return;
-	}
-
-	mostrarInfoTecnica(expedienteActual);
-	renderAdjuntos(expedienteActual.adjuntos || []);
+function renderizarInformacion(data, codigo) {
+    setText('info-version', data.version || '-');
+    setText('info-fecha', formatearFecha(data.fechaElaboracion) || '-');
+    setText('info-facultad', data.facultad || data.facultadNombre || '-');
+    setText('info-asunto', data.asunto || 'Inventarios');
+    setText('info-operacion', data.operacion || 'GESTIÓN DE INVENTARIO');
+    setText('info-documento', data.documentoTecnico || data.descripcion || `Inventario ${codigo}`);
 }
 
-function obtenerPrimeroInventario() {
-	const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
-	if (!raw) return null;
-	try {
-		const map = JSON.parse(raw);
-		const entry = Object.values(map).find((item) => item?.tipo === 'inventario' || /inventario/i.test(item?.asunto || ''));
-		return entry ? construirDetalleInventario(entry.codigo, entry) : null;
-	} catch {
-		return null;
-	}
+function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text || '-';
 }
 
-function obtenerInventario(codigo) {
-	if (!codigo) return null;
-	const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
-	if (!raw) return null;
-	try {
-		const map = JSON.parse(raw);
-		const item = map?.[codigo];
-		if (!item) return null;
-		return construirDetalleInventario(codigo, item);
-	} catch (error) {
-		console.error('Error leyendo inventario:', error);
-		return null;
-	}
+function formatearFecha(fechaStr) {
+    if (!fechaStr) return '-';
+    const fecha = new Date(fechaStr);
+    if (isNaN(fecha.getTime())) return fechaStr;
+    return fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-function construirDetalleInventario(codigo, item) {
-	const ficha = item.fichaData || item;
-	const fechaElaboracion = item.fechaElaboracion || ficha.fechaElaboracion || '-';
-	const version = item.version || ficha.version || '-';
-	const adjuntos = normalizarAdjuntos(codigo, item.adjuntos || ficha.adjuntos || []);
+// ==========================================
+// GOOGLE SHEETS
+// ==========================================
 
-	return {
-		codigo: item.codigo || codigo,
-		tipo: 'inventario',
-		asunto: 'Inventarios',
-		descripcion: item.titulo || `Inventario ${codigo}`,
-		version,
-		fechaElaboracion,
-		operacion: item.operacion || 'GESTION DE INVENTARIO',
-		facultad: item.reporteData?.facultad || ficha.facultad || '-',
-		adjuntos,
-		resumenCampos: [
-			{ label: 'Versión', value: version },
-			{ label: 'Fecha de elaboración', value: fechaElaboracion },
-			{ label: 'Documento adjunto', value: adjuntos.map((adj) => adj.nombre).join(', ') || '-' }
-		]
-	};
+function renderizarGoogleSheets(fichaData) {
+    const container = document.getElementById('gsheets-section');
+    const iframe = document.getElementById('gsheets-embed');
+    const urlDisplay = document.getElementById('gsheets-url-display');
+    const rangeDisplay = document.getElementById('gsheets-range-display');
+
+    if (!container) return;
+
+    const url = fichaData?.googleSheetsUrl || fichaData?.googleSheetsURL || '';
+    const range = fichaData?.googleSheetsRange || 'A1:Z50';
+
+    if (!url) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+
+    const embedUrl = construirGoogleSheetsEmbedUrl(url, range);
+    if (embedUrl && iframe) {
+        iframe.src = embedUrl;
+    }
+
+    if (urlDisplay) urlDisplay.textContent = url;
+    if (rangeDisplay) rangeDisplay.textContent = range;
 }
 
-function normalizarAdjuntos(codigo, adjuntos) {
-	let list = Array.isArray(adjuntos) ? adjuntos : [];
+/**
+ * Convierte una URL pública de Google Sheets en URL embeddable
+ * Soporta:
+ *   https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit...
+ *   https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/pubhtml...
+ */
+function construirGoogleSheetsEmbedUrl(sheetsUrl, range) {
+    if (!sheetsUrl) return null;
 
-	try {
-		const cacheRaw = sessionStorage.getItem('sigpro_adjuntos_cache');
-		const cache = cacheRaw ? JSON.parse(cacheRaw) : {};
-		const cacheByCodigo = Array.isArray(cache?.[codigo]) ? cache[codigo] : [];
+    // Extraer ID del spreadsheet
+    const match = sheetsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match) return null;
 
-		if (cacheByCodigo.length > 0) {
-			const cacheMap = new Map(cacheByCodigo.map((adj) => [adj.nombre || adj.name || '', adj]));
-			list = list.map((adj) => {
-				if (adj?.contenido || adj?.url || adj?.path) return adj;
-				const key = adj?.nombre || adj?.name || '';
-				const cached = cacheMap.get(key);
-				return cached ? { ...adj, ...cached } : adj;
-			});
+    const sheetId = match[1];
 
-			if (list.length === 0) list = cacheByCodigo;
-		}
-	} catch (error) {
-		console.warn('No se pudo leer cache temporal:', error);
-	}
+    // Extraer gid si existe en la URL
+    const gidMatch = sheetsUrl.match(/[#&]gid=(\d+)/);
+    const gid = gidMatch ? gidMatch[1] : '0';
 
-	return list;
+    // URL de embed con htmlembed (más limpia para iframes)
+    const params = new URLSearchParams({
+        widget: 'true',
+        headers: 'false',
+        chrome: 'false',
+        range: range || 'A1:Z50'
+    });
+
+    if (gid) params.set('gid', gid);
+
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/htmlembed?${params.toString()}`;
 }
 
-function mostrarInfoTecnica(detalle) {
-	document.getElementById('codigo-display').textContent = detalle.codigo || '-';
-	document.getElementById('info-version').textContent = detalle.version || '-';
-	document.getElementById('info-fecha').textContent = detalle.fechaElaboracion || '-';
-	document.getElementById('info-facultad').textContent = detalle.facultad || '-';
-	document.getElementById('info-asunto').textContent = detalle.asunto || '-';
-	document.getElementById('info-operacion').textContent = detalle.operacion || '-';
-	document.getElementById('info-documento').textContent = detalle.descripcion || '-';
+function abrirGoogleSheetsExterno() {
+    const url = document.getElementById('gsheets-url-display')?.textContent;
+    if (url && url !== '-') window.open(url, '_blank');
 }
 
-function renderAdjuntos(adjuntos) {
-	adjuntosActuales = Array.isArray(adjuntos) ? adjuntos : [];
-	const container = document.getElementById('adjuntos-container');
-	if (!container) return;
+// ==========================================
+// ADJUNTOS + INDEXEDDB
+// ==========================================
 
-	if (!adjuntosActuales.length) {
-		container.innerHTML = '<div class="p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500 text-center md:col-span-2">No hay archivos adjuntos para este inventario.</div>';
-		return;
-	}
+async function renderizarAdjuntos(adjuntos, codigo) {
+    const container = document.getElementById('adjuntos-container');
+    if (!container) return;
 
-	container.innerHTML = adjuntosActuales.map((adj, index) => {
-		const extension = String(adj.tipo || adj.nombre || '').split('.').pop().toLowerCase();
-		const icono = extension === 'xlsx' || extension === 'xls' ? 'table_chart' : 'picture_as_pdf';
-		return `
-			<div class="adjunto-card" onclick="abrirAdjunto(${index})">
-				<div class="flex items-center gap-4 min-w-0">
-					<div class="adjunto-icon"><span class="material-symbols-outlined">${icono}</span></div>
-					<div class="min-w-0">
-						<p class="adjunto-name truncate">${escapeHtml(adj.nombre || 'Documento')}</p>
-						<p class="adjunto-meta">${escapeHtml(adj.tipo || 'Archivo')} • ${escapeHtml(adj.tamaño || '-')} • ${escapeHtml(adj.fecha || '-')}</p>
-					</div>
-				</div>
-				<span class="material-symbols-outlined text-primary">visibility</span>
-			</div>
-		`;
-	}).join('');
+    currentAdjuntos = adjuntos || [];
 
-	if (adjuntosActuales.length > 0) {
-		abrirAdjunto(0, false);
-	}
+    if (currentAdjuntos.length === 0) {
+        container.innerHTML = `
+            <div class="col-span-full text-center py-8 text-slate-400 dark:text-slate-500">
+                <span class="material-symbols-outlined text-4xl mb-2">folder_off</span>
+                <p class="text-sm">No hay archivos adjuntos para este expediente.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Recuperar contenido de IndexedDB si existe indexedDbId
+    for (let i = 0; i < currentAdjuntos.length; i++) {
+        const adj = currentAdjuntos[i];
+        if (adj.indexedDbId && !adj.contenido) {
+            try {
+                const contenido = await recuperarAdjuntoIndexedDB(adj.indexedDbId);
+                if (contenido) currentAdjuntos[i].contenido = contenido;
+            } catch (e) {
+                console.warn('No se pudo recuperar adjunto de IndexedDB:', e);
+            }
+        }
+    }
+
+    container.innerHTML = currentAdjuntos.map((adj, index) => {
+        const icono = adj.icono || getFileIcon(adj.nombre);
+        const tieneContenido = !!adj.contenido;
+        return `
+            <div class="group flex items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-5 py-4 hover:border-primary/40 dark:hover:border-primary/40 transition-all cursor-pointer ${tieneContenido ? '' : 'opacity-75'}"
+                 onclick="previsualizarAdjunto(${index})">
+                <div class="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-slate-500 dark:text-slate-400">${icono}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">${adj.nombre}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">${adj.tamaño || '-'} · ${formatearFecha(adj.fecha)}</p>
+                </div>
+                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    ${tieneContenido ? `
+                        <button type="button" onclick="event.stopPropagation(); descargarAdjunto(${index})" 
+                            class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-primary" title="Descargar">
+                            <span class="material-symbols-outlined text-sm">download</span>
+                        </button>
+                    ` : ''}
+                    <span class="material-symbols-outlined text-slate-300 dark:text-slate-600 text-sm">chevron_right</span>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
-function escapeHtml(value) {
-	return String(value || '')
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;');
+function getFileIcon(filename) {
+    const ext = String(filename || '').split('.').pop().toLowerCase();
+    const icons = {
+        pdf: 'picture_as_pdf',
+        doc: 'description', docx: 'description',
+        xls: 'table_chart', xlsx: 'table_chart',
+        png: 'image', jpg: 'image', jpeg: 'image',
+        default: 'insert_drive_file'
+    };
+    return icons[ext] || icons.default;
 }
 
-function getMimeType(filename) {
-	const ext = String(filename || '').split('.').pop().toLowerCase();
-	const mimeTypes = {
-		pdf: 'application/pdf',
-		xls: 'application/vnd.ms-excel',
-		xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-	};
-	return mimeTypes[ext] || 'application/octet-stream';
+function previsualizarAdjunto(index) {
+    const adj = currentAdjuntos[index];
+    if (!adj) return;
+
+    const previewNombre = document.getElementById('preview-nombre');
+    const previewInfo = document.getElementById('preview-info');
+    const previewEmbed = document.getElementById('preview-embed');
+    const previewHelper = document.getElementById('preview-helper');
+    const btnDescargar = document.getElementById('btn-descargar-preview');
+
+    if (previewNombre) previewNombre.textContent = adj.nombre;
+    if (previewInfo) previewInfo.textContent = `${adj.tipo || adj.tipoMime || 'Archivo'} · ${adj.tamaño || '-'}`;
+    if (previewHelper) previewHelper.classList.add('hidden');
+
+    currentPreviewUrl = null;
+
+    if (adj.contenido) {
+        // Es base64
+        currentPreviewUrl = adj.contenido;
+        if (previewEmbed) previewEmbed.src = adj.contenido;
+        if (btnDescargar) {
+            btnDescargar.onclick = () => descargarAdjunto(index);
+            btnDescargar.classList.remove('hidden');
+        }
+    } else if (adj.url) {
+        currentPreviewUrl = adj.url;
+        if (previewEmbed) previewEmbed.src = adj.url;
+        if (btnDescargar) {
+            btnDescargar.onclick = () => window.open(adj.url, '_blank');
+            btnDescargar.classList.remove('hidden');
+        }
+    } else {
+        if (previewEmbed) previewEmbed.src = 'about:blank';
+        if (previewHelper) {
+            previewHelper.classList.remove('hidden');
+            previewHelper.textContent = 'No hay vista previa disponible para este archivo.';
+        }
+        if (btnDescargar) btnDescargar.classList.add('hidden');
+    }
 }
 
-window.abrirAdjunto = function(index) {
-	abrirAdjunto(index, true);
+function descargarAdjunto(index) {
+    const adj = currentAdjuntos[index];
+    if (!adj) return;
+
+    if (adj.contenido) {
+        const link = document.createElement('a');
+        link.href = adj.contenido;
+        link.download = adj.nombre;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } else if (adj.url) {
+        window.open(adj.url, '_blank');
+    }
+}
+
+// ==========================================
+// INDEXEDDB
+// ==========================================
+
+function openSigproIndexedDB() {
+    return new Promise((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') {
+            reject(new Error('IndexedDB no disponible'));
+            return;
+        }
+        const request = indexedDB.open('sigpro_adjuntos_db', 1);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('adjuntos')) {
+                db.createObjectStore('adjuntos', { keyPath: 'id' });
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function recuperarAdjuntoIndexedDB(id) {
+    const db = await openSigproIndexedDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('adjuntos', 'readonly');
+        const store = tx.objectStore('adjuntos');
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result?.contenido || null);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+// ==========================================
+// EXPORTAR PDF
+// ==========================================
+
+function exportarPDF() {
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) {
+        showToast('Librería PDF no disponible', 'error');
+        return;
+    }
+
+    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    const codigo = document.getElementById('codigo-display')?.textContent || 'INV-000';
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 40;
+
+    // Header
+    doc.setFillColor(25, 120, 229);
+    doc.rect(0, 0, pageWidth, 60, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.text('SIGPRO UNMSM', 40, 38);
+    doc.setFontSize(10);
+    doc.text('Expediente de Inventario', pageWidth - 40, 38, { align: 'right' });
+
+    y = 80;
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(14);
+    doc.text(`Ficha de Inventario — ${codigo}`, 40, y);
+
+    y += 30;
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+
+    const campos = [
+        ['Versión', document.getElementById('info-version')?.textContent || '-'],
+        ['Fecha de elaboración', document.getElementById('info-fecha')?.textContent || '-'],
+        ['Facultad', document.getElementById('info-facultad')?.textContent || '-'],
+        ['Asunto', document.getElementById('info-asunto')?.textContent || '-'],
+        ['Operación', document.getElementById('info-operacion')?.textContent || '-'],
+        ['Documento técnico', document.getElementById('info-documento')?.textContent || '-'],
+    ];
+
+    campos.forEach(([label, value]) => {
+        doc.setFont(undefined, 'bold');
+        doc.text(`${label}:`, 40, y);
+        doc.setFont(undefined, 'normal');
+        doc.text(String(value), 180, y);
+        y += 18;
+    });
+
+    // Adjuntos
+    y += 10;
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(12);
+    doc.text('Archivos Adjuntos', 40, y);
+    y += 20;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+
+    if (currentAdjuntos.length === 0) {
+        doc.text('No hay archivos adjuntos.', 40, y);
+    } else {
+        currentAdjuntos.forEach(adj => {
+            doc.text(`• ${adj.nombre} (${adj.tamaño || '-'})`, 40, y);
+            y += 16;
+        });
+    }
+
+    // Footer
+    const fecha = new Date().toLocaleDateString('es-PE');
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Generado el ${fecha} — Sistema de Racionalización SIGPRO v2.0`, 40, doc.internal.pageSize.getHeight() - 30);
+
+    doc.save(`expediente-inventario-${codigo}.pdf`);
+    showToast('PDF exportado correctamente', 'success');
+}
+
+// ==========================================
+// PERFIL
+// ==========================================
+
+const PERFIL_FALLBACK = {
+    nombre: 'Usuario SIGPRO',
+    email: 'usuario@unmsm.edu.pe',
+    iniciales: 'US',
+    rol: 'Usuario',
+    facultad: 'UNMSM',
+    color: 'bg-blue-600'
 };
 
-function abrirAdjunto(index, desplazar = true) {
-	const adjunto = adjuntosActuales[index];
-	if (!adjunto) return;
-
-	const source = adjunto.contenido || adjunto.url || adjunto.path || '';
-	if (!source) {
-		showToast('El archivo no tiene fuente de vista previa', 'warning');
-		return;
-	}
-
-	const nombreEl = document.getElementById('preview-nombre');
-	const infoEl = document.getElementById('preview-info');
-	const notaEl = document.getElementById('preview-helper');
-	const embed = document.getElementById('preview-embed');
-	if (!nombreEl || !infoEl || !notaEl || !embed) return;
-
-	nombreEl.textContent = adjunto.nombre || 'Archivo';
-	infoEl.textContent = `${adjunto.tipo || '-'} • ${adjunto.tamaño || '-'} • ${adjunto.fecha || '-'}`;
-	notaEl.textContent = /xlsx|xls/i.test(adjunto.nombre || adjunto.tipo || '')
-		? 'Vista previa de Excel: si el navegador no la renderiza, use el botón Descargar.'
-		: 'Vista previa del documento.';
-
-	embed.type = getMimeType(adjunto.nombre || adjunto.tipo || '');
-	embed.src = source;
-
-	const downloadBtn = document.getElementById('btn-descargar-preview');
-	if (downloadBtn) {
-		downloadBtn.onclick = () => descargarAdjunto(adjunto);
-	}
-
-	window.adjuntoActual = adjunto;
-
-	if (desplazar) {
-		document.getElementById('preview-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-	}
-};
-
-window.cerrarPreview = function() {
-	const embed = document.getElementById('preview-embed');
-	if (embed) embed.src = '';
-};
-
-function initPreviewControls() {
-	return;
+function getInicialesDesdeNombre(nombre) {
+    if (!nombre || typeof nombre !== 'string') return 'US';
+    return nombre.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase()).join('') || 'US';
 }
 
-function descargarAdjunto(adjunto) {
-	const source = adjunto.contenido || adjunto.url || adjunto.path || '';
-	if (!source) {
-		showToast('El archivo no está disponible', 'error');
-		return;
-	}
-
-	const link = document.createElement('a');
-	link.href = source;
-	link.download = adjunto.nombre || 'archivo';
-	document.body.appendChild(link);
-	link.click();
-	link.remove();
+function getColorPorRol(rol) {
+    const colores = {
+        administrador: 'bg-blue-600', admin: 'bg-blue-600',
+        editor: 'bg-emerald-600', visualizador: 'bg-purple-600',
+        'usuario facultad': 'bg-amber-600'
+    };
+    return colores[String(rol || '').trim().toLowerCase()] || 'bg-slate-600';
 }
 
-window.exportarPDF = function() {
-	if (!window.jspdf?.jsPDF) {
-		showToast('No se pudo exportar el PDF', 'error');
-		return;
-	}
+function normalizarPerfil(user) {
+    if (!user || typeof user !== 'object') return null;
+    const email = user.correo || user.email || PERFIL_FALLBACK.email;
+    const nombreBase = user.nombreCompleto || user.nombre || user.name || email.split('@')[0] || PERFIL_FALLBACK.nombre;
+    const nombre = String(nombreBase).replace(/\./g, ' ').trim() || PERFIL_FALLBACK.nombre;
+    return {
+        nombre, email,
+        iniciales: user.iniciales || getInicialesDesdeNombre(nombre),
+        rol: user.cargo || user.rol || user.role || PERFIL_FALLBACK.rol,
+        facultad: user.facultad || user.nombreFacultad || PERFIL_FALLBACK.facultad,
+        color: user.color || getColorPorRol(user.rol)
+    };
+}
 
-	const { jsPDF } = window.jspdf;
-	const doc = new jsPDF('p', 'mm', 'a4');
-	const yBase = 20;
-	let y = yBase;
+function renderizarPerfil(usuario) {
+    const inicialesEl = document.getElementById('profile-iniciales');
+    const nombreEl = document.getElementById('profile-nombre');
+    const emailEl = document.getElementById('profile-email');
+    const rolEl = document.getElementById('profile-rol');
+    const facultadEl = document.getElementById('profile-facultad');
+    const avatarEl = document.getElementById('profile-avatar');
 
-	doc.setFontSize(18);
-	doc.setTextColor(25, 120, 229);
-	doc.text('Expediente de Inventario - SIGPRO UNMSM', 20, y);
-	y += 12;
+    if (inicialesEl) inicialesEl.textContent = usuario.iniciales || '-';
+    if (nombreEl) nombreEl.textContent = usuario.nombre || 'Usuario';
+    if (emailEl) emailEl.textContent = usuario.email || '-';
+    if (rolEl) rolEl.textContent = usuario.rol || '-';
+    if (facultadEl) facultadEl.textContent = usuario.facultad || '-';
+    if (avatarEl) {
+        avatarEl.className = `w-10 h-10 rounded-full ${usuario.color || 'bg-slate-600'} flex items-center justify-center text-white font-semibold`;
+    }
+}
 
-	doc.setFontSize(11);
-	doc.setTextColor(0, 0, 0);
-	const filas = [
-		['Código', expedienteActual?.codigo || '-'],
-		['Versión', expedienteActual?.version || '-'],
-		['Fecha de elaboración', expedienteActual?.fechaElaboracion || '-'],
-		['Operación', expedienteActual?.operacion || '-']
-	];
+async function cargarPerfilDesdeBackend() {
+    try {
+        if (typeof API !== 'undefined' && API.auth && typeof API.auth.getUser === 'function') {
+            const response = await Promise.resolve(API.auth.getUser());
+            const user = response && response.success && response.data ? response.data : response;
+            const perfilApi = normalizarPerfil(user);
+            if (perfilApi) { renderizarPerfil(perfilApi); return; }
+        }
+        const rawStorage = localStorage.getItem('usuario') || localStorage.getItem('sigpro_usuario') || localStorage.getItem('user');
+        if (rawStorage) {
+            const perfilStorage = normalizarPerfil(JSON.parse(rawStorage));
+            if (perfilStorage) { renderizarPerfil(perfilStorage); return; }
+        }
+        renderizarPerfil(PERFIL_FALLBACK);
+    } catch (error) {
+        renderizarPerfil(PERFIL_FALLBACK);
+    }
+}
 
-	filas.forEach(([label, value]) => {
-		doc.setFont(undefined, 'bold');
-		doc.text(`${label}:`, 20, y);
-		doc.setFont(undefined, 'normal');
-		doc.text(String(value).substring(0, 90), 65, y);
-		y += 8;
-	});
-
-	y += 6;
-	doc.setFont(undefined, 'bold');
-	doc.text('Adjuntos', 20, y);
-	y += 8;
-
-	doc.setFont(undefined, 'normal');
-	(adjuntosActuales || []).forEach((adj, index) => {
-		if (y > 275) { doc.addPage(); y = 20; }
-		doc.text(`${index + 1}. ${String(adj.nombre || 'Archivo').substring(0, 90)}`, 20, y);
-		y += 6;
-	});
-
-	doc.save(`${expedienteActual?.codigo || 'inventario'}.pdf`);
-};
+// ==========================================
+// TOAST
+// ==========================================
 
 function showToast(message, type = 'info', duration = 3000) {
-	const container = document.getElementById('toast-container');
-	if (!container) return;
-
-	const toast = document.createElement('div');
-	toast.className = `toast ${type}`;
-	toast.innerHTML = `<span class="material-symbols-outlined">${type === 'success' ? 'check_circle' : type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'info'}</span><span>${message}</span>`;
-	container.appendChild(toast);
-
-	setTimeout(() => {
-		toast.classList.add('hiding');
-		setTimeout(() => toast.remove(), 300);
-	}, duration);
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const icons = { info: 'info', success: 'check_circle', warning: 'warning', error: 'error' };
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<span class="material-symbols-outlined">${icons[type]}</span><span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
 }

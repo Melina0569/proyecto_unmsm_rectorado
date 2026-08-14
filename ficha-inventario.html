@@ -27,10 +27,12 @@
 	</script>
 
 	<link rel="stylesheet" href="css/facultades-nuevo/ficha-inventario.css">
+<base target="_blank">
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 min-h-screen p-6 md:p-12">
 	<div class="max-w-5xl mx-auto">
 		<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+			<!-- HEADER -->
 			<div class="bg-slate-100 dark:bg-slate-800 p-6 border-b border-slate-300 dark:border-slate-700">
 				<h1 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
 					<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg">
@@ -43,64 +45,138 @@
 				</p>
 			</div>
 
-			<form id="ficha-form" class="p-8">
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-					<div>
-						<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
-							Código <span class="text-xs font-normal text-slate-400">(Auto-generado)</span>
-						</label>
-						<input type="text" name="codigo" id="codigo-field" readonly
-							class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
-							placeholder="INV-FISI-2026-001"/>
+			<form id="ficha-form" class="p-8 space-y-8">
+
+				<!-- ════════════════════════════════════════
+				     SECCIÓN 1: DATOS PRINCIPALES
+				     ════════════════════════════════════════ -->
+				<section>
+					<div class="flex items-center gap-2 mb-5">
+						<span class="material-symbols-outlined text-slate-400 text-sm">edit_note</span>
+						<h2 class="text-xs font-black uppercase tracking-wider text-slate-500">Datos Principales</h2>
 					</div>
 
-					<div>
-						<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
-							Versión <span class="text-red-500">*</span>
-						</label>
-						<input type="text" name="version" required
-							class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
-							placeholder="Ej. 1.0"/>
-					</div>
-
-					<div>
-						<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
-							Fecha de elaboración <span class="text-red-500">*</span>
-						</label>
-						<input type="date" name="fechaElaboracion" required
-							class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"/>
-					</div>
-
-					<div class="md:col-span-2">
-						<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
-							Archivos Adjuntos
-						</label>
-						<div id="upload-area" class="rounded-2xl flex flex-col items-center justify-center py-10 px-4 cursor-pointer group border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-emerald-500 dark:hover:border-emerald-400 transition-all" onclick="document.getElementById('file-input').click()">
-							<div class="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4 transition-colors group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20">
-								<span class="material-symbols-outlined text-3xl text-slate-400 group-hover:text-emerald-500">attach_file</span>
-							</div>
-							<p class="text-base font-semibold text-slate-700 dark:text-slate-200">Haga clic para adjuntar archivos</p>
-							<p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Puede seleccionar uno o varios archivos</p>
-							<input type="file" id="file-input" name="adjuntos" class="hidden" multiple>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+						<!-- Código -->
+						<div>
+							<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+								Código <span class="text-xs font-normal text-slate-400 normal-case">(Auto-generado)</span>
+							</label>
+							<input type="text" name="codigo" id="codigo-field" readonly
+								class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed font-mono"
+								placeholder="INV-FISI-2026-001"/>
 						</div>
-						<div id="file-list" class="mt-4 hidden space-y-2"></div>
+
+						<!-- Versión -->
+						<div>
+							<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+								Versión <span class="text-red-500">*</span>
+							</label>
+							<input type="text" name="version" required
+								class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+								placeholder="Ej. 1.0"/>
+						</div>
+
+						<!-- Fecha -->
+						<div class="md:col-span-2">
+							<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+								Fecha de elaboración <span class="text-red-500">*</span>
+							</label>
+							<input type="date" name="fechaElaboracion" required
+								class="w-full md:w-1/2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"/>
+						</div>
 					</div>
-				</div>
+				</section>
+
+				<!-- ════════════════════════════════════════
+				     SECCIÓN 2: GOOGLE SHEETS (OPCIONAL)
+				     ════════════════════════════════════════ -->
+				<section class="bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+					<div class="flex items-center justify-between mb-1">
+						<div class="flex items-center gap-2">
+							<div class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+								<span class="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-sm">table_chart</span>
+							</div>
+							<h2 class="text-sm font-bold text-slate-800 dark:text-slate-200">Hoja de Cálculo Google Sheets</h2>
+						</div>
+					</div>
+					<p class="text-xs text-slate-500 dark:text-slate-400 mb-5 ml-10">
+						Vincule una hoja de cálculo para visualizarla directamente en el expediente. 
+						La hoja debe tener permisos de <strong class="text-slate-600 dark:text-slate-300">"Cualquiera con el enlace puede ver"</strong>.
+					</p>
+
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<!-- URL -->
+						<div class="md:col-span-2">
+							<label for="googleSheetsUrl" class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+								Enlace de Google Sheets
+							</label>
+							<div class="relative">
+								<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">link</span>
+								<input type="url" id="googleSheetsUrl" name="googleSheetsUrl" 
+									placeholder="https://docs.google.com/spreadsheets/d/..."
+									class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 pl-10 pr-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all" />
+							</div>
+							<p class="text-[11px] text-slate-400 mt-1.5">Copie el enlace de compartir de su hoja de Google Sheets.</p>
+						</div>
+
+						<!-- Rango -->
+						<div>
+							<label for="googleSheetsRange" class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+								Rango a mostrar
+							</label>
+							<div class="relative">
+								<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">select_all</span>
+								<input type="text" id="googleSheetsRange" name="googleSheetsRange" value="A1:Z50"
+									placeholder="Ej: A1:G30"
+									class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 pl-10 pr-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all font-mono" />
+							</div>
+							<p class="text-[11px] text-slate-400 mt-1.5">Rango de celdas a visualizar.</p>
+						</div>
+					</div>
+				</section>
+
+				<!-- ════════════════════════════════════════
+				     SECCIÓN 3: ARCHIVOS ADJUNTOS (OPCIONAL)
+				     ════════════════════════════════════════ -->
+				<section>
+					<div class="flex items-center gap-2 mb-4">
+						<span class="material-symbols-outlined text-slate-400 text-sm">attach_file</span>
+						<h2 class="text-xs font-black uppercase tracking-wider text-slate-500">Archivos Adjuntos</h2>
+						<span class="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500 tracking-wide">Opcional</span>
+					</div>
+
+					<div id="upload-area" 
+						class="rounded-xl flex flex-col items-center justify-center py-10 px-4 cursor-pointer group border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 transition-all"
+						onclick="document.getElementById('file-input').click()">
+						<div class="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4 transition-colors group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/30">
+							<span class="material-symbols-outlined text-3xl text-slate-400 group-hover:text-emerald-500 transition-colors">attach_file</span>
+						</div>
+						<p class="text-base font-semibold text-slate-700 dark:text-slate-200">Haga clic para adjuntar archivos</p>
+						<p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Puede seleccionar uno o varios archivos</p>
+						<input type="file" id="file-input" name="adjuntos" class="hidden" multiple>
+					</div>
+					<div id="file-list" class="mt-4 hidden space-y-2"></div>
+				</section>
+
 			</form>
 
+			<!-- FOOTER / ACCIONES -->
 			<div class="p-8 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 flex flex-col items-center gap-4">
 				<button type="button" id="btn-finalizar"
 					class="bg-gradient-to-r from-emerald-600 to-teal-800 hover:from-emerald-700 hover:to-teal-900 text-white px-12 py-4 rounded-xl font-bold tracking-wide flex items-center gap-3 shadow-lg shadow-emerald-600/30 transition-all transform hover:scale-105 active:scale-95">
 					<span class="material-symbols-outlined text-xl">check_circle</span>
 					FINALIZAR Y GENERAR REPORTE
 				</button>
+
 				<a href="facultades-documentos.html" id="btn-expedientes"
 					class="hidden bg-gradient-to-r from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white px-8 py-3 rounded-xl font-semibold tracking-wide flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-all transform hover:scale-105 animate-bounce">
 					<span class="material-symbols-outlined text-lg">folder_open</span>
 					Ver en Documentos
 					<span class="material-symbols-outlined text-lg">arrow_forward</span>
 				</a>
-				<p class="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
+
+				<p class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">
 					El código se genera automáticamente al cargar la ficha.
 				</p>
 			</div>

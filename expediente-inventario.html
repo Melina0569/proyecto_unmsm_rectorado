@@ -30,6 +30,7 @@
 	</script>
 
 	<link rel="stylesheet" href="css/facultades-expedientes/expediente-inventario.css">
+<base target="_blank">
 </head>
 <body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
 	<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
@@ -99,7 +100,7 @@
 			</header>
 
 			<div id="logout-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-200">
-				<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm mx-4 transform transition-all duration-200 scale-100 opacity-100">
+				<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm mx-4">
 					<div class="mx-auto w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
 						<span class="material-symbols-outlined text-red-600 dark:text-red-400 text-3xl">logout</span>
 					</div>
@@ -107,7 +108,7 @@
 					<p class="text-sm text-center text-slate-500 dark:text-slate-400 mb-6 px-2">¿Estás seguro de que deseas salir de tu cuenta? Deberás iniciar sesión nuevamente.</p>
 					<div class="flex gap-3">
 						<button id="logout-cancel" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
-						<button id="logout-confirm" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 transition-colors shadow-lg shadow-red-600/30 hover:shadow-red-600/40">Sí, cerrar sesión</button>
+						<button id="logout-confirm" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 transition-colors shadow-lg shadow-red-600/30">Sí, cerrar sesión</button>
 					</div>
 				</div>
 			</div>
@@ -122,7 +123,7 @@
 								<span class="text-primary">Expediente de Inventario</span>
 							</nav>
 							<h1 class="text-slate-900 dark:text-slate-100 text-4xl font-black leading-tight tracking-[-0.033em]">Ficha de Inventario</h1>
-							<p class="text-slate-500 dark:text-slate-400 text-base font-normal">Detalle técnico, versión y archivos adjuntos del inventario institucional</p>
+							<p class="text-slate-500 dark:text-slate-400 text-base font-normal">Detalle técnico, versión, archivos adjuntos y hoja de cálculo asociada</p>
 						</div>
 						<div class="flex gap-3">
 							<button onclick="exportarPDF()" class="flex items-center justify-center rounded-lg px-4 h-10 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold gap-2 hover:bg-slate-50 transition-colors">
@@ -134,6 +135,7 @@
 						</div>
 					</div>
 
+					<!-- INFORMACIÓN TÉCNICA -->
 					<section id="ficha-info" class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
 						<div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
 							<div class="flex items-center gap-2">
@@ -153,6 +155,7 @@
 						</div>
 					</section>
 
+					<!-- ARCHIVOS ADJUNTOS -->
 					<section class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
 						<div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
 							<div class="flex items-center gap-2">
@@ -164,6 +167,40 @@
 						<div id="adjuntos-container" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
 					</section>
 
+					<!-- GOOGLE SHEETS -->
+					<section id="gsheets-section" class="hidden bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
+						<div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+							<div class="flex items-center gap-2">
+								<span class="material-symbols-outlined text-primary">table_chart</span>
+								<h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight">Hoja de Cálculo Google Sheets</h2>
+							</div>
+							<button onclick="abrirGoogleSheetsExterno()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
+								<span class="material-symbols-outlined text-sm">open_in_new</span>
+								Abrir en Google Sheets
+							</button>
+						</div>
+						<div class="p-6 space-y-4">
+							<div class="flex flex-wrap items-center gap-4 text-sm">
+								<div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+									<span class="material-symbols-outlined text-slate-400 text-sm">link</span>
+									<span class="truncate max-w-md" id="gsheets-url-display">-</span>
+								</div>
+								<div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+									<span class="material-symbols-outlined text-slate-400 text-sm">select_all</span>
+									<span id="gsheets-range-display">-</span>
+								</div>
+							</div>
+							<div class="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800">
+								<iframe id="gsheets-embed" class="w-full h-[65vh] rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700" title="Vista de Google Sheets"></iframe>
+							</div>
+							<p class="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+								<span class="material-symbols-outlined text-xs">info</span>
+								La vista muestra el rango configurado. Si la hoja es privada, inicie sesión en Google en otra pestaña.
+							</p>
+						</div>
+					</section>
+
+					<!-- VISTA INFERIOR / PREVIEW -->
 					<section id="preview-section" class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-10">
 						<div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
 							<span class="material-symbols-outlined text-primary">visibility</span>
@@ -177,7 +214,7 @@
 										<h3 id="preview-nombre" class="text-sm font-bold text-slate-900 dark:text-slate-100">Vista previa</h3>
 										<p id="preview-info" class="text-xs text-slate-500 dark:text-slate-400">-</p>
 									</div>
-									<button id="btn-descargar-preview" type="button" class="px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90">Descargar</button>
+									<button id="btn-descargar-preview" type="button" class="px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90 hidden">Descargar</button>
 								</div>
 								<div class="p-4">
 									<iframe id="preview-embed" class="w-full h-[62vh] rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700" title="Vista previa inferior"></iframe>
@@ -206,27 +243,6 @@
 	</div>
 
 	<div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
-
-	<div id="modal-preview" class="hidden fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-		<div class="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700">
-			<div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
-				<div>
-					<h3 id="preview-nombre" class="text-base font-bold text-slate-900 dark:text-slate-100">Archivo</h3>
-					<p id="preview-info" class="text-xs text-slate-500 dark:text-slate-400">-</p>
-				</div>
-				<div class="flex items-center gap-2">
-					<button id="btn-descargar-preview" class="px-3 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90">Descargar</button>
-					<button onclick="cerrarPreview()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400">
-						<span class="material-symbols-outlined">close</span>
-					</button>
-				</div>
-			</div>
-			<div class="bg-slate-100 dark:bg-slate-800 p-4">
-				<p id="preview-nota" class="text-xs text-slate-500 dark:text-slate-400 mb-3"></p>
-				<iframe id="preview-embed" class="w-full h-[70vh] rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700" title="Vista previa"></iframe>
-			</div>
-		</div>
-	</div>
 
 	<script src="js/components/api.js"></script>
 	<script src="js/facultades-expedientes/expediente-inventario.js"></script>

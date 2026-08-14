@@ -421,9 +421,12 @@ async function guardarInventarioLocal(payload) {
         resumenCampos: [
             { label: 'Versión', value: version || '-' },
             { label: 'Fecha de elaboración', value: fechaElaboracion || '-' },
-            { label: 'Documento adjunto', value: adjuntosLigeros.map(a => a.nombre).join(', ') || '-' }
+            { label: 'Documento adjunto', value: adjuntosLigeros.map(a => a.nombre).join(', ') || '-' },
+            { label: 'Google Sheets', value: payload.googleSheetsUrl || '-' }
         ],
-        adjuntos: adjuntosLigeros     // ← sin base64
+        adjuntos: adjuntosLigeros,     // ← sin base64
+        googleSheetsUrl: payload.googleSheetsUrl || null,
+        googleSheetsRange: payload.googleSheetsRange || 'A1:Z50'
     };
 
     try {
@@ -562,7 +565,9 @@ async function initFormHandler() {
                 facultadId: resolveFacultyId(),
                 generadoPor: 'Facultad',
                 origen: 'local',
-                adjuntos
+                adjuntos,
+                googleSheetsUrl: data.googleSheetsUrl || '',
+                googleSheetsRange: data.googleSheetsRange || 'A1:Z50'
             };
 
             let result = null;

@@ -1,16 +1,10 @@
 /**
- * FICHA DE CARACTERIZACIÓN - JavaScript (MODIFICADO)
+ * FICHA DE CARACTERIZACION - JavaScript (CORREGIDO)
  * Lógica específica del formulario de caracterización de procesos
- * 
- * CAMBIOS:
- * 1. Soporte para enlace de Google Sheets como alternativa/complemento a archivos
- * 2. Validación de URL de Google Sheets
- * 3. Generación de URL embebida para previsualización
- * 4. Guardado en localStorage del enlace
  */
 
 // ==========================================
-// CONFIGURACIÓN
+// CONFIGURACION
 // ==========================================
 
 const FICHA_CONFIG = {
@@ -24,15 +18,17 @@ const FICHA_CONFIG = {
         tipoProcesoSelect: '#tipo-proceso-select',
         macroProcesoSelect: '#macro-proceso-select',
         codigoField: '#codigo-field',
-        googleSheetsInput: '#google-sheets-url'  // ← NUEVO: Input para enlace de Google Sheets
+        googleSheetsInput: '#google-sheets-url'
     },
     SHOW_DOCUMENTOS_BUTTON_DELAY_MS: 1400
 };
 
 const _SK_MODE = (typeof CONFIG !== 'undefined' && CONFIG.MODE) ? CONFIG.MODE : 'local';
-const FICHA_STORAGE_KEYS = {
-    DOCUMENTOS_LISTA:   `${_SK_MODE}_sigpro_documentos_lista`,
-    DOCUMENTOS_DETALLE: `${_SK_MODE}_sigpro_documentos_detalle`
+
+const STORAGE_KEYS = {
+    EXPEDIENTE_ACTUAL: "sigpro_expediente_actual",
+    DOCUMENTOS_DETALLE: `${_SK_MODE}_sigpro_documentos_detalle`,
+    DOCUMENTOS_LISTA:   `${_SK_MODE}_sigpro_documentos_lista`
 };
 
 const FACULTY_CODE_MAP = {
@@ -130,44 +126,26 @@ const TIPO_PROCESO_MAP = {
 };
 
 // ==========================================
-// GOOGLE SHEETS HELPERS (NUEVO)
+// GOOGLE SHEETS HELPERS
 // ==========================================
 
-/**
- * Extrae el ID de un spreadsheet desde una URL de Google Sheets
- * Soporta formatos:
- * - https://docs.google.com/spreadsheets/d/1BxiMVs.../edit#gid=0
- * - https://docs.google.com/spreadsheets/d/1BxiMVs.../edit
- * - https://docs.google.com/spreadsheets/d/1BxiMVs...
- */
 function extractGoogleSheetsId(url) {
     if (!url || typeof url !== 'string') return null;
     const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
     return match ? match[1] : null;
 }
 
-/**
- * Valida si una URL es de Google Sheets
- */
 function isValidGoogleSheetsUrl(url) {
     if (!url) return false;
     return /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]+/.test(url.trim());
 }
 
-/**
- * Genera la URL embebida para previsualización en iframe
- * Requiere que la hoja esté publicada o compartida públicamente
- */
 function getGoogleSheetsEmbedUrl(url) {
     const id = extractGoogleSheetsId(url);
     if (!id) return null;
-    // Usamos pubhtml con parámetros de widget para embed limpio
     return `https://docs.google.com/spreadsheets/d/${id}/pubhtml?widget=true&headers=false&chrome=false`;
 }
 
-/**
- * Genera la URL de vista previa en modo presentación
- */
 function getGoogleSheetsPreviewUrl(url) {
     const id = extractGoogleSheetsId(url);
     if (!id) return null;
@@ -192,7 +170,6 @@ function getRequiredEmptyFields(form, data) {
         if (field.type === 'file') {
             return !field.files || field.files.length === 0;
         }
-
         const value = field.name ? data[field.name] : field.value;
         return !String(value || '').trim();
     });
@@ -200,11 +177,9 @@ function getRequiredEmptyFields(form, data) {
 
 function getSelectedOptionText(selectElement) {
     if (!selectElement) return '';
-
     const option = selectElement.options && selectElement.selectedIndex >= 0
         ? selectElement.options[selectElement.selectedIndex]
         : null;
-
     return option ? option.textContent.trim() : '';
 }
 
@@ -217,31 +192,26 @@ function safeParseJson(rawValue, fallback) {
     }
 }
 
-
 function resolveFacultyId() {
     const storedFacultyId = localStorage.getItem('current_faculty_id');
     const parsedFacultyId = parseInt(storedFacultyId, 10);
-
     if (Number.isInteger(parsedFacultyId) && parsedFacultyId > 0) {
         return parsedFacultyId;
     }
-
     if (typeof API !== 'undefined' && API.auth && typeof API.auth.getUser === 'function') {
         const user = API.auth.getUser();
         const facultyId = Number(user?.facultadId || user?.facultyId);
-
         if (Number.isInteger(facultyId) && facultyId > 0) {
             return facultyId;
         }
     }
-
     return 1;
 }
 
 function saveFichaToLocalStorage(payload) {
     const now = new Date();
     const codigo = payload.codigo;
-    const docsRaw = localStorage.getItem(FICHA_STORAGE_KEYS.DOCUMENTOS_LISTA);
+    const docsRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
     const docs = safeParseJson(docsRaw, []);
 
     const docPendiente = {
@@ -252,12 +222,11 @@ function saveFichaToLocalStorage(payload) {
         codigo: payload.codigo,
         descripcion: payload.nombreProceso || payload.macroProcesoNombre || `Caracterizacion ${payload.codigo}`,
         generadoPor: payload.generadoPor || 'Facultad',
-        estado: 'pendiente',
+        estado: 'aprobado',
         progreso: 5,
         facultadId: payload.facultadId || 1,
         tipo: 'caracterizacion',
         origen: payload.backendId ? 'hibrido' : 'local',
-        // ← NUEVO: Guardar referencia a Google Sheets
         googleSheetsUrl: payload.googleSheetsUrl || null,
         tieneGoogleSheets: Boolean(payload.googleSheetsUrl)
     };
@@ -268,9 +237,9 @@ function saveFichaToLocalStorage(payload) {
     } else {
         docs.unshift(docPendiente);
     }
-    localStorage.setItem(FICHA_STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(docs));
+    localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(docs));
 
-    const detalleRaw = localStorage.getItem(FICHA_STORAGE_KEYS.DOCUMENTOS_DETALLE);
+    const detalleRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
     const detalle = safeParseJson(detalleRaw, {});
     detalle[codigo] = {
         tipo: 'caracterizacion',
@@ -283,25 +252,39 @@ function saveFichaToLocalStorage(payload) {
             { label: 'Tipo de Proceso', value: payload.tipoProcesoLabel || payload.tipoProceso || '-' },
             { label: 'Proceso', value: payload.macroProcesoNombre || payload.macroProceso || '-' },
             { label: 'Archivo adjunto', value: (payload.adjuntos || []).map((adj) => adj.nombre).join(', ') || '-' },
-            // ← NUEVO: Mostrar enlace en resumen
             { label: 'Google Sheets', value: payload.googleSheetsUrl || 'No vinculado' }
         ],
         adjuntos: payload.adjuntos || []
     };
-    localStorage.setItem(FICHA_STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
-    // Sync modo-agnóstico
+    localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
     sincronizarClavesNeutras(docPendiente);
+
+    const expListaRaw = localStorage.getItem('sigpro_expedientes_lista');
+    const expLista = expListaRaw ? JSON.parse(expListaRaw) : [];
+    const expItem = {
+        id: docPendiente.id,
+        codigo: docPendiente.codigo,
+        tipo: 'caracterizacion',
+        nombre: payload.nombreProceso || payload.macroProcesoNombre || `Caracterizacion ${payload.codigo}`,
+        macroProceso: payload.macroProcesoNombre || payload.macroProceso || 'Gestion Institucional',
+        fechaAprobacion: docPendiente.fecha,
+        estado: 'aprobado',
+        responsable: payload.unidadOrganica || 'UNMSM'
+    };
+    const idxExp = expLista.findIndex(e => e.codigo === docPendiente.codigo);
+    if (idxExp >= 0) expLista[idxExp] = expItem;
+    else expLista.unshift(expItem);
+    localStorage.setItem('sigpro_expedientes_lista', JSON.stringify(expLista));
 }
 
 function compactEmbeddedAdjuntos(excludeCodigo) {
-    const detalleRaw = localStorage.getItem(FICHA_STORAGE_KEYS.DOCUMENTOS_DETALLE);
+    const detalleRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
     const detalle = safeParseJson(detalleRaw, {});
 
     Object.keys(detalle).forEach((codigo) => {
         if (codigo === excludeCodigo) return;
         const item = detalle[codigo];
         if (!item || !Array.isArray(item.adjuntos)) return;
-
         item.adjuntos = item.adjuntos.map((adjunto) => {
             if (!adjunto || typeof adjunto !== 'object') return adjunto;
             const { contenido, ...rest } = adjunto;
@@ -309,12 +292,11 @@ function compactEmbeddedAdjuntos(excludeCodigo) {
         });
     });
 
-    localStorage.setItem(FICHA_STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
+    localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
 }
 
 function cacheAdjuntosTemporales(codigo, adjuntos) {
     if (!codigo || !Array.isArray(adjuntos) || adjuntos.length === 0) return;
-
     try {
         const raw = sessionStorage.getItem('sigpro_adjuntos_cache');
         const cache = safeParseJson(raw, {});
@@ -368,54 +350,37 @@ function persistCaracterizacionLocal(payload, savedOrigin) {
     }
 }
 
-// Archivos seleccionados
 let selectedFiles = [];
-
-// Procesos cargados desde API
 let procesosCache = null;
-
 let currentUser = null;
 let userFaculty = null;
 let cascadaSelectsInicializada = false;
 
-// ==========================================
-// UTILIDADES
-// ==========================================
-
 function showToast(message, type = 'info', duration = 3000) {
     const container = document.querySelector(FICHA_CONFIG.selectors.toastContainer);
     if (!container) return;
-
     const icons = {
         success: 'check_circle',
         error: 'error',
         info: 'info',
         warning: 'warning'
     };
-
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = `
         <span class="material-symbols-outlined">${icons[type]}</span>
         <span class="font-medium">${message}</span>
     `;
-
     container.appendChild(toast);
-
     setTimeout(() => {
         toast.classList.add('hiding');
         setTimeout(() => toast.remove(), 300);
     }, duration);
 }
 
-// ==========================================
-// MANEJO DE ARCHIVOS
-// ==========================================
-
 function initFileUpload() {
     const fileInput = document.querySelector(FICHA_CONFIG.selectors.fileInput);
     const fileList = document.querySelector(FICHA_CONFIG.selectors.fileList);
-
     if (!fileInput || !fileList) return;
 
     fileInput.addEventListener('change', (e) => {
@@ -424,18 +389,14 @@ function initFileUpload() {
 
         files.forEach(file => {
             const ext = String(file.name || '').split('.').pop().toLowerCase();
-
             if (!allowedExtensions.includes(ext)) {
                 showToast(`Formato no permitido: ${file.name}`, 'warning');
                 return;
             }
-
-            // Validar tamaño (25MB)
             if (file.size > 25 * 1024 * 1024) {
                 showToast(`El archivo ${file.name} excede 25MB`, 'error');
                 return;
             }
-
             const alreadySelected = selectedFiles.some((selected) => selected.name === file.name && selected.size === file.size);
             if (!alreadySelected) {
                 selectedFiles.push(file);
@@ -444,7 +405,6 @@ function initFileUpload() {
 
         renderFileList();
         e.target.value = '';
-
         if (selectedFiles.length > 0) {
             showToast('Archivo detectado correctamente', 'success', 1400);
         }
@@ -454,17 +414,14 @@ function initFileUpload() {
 function renderFileList() {
     const fileList = document.querySelector(FICHA_CONFIG.selectors.fileList);
     if (!fileList) return;
-
     if (selectedFiles.length === 0) {
         fileList.classList.add('hidden');
         return;
     }
-
     fileList.classList.remove('hidden');
     fileList.innerHTML = selectedFiles.map((file, index) => {
         const size = formatFileSize(file.size);
         const icon = getFileIcon(file.name);
-
         return `
             <div class="file-item">
                 <span class="material-symbols-outlined text-purple-500">${icon}</span>
@@ -501,21 +458,15 @@ function getFileIcon(filename) {
     return icons[ext] || icons.default;
 }
 
-/**
- * Convierte un archivo a base64
- */
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => {
-            resolve(reader.result);
-        };
+        reader.onload = () => resolve(reader.result);
         reader.onerror = reject;
         reader.readAsDataURL(file);
     });
 }
 
-// Hacer global para los onclick
 window.removeFile = function(index) {
     selectedFiles.splice(index, 1);
     renderFileList();
@@ -533,13 +484,11 @@ function normalizeText(value) {
 function findFacultyCodeInMap(value) {
     const normalizedValue = normalizeText(value);
     if (!normalizedValue) return null;
-
     for (const [rawName, code] of Object.entries(FACULTY_CODE_MAP)) {
         if (normalizeText(rawName) === normalizedValue) {
             return code;
         }
     }
-
     return null;
 }
 
@@ -579,31 +528,28 @@ function resolveFacultyCode() {
     if (userFaculty && userFaculty.code) {
         return String(userFaculty.code).toUpperCase();
     }
-
     const candidates = [
         currentUser?.facultad,
         currentUser?.nombreFacultad,
         userFaculty?.name,
         userFaculty?.nombre
     ];
-
     for (const candidate of candidates) {
         const code = findFacultyCodeInMap(candidate);
         if (code) return code;
     }
-
     return 'GEN';
 }
 
 function extractSequenceFromCode(code, facultyCode, year) {
-    const pattern = new RegExp(`^FC-${facultyCode}-${year}-(\d+)$`);
+    const pattern = new RegExp(`^FC-${facultyCode}-${year}-(\\d+)$`);
     const match = String(code || '').trim().match(pattern);
     return match ? Number(match[1]) : null;
 }
 
 async function getNextFichaSequence(facultyCode, year) {
     const usedSequences = new Set();
-    const docsRaw = localStorage.getItem(FICHA_STORAGE_KEYS.DOCUMENTOS_LISTA);
+    const docsRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
     const docs = docsRaw ? JSON.parse(docsRaw) : [];
 
     docs.forEach((doc) => {
@@ -625,19 +571,17 @@ async function generateFichaCode() {
     const year = new Date().getFullYear();
     const facultyCode = resolveFacultyCode();
     const nextSequence = await getNextFichaSequence(facultyCode, year);
-    return `FC-${facultyCode}-${year}-${nextSequence}`;
+    return `FC-${facultyCode}-${year}-${String(nextSequence).padStart(3, '0')}`;
 }
 
 async function refreshGeneratedCode() {
     const codigoInput = document.querySelector(FICHA_CONFIG.selectors.codigoField);
     if (!codigoInput) return;
-
     codigoInput.value = await generateFichaCode();
 }
 
 function setDemoUser() {
     const fallbackCode = getFacultyCodeFromLocalContext() || 'GEN';
-
     currentUser = {
         correo: 'demo@unmsm.edu.pe',
         rol: 'Usuario Facultad',
@@ -655,18 +599,15 @@ async function loadUserData() {
             setDemoUser();
             return;
         }
-
         const user = API.auth.getUser();
         if (!user) {
             setDemoUser();
             return;
         }
-
         currentUser = user;
         const resolvedCode = findFacultyCodeInMap(user.facultad || user.nombreFacultad)
             || getFacultyCodeFromLocalContext()
             || 'GEN';
-
         userFaculty = {
             code: resolvedCode,
             name: user.facultad || user.nombreFacultad || ''
@@ -712,13 +653,11 @@ function populateMacroProcesoSelect(tipoValue, preserveSelection = true) {
 function rehydrateCascadaFromCurrentSelection() {
     const tipoSelect = document.querySelector(FICHA_CONFIG.selectors.tipoProcesoSelect);
     if (!tipoSelect) return;
-
     populateMacroProcesoSelect(tipoSelect.value, true);
 }
 
 function guardarFichaYRedirigir(codigo) {
     const destino = `facultades-documentos.html?docCode=${encodeURIComponent(codigo)}`;
-
     if (window.top && window.top !== window) {
         window.top.location.href = destino;
         return;
@@ -747,9 +686,10 @@ function initFormHandler() {
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
 
-        // ← NUEVO: Leer y validar enlace de Google Sheets
-        const googleSheetsInput = form.querySelector(FICHA_CONFIG.selectors.googleSheetsInput);
+        const googleSheetsInput = form.querySelector('#google-sheets-url');
         const googleSheetsUrl = googleSheetsInput ? googleSheetsInput.value.trim() : '';
+        const googleSheetsRangeInput = form.querySelector('#google-sheets-range');
+        const googleSheetsRange = googleSheetsRangeInput ? googleSheetsRangeInput.value.trim() : 'A1:Z50';
 
         if (googleSheetsUrl && !isValidGoogleSheetsUrl(googleSheetsUrl)) {
             showToast('El enlace de Google Sheets no es válido. Debe tener el formato: https://docs.google.com/spreadsheets/d/...', 'error', 5000);
@@ -767,7 +707,6 @@ function initFormHandler() {
 
         if (emptyRequiredFields.length > 0) {
             showToast('Complete todos los campos obligatorios (*)', 'warning');
-
             emptyRequiredFields.forEach(input => {
                 input.classList.add('ring-2', 'ring-red-500', 'border-red-500');
                 input.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -775,11 +714,9 @@ function initFormHandler() {
                     input.classList.remove('ring-2', 'ring-red-500', 'border-red-500');
                 }, 3000);
             });
-
             return;
         }
 
-        // Mostrar carga
         const originalText = btnFinalizar.innerHTML;
         btnFinalizar.disabled = true;
         btnFinalizar.innerHTML = `
@@ -810,8 +747,8 @@ function initFormHandler() {
                     tipo: getFileIcon(f.name)
                 })),
                 adjuntos: [],
-                // ← NUEVO: Incluir datos de Google Sheets
                 googleSheetsUrl: googleSheetsUrl || null,
+                googleSheetsRange: googleSheetsRange,
                 googleSheetsEmbedUrl: googleSheetsUrl ? getGoogleSheetsEmbedUrl(googleSheetsUrl) : null,
                 googleSheetsPreviewUrl: googleSheetsUrl ? getGoogleSheetsPreviewUrl(googleSheetsUrl) : null,
                 googleSheetsId: googleSheetsUrl ? extractGoogleSheetsId(googleSheetsUrl) : null
@@ -822,7 +759,6 @@ function initFormHandler() {
             const adjuntosConBase64 = [];
             for (let file of selectedFiles) {
                 const base64 = await fileToBase64(file);
-
                 const ext = file.name.split('.').pop().toLowerCase();
                 let tipo = 'Documento';
                 if (ext === 'pdf') tipo = 'PDF';
@@ -847,12 +783,8 @@ function initFormHandler() {
 
             if (canUseApiUpload()) {
                 try {
-                    const tipoProcesoInput = form.querySelector(FICHA_CONFIG.selectors.tipoProcesoSelect);
-                    const macroProcesoInput = form.querySelector(FICHA_CONFIG.selectors.macroProcesoSelect);
-
                     const macroProcess = tipoProcesoLabel || 'Estratégico';
                     const process = macroProcesoLabel || 'Gestión estratégica';
-
                     const pdfFile = selectedFiles.find(f => f.name.toLowerCase().endsWith('.pdf')) || selectedFiles[0];
 
                     if (!pdfFile) {
@@ -867,9 +799,7 @@ function initFormHandler() {
                         payload.codigo = backendCode;
                         payload.id = backendCode;
                         payload.backendId = backendCode;
-
                         console.log('✅ Ficha subida con backendId:', backendCode);
-
                         showToast(`Ficha subida: ${backendCode}`, 'success', 3000);
                     }
                 } catch (apiError) {
@@ -883,10 +813,10 @@ function initFormHandler() {
                 result = { success: true, data: { id: payload.codigo, code: payload.codigo } };
                 showToast('Sin conexión a API. Se guardó localmente.', 'warning', 4000);
             } else {
-                    payload.codigo = result.data?.code || payload.codigo;
-                    payload.id = result.data?.id || result.data?.code;
-                    payload.backendId = result.data?.id || result.data?.code || null;
-                    persistCaracterizacionLocal(payload, 'local');
+                payload.codigo = result.data?.code || payload.codigo;
+                payload.id = result.data?.id || result.data?.code;
+                payload.backendId = result.data?.id || result.data?.code || null;
+                persistCaracterizacionLocal(payload, 'local');
             }
 
             showToast('Ficha de caracterización creada exitosamente', 'success');
@@ -899,7 +829,6 @@ function initFormHandler() {
                     docType: 'caracterizacion',
                     docStatus: 'pendiente',
                     facultyId: payload.facultadId || resolveFacultyId(),
-                    // ← NUEVO: Notificar al padre sobre Google Sheets
                     googleSheetsUrl: payload.googleSheetsUrl
                 }, '*');
             }
@@ -908,7 +837,6 @@ function initFormHandler() {
                 setTimeout(() => {
                     btnFinalizar.style.display = 'none';
                     btnExpedientes.classList.remove('hidden');
-
                     btnExpedientes.href = `facultades-documentos.html?docCode=${encodeURIComponent(codigo)}`;
                     btnExpedientes.onclick = (ev) => {
                         ev.preventDefault();
@@ -923,7 +851,6 @@ function initFormHandler() {
             console.error('Error:', error);
             const detail = error?.message ? ` (${error.message})` : '';
             showToast(`Error al guardar${detail}`, 'error');
-
             btnFinalizar.disabled = false;
             btnFinalizar.innerHTML = originalText;
         }
@@ -975,10 +902,6 @@ async function cargarProcesosDesdeAPI() {
     rehydrateCascadaFromCurrentSelection();
 }
 
-// ==========================================
-// CASCADA DE SELECTORES
-// ==========================================
-
 function initCascadaSelects() {
     if (cascadaSelectsInicializada) {
         rehydrateCascadaFromCurrentSelection();
@@ -1008,16 +931,11 @@ function obtenerNombreMacroProceso(macroProcesoId) {
     return encontrado ? `${encontrado.code} - ${encontrado.name}` : macroProcesoId;
 }
 
-// ==========================================
-// TEMA OSCURO/CLARO
-// ==========================================
-
 function initTheme() {
     const currentTheme = localStorage.getItem('theme') || 'light';
     document.documentElement.classList.toggle('dark', currentTheme === 'dark');
 }
 
-// Escuchar cambios de tema desde el iframe padre
 window.addEventListener('message', (event) => {
     if (event.data.type === 'theme-change') {
         const theme = event.data.theme;
@@ -1027,19 +945,12 @@ window.addEventListener('message', (event) => {
     }
 });
 
-// ==========================================
-// ATAJOS DE TECLADO
-// ==========================================
-
 function initKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        // Ctrl/Cmd + S para guardar
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
             document.querySelector(FICHA_CONFIG.selectors.btnFinalizar)?.click();
         }
-
-        // Escape para volver
         if (e.key === 'Escape') {
             if (confirm('¿Desea salir? Los cambios no guardados se perderán.')) {
                 window.location.href = 'facultades-nuevo.html';
@@ -1047,10 +958,6 @@ function initKeyboardShortcuts() {
         }
     });
 }
-
-// ==========================================
-// INICIALIZACIÓN
-// ==========================================
 
 function init() {
     console.log('🚀 Ficha de Caracterización cargada (v2 - Google Sheets support)');
@@ -1078,16 +985,12 @@ function init() {
     showToast('Formulario listo', 'info', 2000);
 }
 
-// Ejecutar
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {
     init();
 }
 
-// ==========================================
-// SYNC MODO-AGNÓSTICO
-// ==========================================
 function sincronizarClavesNeutras(doc) {
     try {
         const neutralRaw = localStorage.getItem('sigpro_documentos_lista');
@@ -1116,7 +1019,8 @@ function sincronizarClavesNeutras(doc) {
             facultadId: doc.facultadId,
             tipo: doc.tipo,
             origen: doc.origen,
-            googleSheetsUrl: doc.googleSheetsUrl || null
+            googleSheetsUrl: doc.googleSheetsUrl || null,
+            googleSheetsRange: doc.googleSheetsRange || 'A1:Z50'
         };
         if (idxR >= 0) {
             reportes[idxR] = { ...reportes[idxR], ...reporteDoc };

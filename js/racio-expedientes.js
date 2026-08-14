@@ -889,46 +889,36 @@ async function approveCurrentExpediente() {
         approveButton.classList.add("opacity-80", "cursor-wait");
     }
 
+    let apiSuccess = false;
+    let publicUrl = '';
+    const approvedDate = new Date();
+
+    // ── 1. Intentar API solo si estamos en modo remoto ──
     try {
-        // 🔥 DETERMINAR ID CORRECTO (UUID o código)
+        const isRemote = (typeof API !== 'undefined' && API.CONFIG?.MODE === 'remote');
         const docId = doc.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(doc.id)
-            ? doc.id  // UUID válido
-            : doc.codigo; // Fallback al código
+            ? doc.id
+            : doc.codigo;
 
-        console.log('📤 Aprobando documento:', docId);
-
-        // 🔥 LLAMADA A LA API REAL
-        let apiResult;
-        if (typeof API !== "undefined" && API.admin?.documents?.approve) {
-            apiResult = await API.admin.documents.approve(docId);
-        } else {
-            // Fallback si API no está cargada
-            const token = localStorage.getItem('unmsm_token') || localStorage.getItem('token');
-            const response = await fetch(`http://localhost:8080/v1/admin/documents/${docId}/approve`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            apiResult = { 
-                success: response.ok, 
-                data: await response.json().catch(() => ({})),
-                status: response.status 
-            };
+        if (isRemote && typeof API !== "undefined" && API.admin?.documents?.approve) {
+            const apiResult = await API.admin.documents.approve(docId);
+            if (apiResult.success) {
+                apiSuccess = true;
+                publicUrl = apiResult.data?.publicUrl || `/public/reps/${docId}`;
+            }
         }
+    } catch (error) {
+        console.warn('API no disponible, se usará aprobación local:', error);
+    }
 
-        console.log('📥 Respuesta API:', apiResult);
+    // Si la API no respondió, generamos URL local
+    if (!apiSuccess) {
+        publicUrl = `/public/reps/${doc.codigo}`;
+    }
 
-        if (!apiResult.success) {
-            throw new Error(apiResult.error || apiResult.data?.message || `Error ${apiResult.status}`);
-        }
-
-        // ✅ ÉXITO: Actualizar estado local
-        const publicUrl = apiResult.data?.publicUrl || `/public/reps/${docId}`;
-        const approvedDate = new Date();
-
-        // Guardar en localStorage para persistencia
+    // ── 2. Guardado LOCAL robusto (claves CON prefijo y SIN prefijo) ──
+    try {
+        // A) Claves internas con prefijo (modo local/remote)
         upsertDocumentoAprobado({
             ...doc,
             estado: "completado",
@@ -943,7 +933,7 @@ async function approveCurrentExpediente() {
             publicUrl: publicUrl
         });
 
-        // ✅ FIX: Guardar también en sigpro_approved_docs (key que usa el repositorio como fallback)
+        // B) sigpro_approved_docs (lee racio-repositorio)
         const approvedDocs = JSON.parse(localStorage.getItem('sigpro_approved_docs') || '[]');
         const approvedDoc = {
             id: doc.id || doc.codigo,
@@ -952,14 +942,14 @@ async function approveCurrentExpediente() {
             title: doc.descripcion || 'Documento aprobado',
             descripcion: doc.descripcion || 'Documento aprobado',
             name: doc.descripcion || 'Documento aprobado',
-            type: doc.tipo || 'reporte',
-            tipo: doc.tipo || 'reporte',
+            type: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
+            tipo: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
             status: 'APPROVED',
             estado: 'aprobado',
             faculty: doc.facultad || 'UNMSM',
             facultad: doc.facultad || 'UNMSM',
             nombreFacultad: doc.facultad || 'UNMSM',
-            facultyId: doc.facultyId || '',
+            facultyId: doc.facultyId || doc.facultadId || '',
             unit: doc.unidad || 'Oficina de Racionalización',
             unidad: doc.unidad || 'Oficina de Racionalización',
             publicUrl: publicUrl,
@@ -968,52 +958,87 @@ async function approveCurrentExpediente() {
             fecha: approvedDate.toISOString(),
             updatedAt: approvedDate.toISOString(),
             publishedAt: approvedDate.toISOString(),
-            createdAt: doc.fecha || approvedDate.toISOString()
+            createdAt: doc.fecha || approvedDate.toISOString(),
+            macroProceso: doc.macroProceso || '',
+            responsable: doc.responsable || doc.unidad || 'Oficina de Racionalización'
         };
-
-        const existingIndex = approvedDocs.findIndex(d => d.id === (doc.id || doc.codigo) || d.codigo === doc.codigo);
-        if (existingIndex >= 0) {
-            approvedDocs[existingIndex] = { ...approvedDocs[existingIndex], ...approvedDoc };
-        } else {
-            approvedDocs.push(approvedDoc);
-        }
-
+        const idxApp = approvedDocs.findIndex(d => d.id === (doc.id || doc.codigo) || d.codigo === doc.codigo);
+        if (idxApp >= 0) approvedDocs[idxApp] = { ...approvedDocs[idxApp], ...approvedDoc };
+        else approvedDocs.push(approvedDoc);
         localStorage.setItem('sigpro_approved_docs', JSON.stringify(approvedDocs));
 
-        // 🔥 Disparar evento para sincronizar otras pestañas
-        window.dispatchEvent(new StorageEvent('storage', {
-            key: 'sigpro_approved_docs',
-            newValue: JSON.stringify(approvedDocs)
-        }));
+        // C) sigpro_expedientes_lista (lee facultades-expedientes)
+        const expsGlobal = JSON.parse(localStorage.getItem('sigpro_expedientes_lista') || '[]');
+        const expItem = {
+            id: doc.id || doc.codigo,
+            codigo: doc.codigo,
+            tipo: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
+            nombre: doc.descripcion || `Expediente ${doc.codigo}`,
+            macroProceso: doc.macroProceso || 'Gestión Institucional',
+            fechaAprobacion: approvedDate.toISOString(),
+            estado: 'aprobado',
+            responsable: doc.responsable || doc.unidad || 'Oficina de Racionalización',
+            facultad: doc.facultad || 'UNMSM',
+            nombreFacultad: doc.facultad || 'UNMSM',
+            publicUrl: publicUrl
+        };
+        const idxExp = expsGlobal.findIndex(e => String(e.codigo) === String(doc.codigo));
+        if (idxExp >= 0) expsGlobal[idxExp] = { ...expsGlobal[idxExp], ...expItem };
+        else expsGlobal.push(expItem);
+        localStorage.setItem('sigpro_expedientes_lista', JSON.stringify(expsGlobal));
 
-        // Actualizar estado en memoria
-        doc.estado = "completado";
-        doc.progreso = 100;
-        doc.fecha = approvedDate;
-        doc.publicUrl = publicUrl;
-        
-        state.allDocuments = state.allDocuments.map((item) => 
-            item.codigo === doc.codigo ? { ...item, estado: "completado", progreso: 100, fecha: approvedDate, publicUrl } : item
-        );
-        state.selectedDocument = doc;
+        // D) sigpro_documentos_lista (compartido entre vistas)
+        const docsGlobal = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+        const docItem = {
+            id: doc.id || doc.codigo,
+            codigo: doc.codigo,
+            tipo: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
+            estado: 'aprobado',
+            descripcion: doc.descripcion || `Documento ${doc.codigo}`,
+            nombre: doc.descripcion || `Documento ${doc.codigo}`,
+            fecha: approvedDate.toISOString().split('T')[0],
+            fechaAprobacion: approvedDate.toISOString(),
+            nombreFacultad: doc.facultad || 'UNMSM',
+            facultad: doc.facultad || 'UNMSM',
+            responsable: doc.responsable || doc.unidad || 'Oficina de Racionalización',
+            macroProceso: doc.macroProceso || 'Gestión Institucional',
+            origen: 'expediente',
+            publicUrl: publicUrl
+        };
+        const idxDoc = docsGlobal.findIndex(d => String(d.codigo || d.id) === String(doc.codigo));
+        if (idxDoc >= 0) docsGlobal[idxDoc] = { ...docsGlobal[idxDoc], ...docItem };
+        else docsGlobal.unshift(docItem);
+        localStorage.setItem('sigpro_documentos_lista', JSON.stringify(docsGlobal));
 
-        // 🔔 Disparar evento para otras vistas
+        // ── 3. Sincronización en tiempo real ──
+        ['sigpro_approved_docs','sigpro_expedientes_lista','sigpro_documentos_lista'].forEach(key => {
+            window.dispatchEvent(new StorageEvent('storage', { key: key }));
+        });
+
         document.dispatchEvent(new CustomEvent('historial-actualizado', {
             detail: { codigo: doc.codigo, accion: 'aprobado', publicUrl }
         }));
 
-        // 🔔 Notificación visual
+        // ── 4. UI y redirección ──
+        doc.estado = "completado";
+        doc.progreso = 100;
+        doc.fecha = approvedDate;
+        doc.publicUrl = publicUrl;
+        state.allDocuments = state.allDocuments.map(item => 
+            item.codigo === doc.codigo ? { ...item, estado: "completado", progreso: 100, fecha: approvedDate, publicUrl } : item
+        );
+        state.selectedDocument = doc;
+
         renderDocumentList();
         await renderSelectedDocument();
-        
-        // ✅ REDIRECCIÓN AL REPOSITORIO
+
         sessionStorage.setItem('sigpro_just_approved', 'true');
         window.alert(`✅ Expediente aprobado y publicado.\n\nSe redirigirá al repositorio...`);
         window.location.href = 'racio-repositorio.html';
 
     } catch (error) {
-        console.error("❌ Error aprobando:", error);
-        window.alert(`No se pudo completar la aprobación:\n${error.message}`);
+        console.error("❌ Error en aprobación:", error);
+        window.alert(`Error guardando la aprobación:\n${error.message}`);
     } finally {
         if (approveButton) {
             approveButton.classList.remove("cursor-wait", "opacity-80");
