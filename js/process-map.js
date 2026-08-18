@@ -586,7 +586,7 @@ const ProcessMap = {
                     </button>
                     <button class="btn-action-secondary strategic-btn" onclick="ProcessMap.openSoporte && ProcessMap.openSoporte('${p.id}')">
                         <span class="material-symbols-outlined text-xs">support_agent</span>
-                        Soporte
+                        Inventario
                     </button>
                     <button class="btn-action-third strategic-btn" onclick="ProcessMap.openFichatecnica('${p.id}')">
                         <span class="material-symbols-outlined text-xs">description</span>
@@ -631,7 +631,7 @@ const ProcessMap = {
                     </button>
                     <button class="btn-action-secondary missional-btn" onclick="ProcessMap.openSoporte && ProcessMap.openSoporte('${p.id}')">
                         <span class="material-symbols-outlined text-xs">support_agent</span>
-                        Soporte
+                        Inventario
                     </button>
                     <button class="btn-action-third missional-btn" onclick="ProcessMap.openFichatecnica('${p.id}')">
                         <span class="material-symbols-outlined text-xs">description</span>
@@ -712,7 +712,7 @@ const ProcessMap = {
                     </button>
                     <button class="btn-action-secondary" onclick="ProcessMap.openSoporte && ProcessMap.openSoporte('${p.id}')">
                         <span class="material-symbols-outlined text-xs">support_agent</span>
-                        Soporte
+                        Inventario
                     </button>
                     <button class="btn-action-third" onclick="ProcessMap.openFichatecnica('${p.id}')">
                         <span class="material-symbols-outlined text-xs">description</span>
@@ -2157,55 +2157,359 @@ const ProcessMap = {
         // ============================================
 
         async openFichatecnica(processId) {
-            console.log('Abriendo ficha técnica para proceso:', processId);
-            
-            const allProcesses = [
-                ...(this.processes?.strategic || []),
-                ...(this.processes?.missional || []),
-                ...(this.processes?.support || [])
-            ];
-            
-            const process = allProcesses.find(p => p.id === parseInt(processId) || p.id === processId);
-            
-            if (!process) {
-                this.showError('Proceso no encontrado');
-                return;
+            console.log('Cargando Ficha Técnica para proceso:', processId);
+
+            // 1. Obtener los elementos del DOM
+            const panel = document.getElementById('ficha-tecnica-section');
+            const processNameEl = document.getElementById('current-ficha-process-name');
+            const fileNameEl = document.getElementById('ficha-tecnica-filename-display');
+            const iframe = document.getElementById('ficha-tecnica-iframe-display');
+            const placeholder = document.getElementById('ficha-tecnica-placeholder-display');
+            const redirectBtn = document.getElementById('btn-redirect-sheet');
+
+            if (!panel) return;
+
+            // Ocultar otros paneles abiertos si los hay
+            if (typeof this.closeIndicatorsPanel === 'function') this.closeIndicatorsPanel();
+            if (typeof this.closeFlowchartsPanel === 'function') this.closeFlowchartsPanel();
+            if (typeof this.closeSoportePanel === 'function') this.closeSoportePanel();
+
+            // Mostrar el panel y hacer scroll suave hacia él
+            panel.classList.remove('hidden');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            // Mostrar pantalla de carga (Placeholder)
+            if (placeholder) {
+                placeholder.style.display = 'flex';
+                placeholder.innerHTML = `
+                    <div class="w-24 h-24 rounded-2xl flex items-center justify-center mb-6 shadow-lg bg-emerald-50 border-2 border-emerald-200">
+                        <span class="material-symbols-outlined text-5xl text-emerald-600 animate-spin">refresh</span>
+                    </div>
+                    <h4 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Buscando Ficha Técnica aprobada...</h4>
+                    <p class="text-slate-500 dark:text-slate-400 text-center max-w-md">Consultando el repositorio de documentos aprobados.</p>
+                `;
             }
 
-            // Intentar obtener ficha técnica desde la API pública antes de mostrar el panel
+            if (iframe) {
+                iframe.src = '';
+                iframe.style.display = 'none';
+            }
+
             try {
-                const sheet = await this.getTechnicalSheet(this.facultyId, process.id);
-                if (sheet && sheet.success && sheet.data) {
-                    const d = sheet.data || {};
-                    // Priorizar rutas comunes devueltas por el backend
-                    const base = (window.API?.CONFIG?.REMOTE_BASE || 'http://localhost:8080/v1').replace(/\/v1\/?$/i, '');
-                    const candidate = d.pdfUrl || d.fileUrl || d.documentUrl || d.url || d.pdf || process.fichaPdfUrl || null;
-                    let resolved = candidate;
-                    if (candidate && String(candidate).startsWith('/')) {
-                        resolved = base + candidate;
-                    }
-                    process.fichaPdfUrl = resolved;
-                    // conservar campo de descarga si viene separado
-                    process.fichaDownloadUrl = d.downloadUrl && String(d.downloadUrl).startsWith('/') ? base + d.downloadUrl : d.downloadUrl || null;
-                    this.currentFichaTecnicaDownloadUrl = process.fichaDownloadUrl || null;
-                    process.ficha = d;
+                // Obtener el nombre del proceso para el título
+                const allProcesses = [
+                    ...(this.processes?.strategic || []),
+                    ...(this.processes?.missional || []),
+                    ...(this.processes?.support || [])
+                ];
+                const process = allProcesses.find(p => String(p.id) === String(processId));
+
+                if (processNameEl) {
+                    processNameEl.textContent = process ? process.name : 'Proceso';
                 }
-            } catch (e) {
-                console.warn('No se pudo obtener ficha técnica remota', e);
-            }
 
-            this.currentFichaTecnicaProcess = process;
+                // 2. BUSCAR EL DOCUMENTO APROBADO PARA ESTE PROCESO
+                let docAprobado = null;
+                const processCode = String(process?.code || '').trim().toUpperCase();
+
+                const docsLista = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+                const candidatos = docsLista.filter(doc => {
+                    const estado = String(doc.estado || '').toLowerCase();
+                    const tipo = String(doc.tipo || '').toLowerCase();
+                    return (estado === 'aprobado' || estado === 'completado') && tipo === 'caracterizacion';
+                });
+
+                // Prioridad 1: coincidencia exacta por codigoProceso
+                docAprobado = candidatos.find(doc =>
+                    String(doc.codigoProceso || '').trim().toUpperCase() === processCode
+                );
+
+                // Prioridad 2 (fallback): el código aparece en el texto de macroProceso
+                if (!docAprobado) {
+                    docAprobado = candidatos.find(doc => {
+                        const texto = String(doc.macroProceso || doc.descripcion || '').toUpperCase();
+                        return processCode && texto.includes(processCode);
+                    });
+                }
+                // Si no se encuentra, buscar en sigpro_documentos_lista
+                if (!docAprobado) {
+                    const docsLista = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+                    const aprobados = docsLista.filter(d => d.estado === 'aprobado' || d.estado === 'APPROVED');
+                    
+                    docAprobado = aprobados.find(doc => {
+                        const codigoDoc = String(doc.codigo || '').toUpperCase();
+                        const codigoProceso = processCode.toUpperCase();
+                        return codigoDoc === codigoProceso; // ✅ COINCIDENCIA EXACTA
+                    });
+                }
+
+                // Si se encontró un documento aprobado, mostrar su contenido
+                if (docAprobado) {
+                    console.log('📄 Documento aprobado encontrado:', docAprobado);
+
+                    // 🔥 ============================================================
+                    // CAMBIO 3: BUSCAR EL RANGO ACTUALIZADO EN sigpro_documentos_detalle
+                    // ============================================================
+                    let rangeActualizado = docAprobado.range || docAprobado.googleSheetsRange || 'B4:J26';
+                    let gidActualizado = docAprobado.gid || '0';
+                    let sheetIdActualizado = docAprobado.sheetId || null;
+                    let sheetNameActualizado = docAprobado.sheetName || 'Datos';
+
+                    try {
+                        const docsDetalle = JSON.parse(localStorage.getItem('sigpro_documentos_detalle') || '{}');
+                        const detalle = docsDetalle[docAprobado.codigo] || docsDetalle[docAprobado.id] || {};
+                        
+                        if (detalle.fichaData) {
+                            if (detalle.fichaData.range) rangeActualizado = detalle.fichaData.range;
+                            if (detalle.fichaData.googleSheetsRange) rangeActualizado = detalle.fichaData.googleSheetsRange;
+                            if (detalle.fichaData.gid) gidActualizado = detalle.fichaData.gid;
+                            if (detalle.fichaData.sheetId) sheetIdActualizado = detalle.fichaData.sheetId;
+                            if (detalle.fichaData.sheetName) sheetNameActualizado = detalle.fichaData.sheetName;
+                        }
+                        if (detalle.range) rangeActualizado = detalle.range;
+                        if (detalle.gid) gidActualizado = detalle.gid;
+                        if (detalle.sheetId) sheetIdActualizado = detalle.sheetId;
+                        if (detalle.sheetName) sheetNameActualizado = detalle.sheetName;
+                        
+                        console.log('📎 Rango actualizado desde detalle:', rangeActualizado);
+                        console.log('📎 GID actualizado:', gidActualizado);
+                        console.log('📎 Sheet ID actualizado:', sheetIdActualizado);
+                    } catch (e) {
+                        console.warn('No se pudo obtener el detalle para actualizar el rango:', e);
+                    }
+
+                    // Usar los valores actualizados
+                    let range = rangeActualizado;
+                    let gid = gidActualizado;
+                    let sheetId = sheetIdActualizado;
+                    let sheetName = sheetNameActualizado;
+
+                    // Obtener la URL pública del documento
+                    let sheetUrl = docAprobado.publicUrl || 
+                                docAprobado.urlPublica || 
+                                docAprobado.pdfUrl || 
+                                docAprobado.url || 
+                                docAprobado.documentUrl || 
+                                docAprobado.sheetUrl || '';
+
+                    // Si hay sheetId pero no URL, construirla con rango
+                    if (!sheetUrl && sheetId) {
+                        const params = new URLSearchParams({
+                            gid: gid || '0',
+                            range: range,
+                            single: 'true',
+                            widget: 'true',
+                            headers: 'false',
+                            chrome: 'false'
+                        });
+                        sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/htmlembed?${params.toString()}`;
+                    }
+
+                    // 🔥 Si la URL es de Google Sheets, convertir a htmlembed con rango
+                    if (sheetUrl && sheetUrl.includes('docs.google.com/spreadsheets/d/')) {
+                        const match = sheetUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                        if (match) {
+                            const id = match[1];
+                            sheetId = id;
+                            
+                            // ✅ USAR HTMLEMBED (el mismo que funciona en expediente-caracterizacion)
+                            const params = new URLSearchParams({
+                                gid: gid || '0',
+                                range: range,
+                                single: 'true',
+                                widget: 'true',
+                                headers: 'false',
+                                chrome: 'false'
+                            });
+                            
+                            sheetUrl = `https://docs.google.com/spreadsheets/d/${id}/htmlembed?${params.toString()}`;
+                            console.log('📎 Usando htmlembed (como en expediente-caracterizacion)');
+                            console.log('📎 Rango:', range);
+                            console.log('📎 GID:', gid);
+                            console.log('📎 URL final:', sheetUrl);
+                        }
+                    }
+
+                    // 🔥 Si aún no hay URL, buscar en attachments
+                    if (!sheetUrl && docAprobado.attachments && Array.isArray(docAprobado.attachments)) {
+                        const sheetLink = docAprobado.attachments.find(a => 
+                            typeof a === 'string' && 
+                            (a.includes('docs.google.com/spreadsheets') || a.includes('sheets.googleapis.com'))
+                        );
+                        if (sheetLink) {
+                            const match = sheetLink.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                            if (match) {
+                                const id = match[1];
+                                const params = new URLSearchParams({
+                                    gid: gid || '0',
+                                    range: range,
+                                    single: 'true',
+                                    widget: 'true',
+                                    headers: 'false',
+                                    chrome: 'false'
+                                });
+                                sheetUrl = `https://docs.google.com/spreadsheets/d/${id}/htmlembed?${params.toString()}`;
+                            } else {
+                                sheetUrl = sheetLink;
+                            }
+                        }
+                    }
+
+                    console.log('📎 URL final para iframe:', sheetUrl);
+
+                    // Actualizar el nombre del archivo
+                    if (fileNameEl) {
+                        const nombreArchivo = docAprobado.title || docAprobado.descripcion || docAprobado.name || 'Ficha_Tecnica_Caracterizacion';
+                        const codigoProceso = docAprobado.code || docAprobado.codigo || processCode || 'PROC';
+                        fileNameEl.textContent = `${codigoProceso} - ${nombreArchivo}.xlsx`;
+                    }
+
+                    // Actualizar el botón de redirección
+                    if (redirectBtn) {
+                        let redirectUrl = docAprobado.publicUrl || 
+                                        docAprobado.urlPublica || 
+                                        docAprobado.pdfUrl || 
+                                        docAprobado.url || 
+                                        docAprobado.documentUrl || 
+                                        sheetUrl;
+                        
+                        // Si es preview, convertir a edit para el botón
+                        if (redirectUrl && redirectUrl.includes('/preview')) {
+                            redirectUrl = redirectUrl.replace('/preview', '/edit');
+                        }
+                        // Si no tiene URL, usar la del iframe
+                        if (!redirectUrl || redirectUrl === '#') {
+                            redirectUrl = sheetUrl;
+                        }
+                        redirectBtn.href = redirectUrl || '#';
+                        redirectBtn.style.display = 'inline-flex';
+                    }
+
+                    // Cargar el iframe con la URL
+                    if (iframe && sheetUrl && sheetUrl !== '#') {
+                        iframe.src = sheetUrl;
+                        iframe.style.display = 'block';
+                        if (placeholder) placeholder.style.display = 'none';
+                    } else if (iframe) {
+                        // Si no hay URL, mostrar mensaje
+                        if (placeholder) {
+                            placeholder.style.display = 'flex';
+                            placeholder.innerHTML = `
+                                <div class="w-24 h-24 rounded-2xl flex items-center justify-center mb-6 shadow-lg bg-amber-50 border-2 border-amber-200">
+                                    <span class="material-symbols-outlined text-5xl text-amber-600">info</span>
+                                </div>
+                                <h4 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Documento sin enlace público</h4>
+                                <p class="text-slate-500 dark:text-slate-400 text-center max-w-md">
+                                    El documento "${docAprobado.title || docAprobado.descripcion || 'Ficha Técnica'}" está aprobado pero no tiene un enlace público configurado.
+                                </p>
+                                <p class="text-sm text-slate-400 mt-2">
+                                    Usa el botón "Abrir Ficha Técnica Completa" si está disponible.
+                                </p>
+                            `;
+                        }
+                    }
+
+                    this.currentFichaTecnicaPdfUrl = sheetUrl;
+                    this.currentFichaTecnicaProcess = process;
+                    this.currentFichaTecnicaFileName = fileNameEl ? fileNameEl.textContent : 'Ficha_Tecnica.xlsx';
+
+                } else {
+                    // No se encontró documento aprobado
+                    console.warn('No se encontró documento aprobado para el proceso:', processCode);
+                    
+                    // 🔥 INTENTAR BUSCAR POR sheetId en documentos generales
+                    const docsDetalle = JSON.parse(localStorage.getItem('sigpro_documentos_detalle') || '{}');
+                    let foundBySheet = null;
+                    for (const [key, value] of Object.entries(docsDetalle)) {
+                        if (value.fichaData && value.fichaData.sheetId) {
+                            const procesoEnFicha = value.fichaData.macroProceso || value.fichaData.proceso || '';
+                            if (procesoEnFicha.includes(processCode) || processName.includes(procesoEnFicha)) {
+                                foundBySheet = {
+                                    id: key,
+                                    title: value.fichaData.nombreIndicador || value.fichaData.descripcion || 'Ficha Técnica',
+                                    sheetId: value.fichaData.sheetId,
+                                    publicUrl: `https://docs.google.com/spreadsheets/d/${value.fichaData.sheetId}/preview`
+                                };
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (foundBySheet) {
+                        console.log('📄 Documento encontrado por sheetId:', foundBySheet);
+                        if (iframe && foundBySheet.publicUrl) {
+                            iframe.src = foundBySheet.publicUrl;
+                            iframe.style.display = 'block';
+                            if (placeholder) placeholder.style.display = 'none';
+                            if (fileNameEl) fileNameEl.textContent = `${processCode} - ${foundBySheet.title}.xlsx`;
+                            if (redirectBtn) {
+                                redirectBtn.href = foundBySheet.publicUrl.replace('/preview', '/edit');
+                                redirectBtn.style.display = 'inline-flex';
+                            }
+                            this.currentFichaTecnicaPdfUrl = foundBySheet.publicUrl;
+                            return;
+                        }
+                    }
+
+                    if (placeholder) {
+                        placeholder.style.display = 'flex';
+                        placeholder.innerHTML = `
+                            <div class="w-24 h-24 rounded-2xl flex items-center justify-center mb-6 shadow-lg bg-amber-50 border-2 border-amber-200">
+                                <span class="material-symbols-outlined text-5xl text-amber-600">file_open</span>
+                            </div>
+                            <h4 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Sin Ficha Técnica aprobada</h4>
+                            <p class="text-slate-500 dark:text-slate-400 text-center max-w-md">
+                                No se encontró un documento de ficha técnica aprobado para este proceso.
+                                <br><span class="text-sm text-slate-400">Código: ${processCode || 'No disponible'}</span>
+                            </p>
+                            <p class="text-xs text-slate-400 mt-4">
+                                Asegúrate de que el documento esté aprobado en el repositorio.<br>
+                                La ficha técnica debe tener un enlace público de Google Sheets.
+                            </p>
+                        `;
+                    }
+
+                    if (redirectBtn) {
+                        redirectBtn.href = '#';
+                        redirectBtn.style.display = 'none';
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error al abrir la ficha técnica:', error);
+
+                // Mostrar estado de error en el contenedor
+                if (placeholder) {
+                    placeholder.style.display = 'flex';
+                    placeholder.innerHTML = `
+                        <div class="w-24 h-24 rounded-2xl flex items-center justify-center mb-6 shadow-lg bg-red-100 dark:bg-red-900/30 border-2 border-red-200 dark:border-red-700/50">
+                            <span class="material-symbols-outlined text-5xl text-red-500">error_outline</span>
+                        </div>
+                        <h4 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Error al cargar la Ficha Técnica</h4>
+                        <p class="text-slate-500 dark:text-slate-400 text-center max-w-md">${error.message || 'Ocurrió un error inesperado.'}</p>
+                    `;
+                }
+            }
+        },
+
+        closeFichaTecnicaPanel() {
+            const panel = document.getElementById('ficha-tecnica-section');
+            const iframe = document.getElementById('ficha-tecnica-iframe-display');
+
+            if (panel) {
+                panel.classList.add('hidden');
+            }
             
-            // Determinar tipo de proceso
-            if (this.processes?.strategic?.some(p => p.id == processId)) {
-                this.currentFichaTecnicaType = 'strategic';
-            } else if (this.processes?.missional?.some(p => p.id == processId)) {
-                this.currentFichaTecnicaType = 'missional';
-            } else {
-                this.currentFichaTecnicaType = 'support';
+            // Limpiar el src del iframe para detener la ejecución en segundo plano
+            if (iframe) {
+                iframe.src = '';
+                iframe.style.display = 'none';
             }
 
-            this.showFichaTecnicaPanel(process);
+            // Resetear estado
+            this.currentFichaTecnicaProcess = null;
+            this.currentFichaTecnicaPdfUrl = null;
+            this.currentFichaTecnicaFileName = null;
         },
 
         async showFichaTecnicaPanel(process) {
@@ -2367,115 +2671,52 @@ const ProcessMap = {
         },
 
         downloadFichaTecnicaFile() {
-            if (!this.currentFichaTecnicaProcess) {
-                this.showError('No hay ficha técnica disponible');
+            if (!this.currentFichaTecnicaPdfUrl) {
+                this.showError('No hay URL de ficha técnica disponible');
                 return;
             }
             
-            const process = this.currentFichaTecnicaProcess;
-            const fileName = this.currentFichaTecnicaFileName;
+            const fileName = this.currentFichaTecnicaFileName || 'Ficha_Tecnica.xlsx';
             const btn = document.getElementById('btn-download-ficha');
             
             if (!btn) return;
             
             const originalHTML = btn.innerHTML;
-
-            if (this.currentFichaTecnicaPdfUrl) {
-                btn.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">sync</span> Descargando...';
-                btn.disabled = true;
-
-                this.downloadPdfFromUrl(this.currentFichaTecnicaPdfUrl, fileName)
-                    .then(() => {
-                        btn.innerHTML = '<span class="material-symbols-outlined text-base">check</span> ¡Descargado!';
-                        btn.style.background = 'linear-gradient(135deg, #059669 0%, #10b981 100%)';
-                        btn.style.borderColor = '#059669';
-                        this.showToast('Ficha técnica descargada exitosamente', 'success');
-                    })
-                    .catch((error) => {
-                        console.error('Error descargando ficha técnica real:', error);
-                        this.showError('Error al descargar el PDF real: ' + error.message);
-                    })
-                    .finally(() => {
-                        setTimeout(() => {
-                            btn.innerHTML = originalHTML;
-                            btn.disabled = false;
-                            btn.style.background = '';
-                            btn.style.borderColor = '';
-                        }, 1500);
-                    });
-                return;
-            }
-            
-            // Estado de carga
-            btn.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">sync</span> Generando...';
+            btn.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">sync</span> Descargando...';
             btn.disabled = true;
-            
-            setTimeout(() => {
-                // Crear contenido del PDF
-                const content = `
-        FICHA TÉCNICA DEL PROCESO
-        =========================
 
-        Proceso: ${process.name}
-        Código: ${process.code}
-        Tipo: ${this.currentFichaTecnicaType === 'strategic' ? 'Estratégico' : this.currentFichaTecnicaType === 'missional' ? 'Misional' : 'De Soporte'}
-
-        Documento generado el: ${new Date().toLocaleDateString('es-ES', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        })}
-
-        --------------------------------------------------
-        OBJETIVO DEL PROCESO
-        --------------------------------------------------
-
-        ${process.description || 'No disponible'}
-
-        --------------------------------------------------
-        INFORMACIÓN GENERAL
-        --------------------------------------------------
-
-        Facultad: ${this.facultyData?.name || 'No especificada'}
-        Responsable: ${process.responsable || 'Por definir'}
-        Versión: 1.0
-        Estado: Activo
-
-        --------------------------------------------------
-        Este documento es parte del Sistema de Gestión por Procesos (SIGPRO)
-        Universidad Nacional Mayor de San Marcos © ${new Date().getFullYear()}
-                `;
-                
-                const blob = new Blob([content], { type: 'application/pdf' });
-                const url = window.URL.createObjectURL(blob);
-                
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                
-                window.URL.revokeObjectURL(url);
-                a.remove();
-                
-                // Estado de éxito
-                btn.innerHTML = '<span class="material-symbols-outlined text-base">check</span> ¡Descargado!';
-                btn.style.background = 'linear-gradient(135deg, #059669 0%, #10b981 100%)';
-                btn.style.borderColor = '#059669';
-                
-                this.showToast('Ficha técnica descargada exitosamente', 'success');
-                
-                // Restaurar botón
+            // Si es una URL de Google Sheets, abrir en nueva pestaña
+            const url = this.currentFichaTecnicaPdfUrl;
+            if (url.includes('docs.google.com')) {
+                window.open(url, '_blank');
+                btn.innerHTML = '<span class="material-symbols-outlined text-base">check</span> Abierto';
                 setTimeout(() => {
                     btn.innerHTML = originalHTML;
                     btn.disabled = false;
-                    btn.style.background = '';
-                    btn.style.borderColor = '';
                 }, 2000);
-                
-            }, 1500);
+                return;
+            }
+
+            // Para otros tipos de URL (PDF, etc.)
+            this.downloadPdfFromUrl(url, fileName)
+                .then(() => {
+                    btn.innerHTML = '<span class="material-symbols-outlined text-base">check</span> ¡Descargado!';
+                    btn.style.background = 'linear-gradient(135deg, #059669 0%, #10b981 100%)';
+                    btn.style.borderColor = '#059669';
+                    this.showToast('Ficha técnica descargada exitosamente', 'success');
+                })
+                .catch((error) => {
+                    console.error('Error descargando:', error);
+                    this.showError('Error al descargar: ' + error.message);
+                })
+                .finally(() => {
+                    setTimeout(() => {
+                        btn.innerHTML = originalHTML;
+                        btn.disabled = false;
+                        btn.style.background = '';
+                        btn.style.borderColor = '';
+                    }, 1500);
+                });
         },
 
     resolveFlowchartPdfUrl(flowchart) {

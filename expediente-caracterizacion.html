@@ -17,7 +17,7 @@
                 extend: {
                     colors: {
                         primary: "#1978e5",
-                        accent: "#2563eb",
+                        accent: "#1a365d",
                         "background-light": "#f6f7f8",
                         "background-dark": "#111821",
                     },
@@ -38,16 +38,8 @@
         @keyframes slideOut { from { transform:translateX(0); opacity:1; } to { transform:translateX(100%); opacity:0; } }
         @keyframes fadeInUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
         .fade-in-up { animation:fadeInUp 0.4s ease forwards; }
-        .gs-table th, .gs-table td { border:1px solid #e2e8f0; padding:8px 12px; font-size:13px; }
-        .dark .gs-table th, .dark .gs-table td { border-color:#334155; }
-        .gs-table th { background:#f1f5f9; font-weight:600; }
-        .dark .gs-table th { background:#1e293b; }
-        .gs-table tr:nth-child(even) { background:#f8fafc; }
-        .dark .gs-table tr:nth-child(even) { background:#0f172a; }
-        .gs-table tr:hover { background:#eff6ff; }
-        .dark .gs-table tr:hover { background:#1e3a5f; }
+        .gsheets-frame { min-height:65vh; border:0; display:block; }
     </style>
-<base target="_blank">
 <base target="_blank">
 </head>
 <body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
@@ -82,17 +74,31 @@
                         </button>
 
                         <!-- Dropdown Perfil -->
-                        <div class="relative" id="profile-dropdown-container">
+                        <div class="relative" id="profile-container">
                             <button type="button" id="profile-btn" 
                                 class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center border border-slate-300 dark:border-slate-600 hover:border-primary dark:hover:border-primary transition-colors"
                                 aria-label="Perfil">
                                 <span class="material-symbols-outlined text-slate-500 dark:text-slate-400 text-sm">person</span>
                             </button>
-                            <div id="profile-dropdown" class="hidden absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-4 z-50"></div>
+                            <div id="profile-dropdown" class="hidden absolute right-0 mt-2 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50"></div>
                         </div>
                     </div>
                 </div>
             </header>
+
+            <div id="logout-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-200">
+                <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm mx-4">
+                    <div class="mx-auto w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+                        <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-3xl">logout</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-center text-slate-900 dark:text-white mb-2">¿Cerrar sesión?</h3>
+                    <p class="text-sm text-center text-slate-500 dark:text-slate-400 mb-6 px-2">¿Estás seguro de que deseas salir de tu cuenta? Deberás iniciar sesión nuevamente.</p>
+                    <div class="flex gap-3">
+                        <button id="logout-cancel" type="button" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                        <button id="logout-confirm" type="button" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 transition-colors shadow-lg shadow-red-600/30">Sí, cerrar sesión</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- MAIN CONTENT -->
             <main class="flex flex-1 justify-center py-8">
@@ -133,81 +139,42 @@
                         </div>
                     </section>
 
-                    <!-- ===== FICHA EN GOOGLE SHEETS ===== -->
-                    <section id="google-sheets-section" class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
+                    <!-- GOOGLE SHEETS: muestra la pestaña y el rango reales del expediente -->
+                    <section id="gsheets-section" class="hidden bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
                         <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-lg bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
-                                    <span class="material-symbols-outlined text-green-600 dark:text-green-400 text-lg">table_chart</span>
-                                </div>
-                                <div>
-                                    <h2 class="text-slate-900 dark:text-slate-100 text-base font-bold leading-tight">Ficha en Google Sheets</h2>
-                                    <p class="text-xs text-slate-500 dark:text-slate-400">Vista previa de la hoja de calculo vinculada</p>
-                                </div>
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">table_chart</span>
+                                <h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight">Hoja de Cálculo Google Sheets</h2>
                             </div>
-                            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] font-bold uppercase border border-emerald-200 dark:border-emerald-800">Aprobado</span>
-                        </div>
-
-                        <div class="px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap items-center justify-between gap-3">
-                            <div class="flex items-center gap-2 flex-1 min-w-0">
-                                <span class="material-symbols-outlined text-base text-slate-400">link</span>
-                                <span id="gs-url-display" class="text-sm text-slate-600 dark:text-slate-400 truncate font-mono text-xs">docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms</span>
-                            </div>
-                            <div class="flex items-center gap-2 flex-shrink-0">
-                                <button onclick="abrirGoogleSheets()" class="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5">
+                            <div class="flex items-center gap-2">
+                                <button id="btn-editar-rango" type="button" onclick="editarRangoGoogleSheets()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                    <span class="material-symbols-outlined text-sm">edit</span>
+                                    Editar rango
+                                </button>
+                                <button type="button" onclick="abrirGoogleSheets()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
                                     <span class="material-symbols-outlined text-sm">open_in_new</span>
                                     Abrir en Google Sheets
                                 </button>
-                                <button onclick="copiarEnlaceGoogleSheets()" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium transition-all flex items-center gap-1">
-                                    <span class="material-symbols-outlined text-sm">content_copy</span>
-                                    Copiar
-                                </button>
                             </div>
                         </div>
-
-                        <div id="gs-content" class="overflow-x-auto">
-                            <table class="gs-table w-full text-left border-collapse">
-                                <thead>
-                                    <tr>
-                                        <th class="text-center w-10">#</th>
-                                        <th>A</th>
-                                        <th>B</th>
-                                        <th>C</th>
-                                        <th>D</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="text-center font-mono text-slate-400 text-xs">1</td>
-                                        <td class="font-semibold">Ficha de Caracterizacion</td>
-                                        <td>2026</td>
-                                        <td>FM</td>
-                                        <td><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">Aprobado</span></td>
-                                    </tr>
-                                    <tr>
-                                        <td class="text-center font-mono text-slate-400 text-xs">2</td>
-                                        <td>Gestion Estrategica</td>
-                                        <td class="font-mono">PE.01</td>
-                                        <td>Estrategico</td>
-                                        <td class="font-mono">V1.0</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="text-center font-mono text-slate-400 text-xs">3</td>
-                                        <td class="text-slate-400">...</td>
-                                        <td class="text-slate-400">...</td>
-                                        <td class="text-slate-400">...</td>
-                                        <td class="text-slate-400">...</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="px-6 py-2.5 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                            <p class="text-xs text-slate-500 flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-sm text-slate-400">info</span>
-                                Vista embebida de Google Sheets
+                        <div class="p-6 space-y-4">
+                            <div class="flex flex-wrap items-center gap-4 text-sm">
+                                <div class="flex items-center gap-2 min-w-0 text-slate-600 dark:text-slate-300">
+                                    <span class="material-symbols-outlined text-slate-400 text-sm">link</span>
+                                    <span id="gsheets-url-display" class="truncate max-w-md">-</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                    <span class="material-symbols-outlined text-slate-400 text-sm">select_all</span>
+                                    <span id="gsheets-range-display">-</span>
+                                </div>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800">
+                                <iframe id="gsheets-embed" class="gsheets-frame w-full bg-white dark:bg-slate-950" title="Vista del rango de Google Sheets"></iframe>
+                            </div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-xs">info</span>
+                                La vista muestra el rango configurado. Si la hoja es privada, inicie sesión en Google en otra pestaña.
                             </p>
-                            <span class="text-xs text-slate-400 font-mono">Rango: A1:D10</span>
                         </div>
                     </section>
 
@@ -254,7 +221,7 @@
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                     <div class="flex items-center justify-center gap-3 mb-4">
                         <span class="material-symbols-outlined text-accent text-3xl">school</span>
-                        <span class="text-white font-bold tracking-widest text-sm uppercase">OFICINA GENERAL DE PLANIFICACIÓN - UNMSM</span>
+                        <span class="text-white font-bold tracking-widest text-sm uppercase">Oficina General de Planificación - UNMSM</span>
                     </div>
                     <p class="text-sm">© 2026 Sistema de Racionalización v2.0</p>
                     <div class="mt-6 flex justify-center gap-8 text-xs font-medium uppercase tracking-wide">

@@ -401,9 +401,16 @@ function upsertDocumentoAprobado(doc) {
 
 function upsertExpedienteRepositorio(doc) {
     const nowIso = new Date().toISOString();
-    const expedientes = parseJsonArray(localStorage.getItem(STORAGE_KEYS.EXPEDIENTES_LISTA));
-    const index = expedientes.findIndex((item) => String(item?.codigo || "") === doc.codigo);
+    const expedientes = parseJsonArray(
+        localStorage.getItem(STORAGE_KEYS.EXPEDIENTES_LISTA)
+    );
+
+    const index = expedientes.findIndex(
+        (item) => String(item?.codigo || "") === doc.codigo
+    );
+
     const existing = index >= 0 ? expedientes[index] : {};
+
     const nextItem = {
         ...existing,
         id: existing.id || doc.id || doc.codigo,
@@ -413,13 +420,47 @@ function upsertExpedienteRepositorio(doc) {
         macroProceso: existing.macroProceso || "Gestion Institucional",
         fechaAprobacion: nowIso,
         estado: "aprobado",
-        responsable: existing.responsable || "Oficina de Racionalizacion"
+        responsable: existing.responsable || "Oficina de Racionalizacion",
+
+        sheetId:
+            doc.sheetId ||
+            doc.googleSheetsId ||
+            existing.sheetId ||
+            null,
+
+        range:
+            doc.range ||
+            doc.googleSheetsRange ||
+            existing.range ||
+            "A1:Z",
+
+        googleSheetsRange:
+            doc.googleSheetsRange ||
+            doc.range ||
+            existing.googleSheetsRange ||
+            "A1:Z",
+
+        googleSheetsUrl:
+            doc.googleSheetsUrl ||
+            existing.googleSheetsUrl ||
+            null,
+
+        gid:
+            doc.gid ||
+            existing.gid ||
+            "0"
     };
 
-    if (index >= 0) expedientes[index] = nextItem;
-    else expedientes.push(nextItem);
-    
-    localStorage.setItem(STORAGE_KEYS.EXPEDIENTES_LISTA, JSON.stringify(expedientes));
+    if (index >= 0) {
+        expedientes[index] = nextItem;
+    } else {
+        expedientes.push(nextItem);
+    }
+
+    localStorage.setItem(
+        STORAGE_KEYS.EXPEDIENTES_LISTA,
+        JSON.stringify(expedientes)
+    );
 }
 
 function isApprovedStatus(value) {
@@ -871,6 +912,10 @@ function syncCorrectionToSharedStorages(doc, correctionRequest) {
 // APROBAR EXPEDIENTE
 // ==========================================
 
+// ==========================================
+// APROBAR EXPEDIENTE (CORREGIDO)
+// ==========================================
+
 async function approveCurrentExpediente() {
     const doc = state.selectedDocument || state.allDocuments[0] || null;
     if (!doc) return;
@@ -916,24 +961,47 @@ async function approveCurrentExpediente() {
         publicUrl = `/public/reps/${doc.codigo}`;
     }
 
-    // ── 2. Guardado LOCAL robusto (claves CON prefijo y SIN prefijo) ──
-    try {
-        // A) Claves internas con prefijo (modo local/remote)
-        upsertDocumentoAprobado({
-            ...doc,
-            estado: "completado",
-            progreso: 100,
-            fechaAprobacion: approvedDate.toISOString(),
-            publicUrl: publicUrl
-        });
-        upsertExpedienteRepositorio({
-            ...doc,
-            estado: "aprobado",
-            fechaAprobacion: approvedDate.toISOString(),
-            publicUrl: publicUrl
-        });
+    // ── 2. 🔥 OBTENER sheetId y range del detalle ──
+    let sheetId = null;
+    let range = 'A1:Z';
+    let sheetName = 'Datos';
+    let gid = '0';
+    let googleSheetsUrl = null;
 
-        // B) sigpro_approved_docs (lee racio-repositorio)
+    try {
+        const detalleMap = JSON.parse(localStorage.getItem('sigpro_documentos_detalle') || '{}');
+        const detalle = detalleMap[doc.codigo] || detalleMap[doc.id] || {};
+        const fichaData = detalle.fichaData || {};
+        
+        sheetId = fichaData.sheetId || fichaData.googleSheetsId || detalle.sheetId || null;
+        range = fichaData.range || fichaData.googleSheetsRange || detalle.range || 'A1:Z';
+        sheetName = fichaData.sheetName || detalle.sheetName || 'Datos';
+        gid = fichaData.gid || detalle.gid || '0';
+        googleSheetsUrl = fichaData.googleSheetsUrl || detalle.googleSheetsUrl || null;
+        
+        console.log('📎 Sheet ID extraído del detalle:', sheetId);
+        console.log('📎 Rango extraído del detalle:', range);
+    } catch (e) {
+        console.warn('No se pudo obtener sheetId del detalle:', e);
+    }
+
+    // ── 3. Construir URL con htmlembed si hay sheetId ──
+    if (sheetId) {
+        const params = new URLSearchParams({
+            gid: gid || '0',
+            range: range,
+            single: 'true',
+            widget: 'true',
+            headers: 'false',
+            chrome: 'false'
+        });
+        publicUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/htmlembed?${params.toString()}`;
+        console.log('📎 URL con htmlembed construida:', publicUrl);
+    }
+
+    // ── 4. Guardado LOCAL robusto ──
+    try {
+        // A) sigpro_approved_docs (CON sheetId, range, publicUrl)
         const approvedDocs = JSON.parse(localStorage.getItem('sigpro_approved_docs') || '[]');
         const approvedDoc = {
             id: doc.id || doc.codigo,
@@ -942,17 +1010,27 @@ async function approveCurrentExpediente() {
             title: doc.descripcion || 'Documento aprobado',
             descripcion: doc.descripcion || 'Documento aprobado',
             name: doc.descripcion || 'Documento aprobado',
-            type: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
-            tipo: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
+            type: doc.tipo || inferirTipo(doc.codigo),
+            tipo: doc.tipo || inferirTipo(doc.codigo),
             status: 'APPROVED',
             estado: 'aprobado',
             faculty: doc.facultad || 'UNMSM',
             facultad: doc.facultad || 'UNMSM',
             nombreFacultad: doc.facultad || 'UNMSM',
-            facultyId: doc.facultyId || doc.facultadId || '',
+            facultyId: doc.facultyId || '',
             unit: doc.unidad || 'Oficina de Racionalización',
             unidad: doc.unidad || 'Oficina de Racionalización',
+            // ✅ GUARDAR SHEET ID, RANGO Y URL
+            sheetId: sheetId,
+            range: range,
+            sheetName: sheetName,
+            gid: gid,
+            googleSheetsUrl: googleSheetsUrl,
             publicUrl: publicUrl,
+            urlPublica: publicUrl,
+            pdfUrl: publicUrl,
+            url: publicUrl,
+            documentUrl: publicUrl,
             approvedAt: approvedDate.toISOString(),
             fechaAprobacion: approvedDate.toISOString(),
             fecha: approvedDate.toISOString(),
@@ -962,37 +1040,19 @@ async function approveCurrentExpediente() {
             macroProceso: doc.macroProceso || '',
             responsable: doc.responsable || doc.unidad || 'Oficina de Racionalización'
         };
+        
         const idxApp = approvedDocs.findIndex(d => d.id === (doc.id || doc.codigo) || d.codigo === doc.codigo);
         if (idxApp >= 0) approvedDocs[idxApp] = { ...approvedDocs[idxApp], ...approvedDoc };
         else approvedDocs.push(approvedDoc);
         localStorage.setItem('sigpro_approved_docs', JSON.stringify(approvedDocs));
+        console.log('✅ Documento guardado en sigpro_approved_docs con sheetId:', sheetId);
 
-        // C) sigpro_expedientes_lista (lee facultades-expedientes)
-        const expsGlobal = JSON.parse(localStorage.getItem('sigpro_expedientes_lista') || '[]');
-        const expItem = {
-            id: doc.id || doc.codigo,
-            codigo: doc.codigo,
-            tipo: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
-            nombre: doc.descripcion || `Expediente ${doc.codigo}`,
-            macroProceso: doc.macroProceso || 'Gestión Institucional',
-            fechaAprobacion: approvedDate.toISOString(),
-            estado: 'aprobado',
-            responsable: doc.responsable || doc.unidad || 'Oficina de Racionalización',
-            facultad: doc.facultad || 'UNMSM',
-            nombreFacultad: doc.facultad || 'UNMSM',
-            publicUrl: publicUrl
-        };
-        const idxExp = expsGlobal.findIndex(e => String(e.codigo) === String(doc.codigo));
-        if (idxExp >= 0) expsGlobal[idxExp] = { ...expsGlobal[idxExp], ...expItem };
-        else expsGlobal.push(expItem);
-        localStorage.setItem('sigpro_expedientes_lista', JSON.stringify(expsGlobal));
-
-        // D) sigpro_documentos_lista (compartido entre vistas)
+        // B) sigpro_documentos_lista
         const docsGlobal = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
         const docItem = {
             id: doc.id || doc.codigo,
             codigo: doc.codigo,
-            tipo: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
+            tipo: doc.tipo || inferirTipo(doc.codigo),
             estado: 'aprobado',
             descripcion: doc.descripcion || `Documento ${doc.codigo}`,
             nombre: doc.descripcion || `Documento ${doc.codigo}`,
@@ -1003,23 +1063,52 @@ async function approveCurrentExpediente() {
             responsable: doc.responsable || doc.unidad || 'Oficina de Racionalización',
             macroProceso: doc.macroProceso || 'Gestión Institucional',
             origen: 'expediente',
-            publicUrl: publicUrl
+            publicUrl: publicUrl,
+            sheetId: sheetId,
+            range: range
         };
         const idxDoc = docsGlobal.findIndex(d => String(d.codigo || d.id) === String(doc.codigo));
         if (idxDoc >= 0) docsGlobal[idxDoc] = { ...docsGlobal[idxDoc], ...docItem };
         else docsGlobal.unshift(docItem);
         localStorage.setItem('sigpro_documentos_lista', JSON.stringify(docsGlobal));
 
-        // ── 3. Sincronización en tiempo real ──
-        ['sigpro_approved_docs','sigpro_expedientes_lista','sigpro_documentos_lista'].forEach(key => {
-            window.dispatchEvent(new StorageEvent('storage', { key: key }));
-        });
+        // C) sigpro_expedientes_lista
+        const expLista = JSON.parse(localStorage.getItem('sigpro_expedientes_lista') || '[]');
+        const expItem = {
+            id: doc.id || doc.codigo,
+            codigo: doc.codigo,
+            tipo: doc.tipo || inferirTipo(doc.codigo),
+            nombre: doc.descripcion || `Expediente ${doc.codigo}`,
+            macroProceso: doc.macroProceso || 'Gestión Institucional',
+            fechaAprobacion: approvedDate.toISOString(),
+            estado: 'aprobado',
+            responsable: doc.responsable || doc.unidad || 'Oficina de Racionalización',
 
+            publicUrl: publicUrl,
+
+            // Datos de Google Sheets heredados de ficha-caracterizacion
+            sheetId: sheetId,
+            range: range,
+            googleSheetsRange: range,
+            sheetName: sheetName,
+            gid: gid,
+            googleSheetsUrl: googleSheetsUrl
+        };
+        const idxExp = expLista.findIndex(e => String(e.codigo || e.id) === String(doc.codigo));
+        if (idxExp >= 0) expLista[idxExp] = { ...expLista[idxExp], ...expItem };
+        else expLista.unshift(expItem);
+        localStorage.setItem('sigpro_expedientes_lista', JSON.stringify(expLista));
+
+        // ── 5. Disparar eventos ──
+        ['sigpro_approved_docs', 'sigpro_documentos_lista', 'sigpro_expedientes_lista'].forEach(key => {
+            window.dispatchEvent(new StorageEvent('storage', { key }));
+        });
+        
         document.dispatchEvent(new CustomEvent('historial-actualizado', {
             detail: { codigo: doc.codigo, accion: 'aprobado', publicUrl }
         }));
 
-        // ── 4. UI y redirección ──
+        // ── 6. UI ──
         doc.estado = "completado";
         doc.progreso = 100;
         doc.fecha = approvedDate;
@@ -1032,13 +1121,16 @@ async function approveCurrentExpediente() {
         renderDocumentList();
         await renderSelectedDocument();
 
-        sessionStorage.setItem('sigpro_just_approved', 'true');
-        window.alert(`✅ Expediente aprobado y publicado.\n\nSe redirigirá al repositorio...`);
-        window.location.href = 'racio-repositorio.html';
+        showToast('✅ Expediente aprobado y publicado', 'success');
+        
+        // Redirigir después de 2 segundos
+        setTimeout(() => {
+            window.location.href = 'racio-repositorio.html';
+        }, 2000);
 
     } catch (error) {
         console.error("❌ Error en aprobación:", error);
-        window.alert(`Error guardando la aprobación:\n${error.message}`);
+        showToast(`Error: ${error.message}`, 'error');
     } finally {
         if (approveButton) {
             approveButton.classList.remove("cursor-wait", "opacity-80");

@@ -1939,43 +1939,153 @@ const RemoteAPI = {
 
             async approve(id) {
                 try {
-                    const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/documents/${id}/approve`, {
-                        method: 'POST',
-                        headers: RemoteAPI.getHeaders()
-                    });
-                    
-                    const data = await response.json();
+                        const response = await fetch(`${CONFIG.REMOTE_BASE}/admin/documents/${id}/approve`, {
+                            method: 'POST',
+                            headers: RemoteAPI.getHeaders()
+                        });
+                        
+                        const data = await response.json();
                     
                     if (response.ok) {
-                        // ✅ OBTENER INFO COMPLETA del documento antes de guardar
+                        // ✅ OBTENER INFO COMPLETA del documento
                         const allDocs = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
                         const docInfo = allDocs.find(d => (d.id === id || d.codigo === id)) || {};
+                        
+                        // 🔥 OBTENER EL DETALLE DEL DOCUMENTO (donde está el sheetId)
+                        const docsDetalle = JSON.parse(localStorage.getItem('sigpro_documentos_detalle') || '{}');
+                        const detalle = docsDetalle[id] || docsDetalle[docInfo.codigo] || {};
+                        const fichaData = detalle.fichaData || {};
+                        
+                        // 🔥 EXTRAER SHEET ID Y RANGE de TODOS los lugares posibles
+                        let sheetId = fichaData.sheetId || 
+                                    fichaData.googleSheetId || 
+                                    fichaData.googleSheetsId || 
+                                    detalle.sheetId || 
+                                    docInfo.sheetId || 
+                                    null;
+
+                        let range = fichaData.range || 
+                                fichaData.googleSheetsRange || 
+                                fichaData.rango || 
+                                detalle.range || 
+                                docInfo.range || 
+                                'A1:Z';
+
+                        let sheetName = fichaData.sheetName || 
+                                    fichaData.rangeConfig?.sheetName || 
+                                    null;
+                        
+                        // 🔥 BUSCAR URL DE GOOGLE SHEETS
+                        let googleSheetUrl = fichaData.googleSheetsUrl || 
+                                            fichaData.googleSheetUrl || 
+                                            fichaData.url || 
+                                            detalle.googleSheetsUrl || 
+                                            docInfo.googleSheetsUrl || 
+                                            '';
+                        
+                        // Si hay sheetId pero no URL, construirla
+                        if (sheetId && !googleSheetUrl.includes('docs.google.com')) {
+                            googleSheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/preview`;
+                        }
+                        
+                        // Si hay URL de Google Sheets pero no sheetId, extraerlo
+                        if (googleSheetUrl && googleSheetUrl.includes('docs.google.com/spreadsheets/d/') && !sheetId) {
+                            const match = googleSheetUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                            if (match) {
+                                sheetId = match[1];
+                            }
+                        }
+                        
+                        // 🔥 TAMBIÉN BUSCAR EN attachments
+                        if (!sheetId && detalle.archivos && Array.isArray(detalle.archivos)) {
+                            for (const archivo of detalle.archivos) {
+                                if (typeof archivo === 'string' && archivo.includes('docs.google.com/spreadsheets')) {
+                                    const match = archivo.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                                    if (match) {
+                                        sheetId = match[1];
+                                        googleSheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/preview`;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Si hay sheetId, construir URL de Google Sheets con rango
+                        let publicUrl = data.publicUrl || data.urlPublica || data.pdfUrl || data.url || data.documentUrl || '';
+                        
+                        // Si tenemos sheetId, priorizar la URL de Google Sheets con rango
+                        if (sheetId) {
+                            publicUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/preview`;
+                            if (range) {
+                                let rangeParam = range;
+                                if (sheetName && !range.includes('!')) {
+                                    rangeParam = `${sheetName}!${range}`;
+                                }
+                                publicUrl += `?range=${encodeURIComponent(rangeParam)}`;
+                            }
+                        }
+                        
+                        // Si la URL es de Google Sheets, asegurar que sea preview
+                        if (publicUrl && publicUrl.includes('docs.google.com/spreadsheets/d/')) {
+                            if (!publicUrl.includes('/preview') && !publicUrl.includes('/edit')) {
+                                const match = publicUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                                if (match) {
+                                    sheetId = match[1];
+                                    publicUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/preview`;
+                                    if (range) {
+                                        let rangeParam = range;
+                                        if (sheetName && !range.includes('!')) {
+                                            rangeParam = `${sheetName}!${range}`;
+                                        }
+                                        publicUrl += `?range=${encodeURIComponent(rangeParam)}`;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 🔥 SI AÚN NO HAY URL, usar la del backend como fallback
+                        if (!publicUrl || publicUrl === '#' || publicUrl === '') {
+                            publicUrl = data.publicUrl || data.urlPublica || data.pdfUrl || data.url || data.documentUrl || '';
+                        }
+                        
+                        console.log('📎 Sheet ID extraído:', sheetId);
+                        console.log('📎 Rango extraído:', range);
+                        console.log('📎 Nombre de hoja:', sheetName);
+                        console.log('📎 URL pública final:', publicUrl);
                         
                         // Normalizar el documento aprobado
                         const approvedDoc = {
                             id: id,
-                            code: docInfo.codigo || id,
-                            codigo: docInfo.codigo || id,
-                            title: docInfo.descripcion || docInfo.nombre || data.title || 'Documento aprobado',
-                            descripcion: docInfo.descripcion || docInfo.nombre || data.title || 'Documento aprobado',
-                            name: docInfo.descripcion || docInfo.nombre || data.title || 'Documento aprobado',
-                            type: docInfo.tipo || data.type || 'reporte',
-                            tipo: docInfo.tipo || data.type || 'reporte',
+                            code: docInfo.codigo || fichaData.codigoProceso || id,
+                            codigo: docInfo.codigo || fichaData.codigoProceso || id,
+                            title: docInfo.descripcion || docInfo.nombre || data.title || fichaData.nombreIndicador || fichaData.nombre || 'Documento aprobado',
+                            descripcion: docInfo.descripcion || docInfo.nombre || data.title || fichaData.descripcion || fichaData.objetivoProceso || 'Documento aprobado',
+                            name: docInfo.descripcion || docInfo.nombre || data.title || fichaData.nombreIndicador || fichaData.nombre || 'Documento aprobado',
+                            type: docInfo.tipo || data.type || fichaData.tipoProceso || 'reporte',
+                            tipo: docInfo.tipo || data.type || fichaData.tipoProceso || 'reporte',
                             status: 'APPROVED',
                             estado: 'aprobado',
-                            faculty: docInfo.nombreFacultad || docInfo.facultad || data.facultyName || 'UNMSM',
-                            facultad: docInfo.nombreFacultad || docInfo.facultad || data.facultyName || 'UNMSM',
-                            nombreFacultad: docInfo.nombreFacultad || docInfo.facultad || data.facultyName || 'UNMSM',
-                            facultyId: docInfo.facultyId || data.facultyId || '',
-                            unit: docInfo.unidad || data.unit || 'Oficina de Racionalización',
-                            unidad: docInfo.unidad || data.unit || 'Oficina de Racionalización',
-                            publicUrl: data.publicUrl || data.urlPublica || `/public/reps/${id}`,
-                            approvedAt: new Date().toISOString(),
-                            fechaAprobacion: new Date().toISOString(),
+                            faculty: docInfo.nombreFacultad || docInfo.facultad || data.facultyName || fichaData.facultad || 'UNMSM',
+                            facultad: docInfo.nombreFacultad || docInfo.facultad || data.facultyName || fichaData.facultad || 'UNMSM',
+                            nombreFacultad: docInfo.nombreFacultad || docInfo.facultad || data.facultyName || fichaData.facultad || 'UNMSM',
+                            facultyId: docInfo.facultyId || data.facultyId || fichaData.facultyId || '',
+                            unit: docInfo.unidad || data.unit || fichaData.unidadResponsable || 'Oficina de Racionalización',
+                            unidad: docInfo.unidad || data.unit || fichaData.unidadResponsable || 'Oficina de Racionalización',
+                            // ✅ URL PÚBLICA (Google Sheets con rango si es posible)
+                            publicUrl: publicUrl,
+                            urlPublica: publicUrl,
+                            pdfUrl: publicUrl,
+                            url: publicUrl,
+                            documentUrl: publicUrl,
+                            // ✅ GUARDAR SHEET ID, RANGO Y NOMBRE DE HOJA
+                            sheetId: sheetId,
+                            range: range,
+                            sheetName: sheetName,
+                            googleSheetUrl: googleSheetUrl || publicUrl,
+                            approvedAt: data.approvedAt || new Date().toISOString(),
+                            fechaAprobacion: data.approvedAt || new Date().toISOString(),
                             fecha: new Date().toISOString(),
                             updatedAt: new Date().toISOString(),
-                            // Campos para compatibilidad con normalizeRemoteRepositoryDoc
-                            approvedAt: data.approvedAt || new Date().toISOString(),
                             publishedAt: data.publishedAt || new Date().toISOString(),
                             createdAt: docInfo.fecha || docInfo.createdAt || new Date().toISOString()
                         };
@@ -1992,6 +2102,31 @@ const RemoteAPI = {
                         
                         localStorage.setItem('sigpro_approved_docs', JSON.stringify(approvedDocs));
                         
+                        // 🔥 TAMBIÉN GUARDAR EN sigpro_documentos_listA con estado aprobado
+                        const docsLista = JSON.parse(localStorage.getItem('sigpro_documentos_lista') || '[]');
+                        const existingDocIndex = docsLista.findIndex(d => d.id === id || d.codigo === approvedDoc.codigo);
+                        const docParaLista = {
+                            id: id,
+                            codigo: approvedDoc.codigo,
+                            tipo: approvedDoc.tipo,
+                            estado: 'aprobado',
+                            descripcion: approvedDoc.descripcion,
+                            nombre: approvedDoc.title,
+                            facultadId: approvedDoc.facultyId,
+                            nombreFacultad: approvedDoc.nombreFacultad,
+                            fecha: approvedDoc.fechaAprobacion,
+                            publicUrl: publicUrl,
+                            sheetId: sheetId,
+                            range: range,
+                            sheetName: sheetName
+                        };
+                        if (existingDocIndex >= 0) {
+                            docsLista[existingDocIndex] = { ...docsLista[existingDocIndex], ...docParaLista };
+                        } else {
+                            docsLista.unshift(docParaLista);
+                        }
+                        localStorage.setItem('sigpro_documentos_lista', JSON.stringify(docsLista));
+                        
                         // 🔥 DISPARAR EVENTO de storage para sincronizar otras pestañas
                         window.dispatchEvent(new StorageEvent('storage', {
                             key: 'sigpro_approved_docs',
@@ -1999,6 +2134,9 @@ const RemoteAPI = {
                         }));
                         
                         console.log('✅ Documento aprobado guardado en localStorage:', approvedDoc);
+                        console.log('📎 URL pública:', publicUrl);
+                        console.log('📎 Sheet ID:', sheetId);
+                        console.log('📎 Rango:', range);
                     }
                     
                     return { success: response.ok, data, status: response.status };
@@ -2006,7 +2144,7 @@ const RemoteAPI = {
                     console.error('❌ Error en approve:', error);
                     return { success: false, error: error.message, status: 0 };
                 }
-            }
+            },
         },
 
         // ========== ADMIN - SOLICITUDES DE ACCESO ==========

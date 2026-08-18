@@ -201,57 +201,21 @@
                 </div>
             </div>
 
-            <!-- PANEL DE FICHA TÉCNICA (debajo del mapa de procesos) -->
-                        <!-- PANEL DE SOPORTE (debajo del mapa de procesos) -->
-                        <div id="soporte-section" class="hidden mt-16">
-                            <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-                                <!-- Header del panel -->
-                                <div class="flex justify-between items-start p-8 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                                    <div>
-                                        <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-1">
-                                            Soporte - <span id="current-soporte-process-name" class="text-primary">Proceso</span>
-                                        </h3>
-                                        <p class="text-slate-500 dark:text-slate-400 text-sm">
-                                            Directorio de documentos y recursos de soporte institucional.
-                                        </p>
-                                    </div>
-                                    <button onclick="ProcessMap.closeSoportePanel()" class="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center transition-all">
-                                        <span class="material-symbols-outlined text-slate-600 dark:text-slate-300">close</span>
-                                    </button>
-                                </div>
-                                <!-- Buscador -->
-                                <div class="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                                    <div class="relative max-w-md">
-                                        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-                                        <input 
-                                            type="text" 
-                                            id="search-soporte"
-                                            placeholder="Buscar recurso de soporte..." 
-                                            class="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                            onkeyup="ProcessMap.filterSoporte(this.value)"
-                                        >
-                                    </div>
-                                </div>
-                                <!-- Lista de recursos de soporte -->
-                                <div class="p-6 flex flex-col items-center justify-center min-h-[320px] bg-slate-50 dark:bg-slate-900" id="soporte-list">
-                                    <!-- Los recursos de soporte se cargan dinámicamente aquí -->
-                                </div>
-                            </div>
-                        </div>
+            <!-- PANEL DE FICHA TÉCNICA (GOOGLE SHEETS) -->
             <div id="ficha-tecnica-section" class="hidden mt-16">
                 <div class="bg-white dark:bg-slate-800 rounded-[2rem] shadow-lg border-[3px] border-[#cbd5e1] dark:border-[#475569] overflow-hidden relative">
                     <!-- Línea decorativa superior -->
-                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#f97316] via-[#3b82f6] to-[#10b981]"></div>
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500"></div>
                     
                     <!-- Header -->
                     <div class="flex justify-between items-start p-8 border-b-[3px] border-[#cbd5e1] dark:border-[#475569] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
                         <div class="flex items-center gap-4">
-                            <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-orange-50 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 border-2 border-orange-200 dark:border-orange-700/50">
-                                <span class="material-symbols-outlined text-3xl text-[#ea580c]">description</span>
+                            <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/40 dark:to-teal-900/40 border-2 border-emerald-200 dark:border-emerald-700/50">
+                                <span class="material-symbols-outlined text-3xl text-emerald-600 dark:text-emerald-400">table_chart</span>
                             </div>
                             <div>
                                 <h3 class="text-2xl font-black text-slate-900 dark:text-slate-100 mb-1">
-                                    Ficha Técnica - <span id="current-ficha-process-name" class="text-[#1e40af] dark:text-[#60a5fa]">Proceso</span>
+                                    Ficha Técnica - <span id="current-ficha-process-name" class="text-emerald-600 dark:text-emerald-400">Proceso</span>
                                 </h3>
                                 <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">
                                     Documento técnico oficial del proceso institucional.
@@ -265,40 +229,38 @@
                     
                     <!-- Contenido -->
                     <div class="p-8 bg-[#f8fafc] dark:bg-[#0f172a]">
-                        <!-- Info del archivo -->
-                        <div class="flex items-center gap-4 mb-6 p-5 bg-white dark:bg-[#1e293b] rounded-xl border-2 border-[#e2e8f0] dark:border-[#334155] shadow-sm">
-                            <div class="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-200 dark:border-amber-700/50">
-                                <span class="material-symbols-outlined text-4xl text-[#d97706]">picture_as_pdf</span>
+                        <!-- Info del archivo y Botón de Redirección -->
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 p-5 bg-white dark:bg-[#1e293b] rounded-xl border-2 border-[#e2e8f0] dark:border-[#334155] shadow-sm">
+                            <div class="flex items-center gap-4 min-w-0">
+                                <div class="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30 border-2 border-emerald-200 dark:border-emerald-700/50">
+                                    <span class="material-symbols-outlined text-4xl text-emerald-600 dark:text-emerald-400">description</span>
+                                </div>
+                                <div class="min-w-0">
+                                    <p id="ficha-tecnica-filename-display" class="text-lg font-bold text-slate-900 dark:text-white truncate mb-1">
+                                        Ficha_Tecnica_Caracterizacion
+                                    </p>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                                        Google Sheets • Matriz de Caracterización
+                                    </p>
+                                </div>
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <p id="ficha-tecnica-filename-display" class="text-lg font-bold text-slate-900 dark:text-white truncate mb-1">
-                                    Ficha_Tecnica_Proceso.pdf
-                                </p>
-                                <p class="text-sm text-slate-500 dark:text-slate-400">
-                                    PDF • Documento técnico oficial
-                                </p>
-                            </div>
-                            <button onclick="ProcessMap.downloadFichaTecnicaFile()" id="btn-download-ficha" class="px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-lg bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 border-2 border-slate-900 dark:border-slate-200 disabled:opacity-60 disabled:cursor-not-allowed">
-                                <span class="material-symbols-outlined text-base">download</span>
-                                Descargar PDF
-                            </button>
                         </div>
                         
-                        <!-- Vista del PDF -->
-                        <div class="relative bg-white dark:bg-[#0f172a] rounded-xl border-2 border-dashed border-[#cbd5e1] dark:border-[#334155] overflow-hidden" style="height: 600px;">
-                            <iframe id="ficha-tecnica-iframe-display" src="" class="w-full h-full" style="border: none;"></iframe>
+                        <!-- Contenedor del Cuadro / Iframe de Google Sheets -->
+                        <div class="relative bg-white dark:bg-[#0f172a] rounded-xl border-2 border-dashed border-[#cbd5e1] dark:border-[#334155] overflow-hidden" style="height: 650px;">
+                            <iframe id="ficha-tecnica-iframe-display" src="" class="w-full h-full" style="border: none;" allowfullscreen></iframe>
                             
-                            <!-- Placeholder -->
+                            <!-- Placeholder si está cargando o no hay documento -->
                             <div id="ficha-tecnica-placeholder-display" class="absolute inset-0 flex flex-col items-center justify-center bg-[#f8fafc] dark:bg-[#1e293b]">
-                                <div class="w-24 h-24 rounded-2xl flex items-center justify-center mb-6 shadow-lg" style="background: #fef3c7; border: 2px solid #fde68a;">
-                                    <span class="material-symbols-outlined text-5xl text-[#d97706]">picture_as_pdf</span>
+                                <div class="w-24 h-24 rounded-2xl flex items-center justify-center mb-6 shadow-lg bg-emerald-50 border-2 border-emerald-200">
+                                    <span class="material-symbols-outlined text-5xl text-emerald-600">table_chart</span>
                                 </div>
-                                <h4 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Vista previa del documento</h4>
+                                <h4 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">Vista previa de Google Sheets</h4>
                                 <p class="text-slate-500 dark:text-slate-400 text-center max-w-md mb-2">
-                                    El PDF se mostrará aquí una vez cargado.
+                                    La ficha técnica se desplegará en esta ventana una vez cargada.
                                 </p>
                                 <p class="text-sm text-slate-400 dark:text-slate-500 text-center">
-                                    Si no puede visualizarse, use el botón de descarga.
+                                    Si no se visualiza, usa el botón superior para abrir el documento completo.
                                 </p>
                             </div>
                         </div>

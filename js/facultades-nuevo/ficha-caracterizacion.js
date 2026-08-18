@@ -152,6 +152,15 @@ function getGoogleSheetsPreviewUrl(url) {
     return `https://docs.google.com/spreadsheets/d/${id}/htmlembed?single=true&widget=true&headers=false&chrome=false`;
 }
 
+function normalizarRangoParaCrecimiento(range) {
+    const value = String(range || 'A1:Z')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '');
+
+    return value;
+}
+
 function getApiMode() {
     return typeof API !== 'undefined' && typeof API.getMode === 'function'
         ? API.getMode()
@@ -214,22 +223,32 @@ function saveFichaToLocalStorage(payload) {
     const docsRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_LISTA);
     const docs = safeParseJson(docsRaw, []);
 
+    // 🔥 EXTRAER sheetId y range del payload
+    const sheetId = payload.googleSheetsId || payload.sheetId || null;
+    const range = payload.googleSheetsRange || payload.range || 'A1:Z';
+
     const docPendiente = {
         id: payload.backendId || payload.codigo || Date.now().toString(),
         backendId: payload.backendId || null,
         fecha: now.toISOString().split('T')[0],
         hora: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) + ' H',
         codigo: payload.codigo,
+        codigoProceso: payload.codigoProceso || '',
         descripcion: payload.nombreProceso || payload.macroProcesoNombre || `Caracterizacion ${payload.codigo}`,
         generadoPor: payload.generadoPor || 'Facultad',
-        estado: 'aprobado',
-        progreso: 5,
+        estado: 'aprobado',  // ← Se guarda como aprobado directamente
+        progreso: 100,
         facultadId: payload.facultadId || 1,
         tipo: 'caracterizacion',
         origen: payload.backendId ? 'hibrido' : 'local',
         googleSheetsUrl: payload.googleSheetsUrl || null,
+        googleSheetsRange: range,
+        // 🔥 GUARDAR sheetId EXPLÍCITAMENTE
+        sheetId: sheetId,
+        range: range,
         tieneGoogleSheets: Boolean(payload.googleSheetsUrl)
     };
+
 
     const idx = docs.findIndex(item => item.codigo === codigo);
     if (idx >= 0) {
@@ -239,6 +258,20 @@ function saveFichaToLocalStorage(payload) {
     }
     localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_LISTA, JSON.stringify(docs));
 
+    // 🔥 EXTRAER GID DE LA URL
+    let gid = '0';
+    if (payload.googleSheetsUrl) {
+        try {
+            const parsed = new URL(payload.googleSheetsUrl);
+            const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+            gid = parsed.searchParams.get('gid') || hashParams.get('gid') || '0';
+        } catch (e) {
+            const gidMatch = payload.googleSheetsUrl.match(/[?#&]gid=(\d+)/);
+            if (gidMatch) gid = gidMatch[1];
+        }
+    }
+
+    // 🔥 EN EL DETALLE, asegurar que fichaData tenga sheetId y range
     const detalleRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
     const detalle = safeParseJson(detalleRaw, {});
     detalle[codigo] = {
@@ -247,16 +280,39 @@ function saveFichaToLocalStorage(payload) {
         titulo: payload.nombreProceso || payload.macroProcesoNombre || `Caracterizacion ${codigo}`,
         operacion: 'GESTION DE CARACTERIZACION',
         fechaRegistro: now.toISOString(),
-        fichaData: payload,
+        fichaData: {
+            ...payload,
+            sheetId: sheetId,
+            googleSheetId: sheetId,
+            range: range,
+            googleSheetsRange: range,
+            // 🔥 GUARDAR GID
+            gid: gid
+        },
+        // 🔥 GUARDAR sheetId y range en el detalle
+        gid: gid,
+        sheetId: sheetId,
+        range: range,
         resumenCampos: [
             { label: 'Tipo de Proceso', value: payload.tipoProcesoLabel || payload.tipoProceso || '-' },
             { label: 'Proceso', value: payload.macroProcesoNombre || payload.macroProceso || '-' },
             { label: 'Archivo adjunto', value: (payload.adjuntos || []).map((adj) => adj.nombre).join(', ') || '-' },
-            { label: 'Google Sheets', value: payload.googleSheetsUrl || 'No vinculado' }
+            { label: 'Google Sheets', value: payload.googleSheetsUrl || 'No vinculado' },
+            { label: 'Sheet ID', value: sheetId || 'No disponible' },
+            { label: 'Rango', value: range || 'A1:Z' }
         ],
         adjuntos: payload.adjuntos || []
     };
     localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalle));
+        // ⭐ NUEVO: sincronizar también a la clave neutra que lee process-map.js
+    try {
+        const detalleNeutralKey = STORAGE_KEYS.DOCUMENTOS_DETALLE.replace(/^[^_]+_/, '');
+        if (detalleNeutralKey !== STORAGE_KEYS.DOCUMENTOS_DETALLE) {
+            localStorage.setItem(detalleNeutralKey, JSON.stringify(detalle));
+        }
+    } catch (e) {
+        console.warn('No se pudo sincronizar detalle a clave neutra:', e);
+    }
     sincronizarClavesNeutras(docPendiente);
 
     const expListaRaw = localStorage.getItem('sigpro_expedientes_lista');
@@ -269,7 +325,10 @@ function saveFichaToLocalStorage(payload) {
         macroProceso: payload.macroProcesoNombre || payload.macroProceso || 'Gestion Institucional',
         fechaAprobacion: docPendiente.fecha,
         estado: 'aprobado',
-        responsable: payload.unidadOrganica || 'UNMSM'
+        responsable: payload.unidadOrganica || 'UNMSM',
+        // 🔥 AGREGAR ESTO: Guardar sheetId en expediente
+        sheetId: payload.sheetId || payload.googleSheetsId || null,
+        googleSheetsUrl: payload.googleSheetsUrl || null
     };
     const idxExp = expLista.findIndex(e => e.codigo === docPendiente.codigo);
     if (idxExp >= 0) expLista[idxExp] = expItem;
@@ -312,7 +371,10 @@ function persistCaracterizacionLocal(payload, savedOrigin) {
         ...payload,
         facultadId: resolveFacultyId(),
         generadoPor: 'Facultad',
-        origen: savedOrigin
+        origen: savedOrigin,
+        // 🔥 AGREGAR ESTO: Asegurar que sheetId se guarde en fichaData
+        sheetId: payload.googleSheetsId || null,
+        googleSheetId: payload.googleSheetsId || null
     };
 
     try {
@@ -689,7 +751,11 @@ function initFormHandler() {
         const googleSheetsInput = form.querySelector('#google-sheets-url');
         const googleSheetsUrl = googleSheetsInput ? googleSheetsInput.value.trim() : '';
         const googleSheetsRangeInput = form.querySelector('#google-sheets-range');
-        const googleSheetsRange = googleSheetsRangeInput ? googleSheetsRangeInput.value.trim() : 'A1:Z50';
+        const googleSheetsRangeRaw = googleSheetsRangeInput
+            ? googleSheetsRangeInput.value.trim()
+            : 'A1:Z';
+
+        const googleSheetsRange = normalizarRangoParaCrecimiento(googleSheetsRangeRaw);
 
         if (googleSheetsUrl && !isValidGoogleSheetsUrl(googleSheetsUrl)) {
             showToast('El enlace de Google Sheets no es válido. Debe tener el formato: https://docs.google.com/spreadsheets/d/...', 'error', 5000);
@@ -730,10 +796,28 @@ function initFormHandler() {
             const macroProcesoInput = form.querySelector(FICHA_CONFIG.selectors.macroProcesoSelect);
             const tipoProcesoLabel = getSelectedOptionText(tipoProcesoInput);
             const macroProcesoLabel = getSelectedOptionText(macroProcesoInput);
+            const macroProcesoCode = (
+                macroProcesoInput?.selectedOptions?.[0]?.dataset?.code
+                || macroProcesoInput?.options?.[macroProcesoInput.selectedIndex]?.dataset?.code
+                || ''
+            ).trim().toUpperCase();
             const fileInput = form.querySelector(FICHA_CONFIG.selectors.fileInput);
 
             if (selectedFiles.length === 0 && fileInput?.files?.length) {
                 selectedFiles = Array.from(fileInput.files);
+            }
+
+            // 🔥 Extraer sheetId de la URL
+            const sheetId = googleSheetsUrl ? extractGoogleSheetsId(googleSheetsUrl) : null;
+
+            // 🔥 Extraer sheetName de la URL o usar 'Datos' por defecto
+            function extractSheetNameFromUrl(url) {
+                if (!url) return 'Datos';
+                const match = url.match(/[?&]gid=([0-9]+)/);
+                // Si tiene gid, intentar obtener el nombre de la hoja
+                // Por defecto, si es gid=0 es la primera hoja
+                if (match && match[1] === '0') return 'Datos';
+                return 'Datos';
             }
 
             const payload = {
@@ -741,6 +825,7 @@ function initFormHandler() {
                 codigo,
                 tipoProcesoLabel,
                 macroProcesoNombre: macroProcesoLabel || obtenerNombreMacroProceso(data.macroProceso),
+                codigoProceso: macroProcesoCode,
                 archivos: selectedFiles.map(f => ({
                     nombre: f.name,
                     tamaño: formatFileSize(f.size),
@@ -748,10 +833,14 @@ function initFormHandler() {
                 })),
                 adjuntos: [],
                 googleSheetsUrl: googleSheetsUrl || null,
-                googleSheetsRange: googleSheetsRange,
+                googleSheetsRange: googleSheetsRange || 'A1:Z',
                 googleSheetsEmbedUrl: googleSheetsUrl ? getGoogleSheetsEmbedUrl(googleSheetsUrl) : null,
                 googleSheetsPreviewUrl: googleSheetsUrl ? getGoogleSheetsPreviewUrl(googleSheetsUrl) : null,
-                googleSheetsId: googleSheetsUrl ? extractGoogleSheetsId(googleSheetsUrl) : null
+                // 🔥 GUARDAR sheetId EXPLÍCITAMENTE
+                googleSheetsId: sheetId,
+                sheetId: sheetId,  // ← AMBOS NOMBRES
+                range: googleSheetsRange || 'A1:Z',
+                sheetName: extractSheetNameFromUrl(googleSheetsUrl) || 'Datos'
             };
 
             console.log('Datos a enviar:', payload);
@@ -1020,7 +1109,7 @@ function sincronizarClavesNeutras(doc) {
             tipo: doc.tipo,
             origen: doc.origen,
             googleSheetsUrl: doc.googleSheetsUrl || null,
-            googleSheetsRange: doc.googleSheetsRange || 'A1:Z50'
+            googleSheetsRange: doc.googleSheetsRange || 'A1:Z'
         };
         if (idxR >= 0) {
             reportes[idxR] = { ...reportes[idxR], ...reporteDoc };

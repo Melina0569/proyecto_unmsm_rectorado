@@ -240,19 +240,21 @@ function construirGoogleSheetsEmbedUrl(sheetsUrl, range) {
 
     const sheetId = match[1];
 
-    // Extraer gid si existe en la URL
-    const gidMatch = sheetsUrl.match(/[#&]gid=(\d+)/);
+    // Extraer el gid de la HOJA seleccionada
+    const gidMatch = sheetsUrl.match(/[?#&]gid=(\d+)/);
     const gid = gidMatch ? gidMatch[1] : '0';
 
-    // URL de embed con htmlembed (más limpia para iframes)
+    // Rango que el usuario eligió
+    const selectedRange = (range || 'A1:Z50').trim();
+
     const params = new URLSearchParams({
+        gid: gid,
+        range: selectedRange,
+        single: 'true',
         widget: 'true',
         headers: 'false',
-        chrome: 'false',
-        range: range || 'A1:Z50'
+        chrome: 'false'
     });
-
-    if (gid) params.set('gid', gid);
 
     return `https://docs.google.com/spreadsheets/d/${sheetId}/htmlembed?${params.toString()}`;
 }
@@ -260,6 +262,60 @@ function construirGoogleSheetsEmbedUrl(sheetsUrl, range) {
 function abrirGoogleSheetsExterno() {
     const url = document.getElementById('gsheets-url-display')?.textContent;
     if (url && url !== '-') window.open(url, '_blank');
+}
+
+function editarRangoGoogleSheets() {
+    const rangeDisplay = document.getElementById('gsheets-range-display');
+    const iframe = document.getElementById('gsheets-embed');
+    const urlDisplay = document.getElementById('gsheets-url-display');
+
+    if (!rangeDisplay || !iframe || !urlDisplay) {
+        showToast('No se pudo acceder a la configuración de Google Sheets.', 'error');
+        return;
+    }
+
+    const rangoActual = rangeDisplay.textContent.trim();
+
+    const nuevoRango = prompt(
+        'Ingrese el nuevo rango de Google Sheets:\n\nEjemplo: A1:F20',
+        rangoActual
+    );
+
+    // Si presionó "Cancelar"
+    if (nuevoRango === null) {
+        return;
+    }
+
+    const rango = nuevoRango.trim();
+
+    // Validar que no esté vacío
+    if (!rango) {
+        showToast('Debe ingresar un rango válido.', 'warning');
+        return;
+    }
+
+    const url = urlDisplay.textContent.trim();
+
+    if (!url || url === '-') {
+        showToast('No hay una URL de Google Sheets configurada.', 'error');
+        return;
+    }
+
+    // Construir nueva URL del iframe
+    const embedUrl = construirGoogleSheetsEmbedUrl(url, rango);
+
+    if (!embedUrl) {
+        showToast('No se pudo construir la URL de Google Sheets.', 'error');
+        return;
+    }
+
+    // Actualizar visualmente el rango
+    rangeDisplay.textContent = rango;
+
+    // Recargar iframe con el nuevo rango
+    iframe.src = embedUrl;
+
+    showToast(`Rango actualizado: ${rango}`, 'success');
 }
 
 // ==========================================

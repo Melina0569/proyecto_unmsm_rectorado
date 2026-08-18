@@ -101,6 +101,53 @@ function extractGoogleSheetsId(url) {
     return match ? match[1] : null;
 }
 
+function extractGoogleSheetsRange(url) {
+    if (!url || typeof url !== "string") return null;
+    try {
+        const parsed = new URL(url);
+        const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ""));
+        return parsed.searchParams.get("range") || hashParams.get("range");
+    } catch (error) {
+        return null;
+    }
+}
+
+function normalizarRangoA1(range) {
+    return String(range || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function esRangoA1Valido(range) {
+    // Ejemplos admitidos: B4:J24, B4:J, A1:I, A:I.
+    return /^[A-Z]+\d*:[A-Z]+\d*$/.test(range);
+}
+
+function construirGoogleSheetsEmbedUrl(sheetsUrl, range) {
+    const sheetId = extractGoogleSheetsId(sheetsUrl);
+    if (!sheetId) return null;
+
+    let gid = "0";
+    let selectedRange = range || "A1:Z100";
+    try {
+        const parsed = new URL(sheetsUrl);
+        const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ""));
+        gid = parsed.searchParams.get("gid") || hashParams.get("gid") || gid;
+        selectedRange = range || parsed.searchParams.get("range") || hashParams.get("range") || selectedRange;
+    } catch (error) {
+        const gidMatch = sheetsUrl.match(/[?#&]gid=(\d+)/);
+        if (gidMatch) gid = gidMatch[1];
+    }
+
+    const params = new URLSearchParams({
+    gid: gid,
+    range: selectedRange,
+    single: "true",
+    widget: "true",
+    headers: "false",
+    chrome: "false"
+    });
+    return "https://docs.google.com/spreadsheets/d/" + sheetId + "/htmlembed?" + params.toString();
+}
+
 async function cargarDatosGoogleSheets(sheetId, range, gid) {
     gid = gid || 0;
     range = range || "A1:Z100";
@@ -212,7 +259,20 @@ function construirModelo(codigo, detalle) {
     const doc = docs.find(function(item) { return item.codigo === codigo; }) || {};
 
     const gsUrl = fichaData?.googleSheetsUrl || doc?.googleSheetsUrl || detalle?.googleSheetsUrl || null;
-    const gsRange = fichaData?.googleSheetsRange || doc?.googleSheetsRange || detalle?.googleSheetsRange || "A1:Z100";
+    const gsRange = fichaData?.googleSheetsRange || doc?.googleSheetsRange || detalle?.googleSheetsRange || extractGoogleSheetsRange(gsUrl) || "A1:Z100";
+
+    // 🔥 EXTRAER GID DE LA URL
+    let gid = '0';
+    if (gsUrl) {
+        try {
+            const parsed = new URL(gsUrl);
+            const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+            gid = parsed.searchParams.get('gid') || hashParams.get('gid') || '0';
+        } catch (e) {
+            const gidMatch = gsUrl.match(/[?#&]gid=(\d+)/);
+            if (gidMatch) gid = gidMatch[1];
+        }
+    }
 
     return {
         codigo: codigo,
@@ -224,7 +284,8 @@ function construirModelo(codigo, detalle) {
         adjuntos: Array.isArray(detalle?.adjuntos) ? detalle.adjuntos : [],
         googleSheetsUrl: gsUrl,
         googleSheetsRange: gsRange,
-        googleSheetsId: gsUrl ? extractGoogleSheetsId(gsUrl) : null
+        googleSheetsId: gsUrl ? extractGoogleSheetsId(gsUrl) : null,
+        gid: gid
     };
 }
 
@@ -364,44 +425,103 @@ function renderizarInfoTecnica() {
     }
 }
 
-async function renderizarGoogleSheets() {
+function renderizarGoogleSheets() {
     const url = caracterizacionActual.googleSheetsUrl;
     const range = caracterizacionActual.googleSheetsRange || "A1:Z100";
-    const sheetId = caracterizacionActual.googleSheetsId;
+    const section = document.getElementById("gsheets-section");
+    const iframe = document.getElementById("gsheets-embed");
+    const urlDisplay = document.getElementById("gsheets-url-display");
+    const rangeDisplay = document.getElementById("gsheets-range-display");
 
-    if (!url || !sheetId) return;
+    if (!url || !section || !iframe) return;
 
-    const section = document.getElementById("google-sheets-section");
-    if (!section) return;
+    const embedUrl = construirGoogleSheetsEmbedUrl(url, range);
+    if (!embedUrl) return;
 
-    const urlDisplay = document.getElementById("gs-url-display");
+    section.classList.remove("hidden");
+    iframe.src = embedUrl;
     if (urlDisplay) {
-        const shortUrl = url.replace(/^https:\/\//, "").replace(/\/edit.*$/, "");
-        urlDisplay.textContent = shortUrl;
+        urlDisplay.textContent = url;
         urlDisplay.title = url;
     }
+    if (rangeDisplay) rangeDisplay.textContent = "Rango: " + range;
+}
 
-    const content = document.getElementById("gs-content");
-    if (!content) return;
-
-    content.innerHTML = '<div class="flex flex-col items-center justify-center py-16">' +
-        '<span class="material-symbols-outlined text-4xl text-slate-300 animate-pulse">table_chart</span>' +
-        '<p class="text-sm text-slate-500 mt-2">Cargando datos de la hoja...</p>' +
-        '<p class="text-xs text-slate-400 mt-1 font-mono">Rango: ' + escapeHtml(range) + '</p>' +
-    '</div>';
-
+function actualizarRangoEnListaStorage(key, codigo, range) {
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
     try {
-        const sheetData = await cargarDatosGoogleSheets(sheetId, range);
-        if (sheetData && sheetData.table && sheetData.table.cols && sheetData.table.cols.length > 0) {
-            renderizarTablaGoogleSheets(sheetData, content);
-        } else {
-            mostrarFallbackGS(content, "No se pudieron cargar los datos del rango especificado.");
-        }
-    } catch (e) {
-        console.error("Error GS:", e);
-        mostrarFallbackGS(content, "Error al cargar los datos. Verifica que la hoja este publicada.");
+        const lista = JSON.parse(raw);
+        if (!Array.isArray(lista)) return;
+        const item = lista.find(function(documento) { return documento.codigo === codigo; });
+        if (!item) return;
+        item.googleSheetsRange = range;
+        localStorage.setItem(key, JSON.stringify(lista));
+    } catch (error) {
+        console.warn("No se pudo actualizar el rango en", key, error);
     }
 }
+
+function actualizarRangoEnDetalleStorage(key, codigo, range) {
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    try {
+        const detalleMap = JSON.parse(raw);
+        const detalle = detalleMap && detalleMap[codigo];
+        if (!detalle) return;
+        detalle.googleSheetsRange = range;
+        detalle.fichaData = detalle.fichaData || {};
+        detalle.fichaData.googleSheetsRange = range;
+        detalleMap[codigo] = detalle;
+        localStorage.setItem(key, JSON.stringify(detalleMap));
+    } catch (error) {
+        console.warn("No se pudo actualizar el detalle del rango en", key, error);
+    }
+}
+
+function guardarRangoGoogleSheets(codigo, range) {
+    const detalleNeutralKey = STORAGE_KEYS.DOCUMENTOS_DETALLE.replace(/^[^_]+_/, "");
+    const listaNeutralKey = STORAGE_KEYS.DOCUMENTOS_LISTA.replace(/^[^_]+_/, "");
+
+    [...new Set([STORAGE_KEYS.DOCUMENTOS_DETALLE, detalleNeutralKey])]
+        .forEach(function(key) { actualizarRangoEnDetalleStorage(key, codigo, range); });
+    [...new Set([STORAGE_KEYS.DOCUMENTOS_LISTA, listaNeutralKey, "sigpro_documentos_lista", "sigpro_reportes"])]
+        .forEach(function(key) { actualizarRangoEnListaStorage(key, codigo, range); });
+
+    try {
+        const actualRaw = localStorage.getItem(STORAGE_KEYS.EXPEDIENTE_ACTUAL);
+        const actual = actualRaw ? JSON.parse(actualRaw) : null;
+        if (actual && actual.codigo === codigo) {
+            actual.googleSheetsRange = range;
+            localStorage.setItem(STORAGE_KEYS.EXPEDIENTE_ACTUAL, JSON.stringify(actual));
+        }
+    } catch (error) {
+        console.warn("No se pudo actualizar el expediente actual", error);
+    }
+}
+
+window.editarRangoGoogleSheets = function() {
+    if (!caracterizacionActual?.codigo) return;
+
+    const rangoActual = caracterizacionActual.googleSheetsRange || "A1:Z100";
+    const nuevoValor = window.prompt(
+        "Ingrese el rango que desea mostrar (por ejemplo: B4:J24).",
+        rangoActual
+    );
+    if (nuevoValor === null) return;
+
+    const nuevoRango = normalizarRangoA1(nuevoValor);
+    if (!esRangoA1Valido(nuevoRango)) {
+        showToast("Rango inválido. Use un formato como B4:J24 o B4:J.", "error", 5000);
+        return;
+    }
+
+    caracterizacionActual.googleSheetsRange = nuevoRango;
+    caracterizacionActual.fichaData.googleSheetsRange = nuevoRango;
+    guardarRangoGoogleSheets(caracterizacionActual.codigo, nuevoRango);
+    renderizarGoogleSheets();
+    showToast("Rango actualizado a " + nuevoRango, "success");
+};
 
 function renderizarTablaGoogleSheets(data, container) {
     const cols = data.table.cols;
@@ -708,34 +828,34 @@ function initProfile() {
         .substring(0, 2)
         .toUpperCase();
 
-    // 3. Renderizar dropdown con datos reales
+    // 3. Renderizar el menú con la misma estructura visual de Inventario.
     menu.innerHTML = `
-        <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">${escapeHtml(initials)}</div>
-            <div>
-                <p class="text-sm font-semibold text-slate-900 dark:text-white">${escapeHtml(userName)}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">${escapeHtml(userEmail)}</p>
+        <div class="p-4 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-cyan-600 flex items-center justify-center text-white font-semibold">${escapeHtml(initials)}</div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-slate-900 dark:text-white text-sm">${escapeHtml(userName)}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 truncate">${escapeHtml(userEmail)}</p>
+                </div>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1">
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">${escapeHtml(userRole)}</span>
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">${escapeHtml(facultyName)}</span>
             </div>
         </div>
-        <div class="flex flex-wrap gap-2 mb-3">
-            <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold">${escapeHtml(userRole)}</span>
-            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">${escapeHtml(facultyName)}</span>
+        <div class="p-2">
+            <a href="facultades-configuracion.html" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-300">
+                <span class="material-symbols-outlined text-slate-400 text-sm">settings</span>Configuración
+            </a>
+            <a href="facultades-cambiar-facultad.html" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-300">
+                <span class="material-symbols-outlined text-slate-400 text-sm">school</span>Cambiar facultad
+            </a>
         </div>
-        <div class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
-        <a href="facultades-configuracion.html" class="flex items-center gap-2 px-2 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors">
-            <span class="material-symbols-outlined text-base">settings</span>
-            Configuración
-        </a>
-        <a href="facultades-cambiar-facultad.html" class="flex items-center gap-2 px-2 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors">
-            <span class="material-symbols-outlined text-base">domain</span>
-            Cambiar facultad
-        </a>
-        <div class="border-t border-slate-200 dark:border-slate-700 my-2"></div>
-        <button id="btn-logout" class="w-full flex items-center gap-2 px-2 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
-            <span class="material-symbols-outlined text-base">logout</span>
-            Cerrar sesión
-        </button>
-    `;
+        <div class="p-2 border-t border-slate-200 dark:border-slate-700">
+            <button id="logout-btn" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300">
+                <span class="material-symbols-outlined text-sm">logout</span>Cerrar sesión
+            </button>
+        </div>`;
 
     // 4. Toggle del dropdown
     btn.addEventListener('click', function(e) {
@@ -749,33 +869,47 @@ function initProfile() {
         }
     });
 
-    // 5. Cerrar sesión
-    const btnLogout = document.getElementById('btn-logout');
+    // 5. Confirmación de cierre de sesión, igual que Inventario.
+    const btnLogout = document.getElementById('logout-btn');
+    const logoutModal = document.getElementById('logout-modal');
+    const logoutCancel = document.getElementById('logout-cancel');
+    const logoutConfirm = document.getElementById('logout-confirm');
+
+    function cerrarModalLogout() {
+        logoutModal?.classList.add('hidden');
+    }
+
     if (btnLogout) {
-        btnLogout.addEventListener('click', async function() {
+        btnLogout.addEventListener('click', function() {
+            menu.classList.add('hidden');
+            logoutModal?.classList.remove('hidden');
+        });
+    }
+
+    logoutCancel?.addEventListener('click', cerrarModalLogout);
+    logoutModal?.addEventListener('click', function(event) {
+        if (event.target === logoutModal) cerrarModalLogout();
+    });
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') cerrarModalLogout();
+    });
+
+    logoutConfirm?.addEventListener('click', async function() {
             try {
                 if (typeof API !== 'undefined' && API.auth && typeof API.auth.logout === 'function') {
                     await API.auth.logout();
                 }
             } catch (e) { /* silent */ }
-            
-            // Limpiar sesión local
-            const keysToRemove = [
+
+            // Se conservan los expedientes locales; solo se elimina la sesión.
+            [
                 'sigpro_expediente_actual',
                 'sigpro_user_name',
                 'sigpro_user_email',
                 'current_user_name',
                 'theme'
-            ];
-            keysToRemove.forEach(k => localStorage.removeItem(k));
-            
-            showToast('Sesión cerrada correctamente', 'success');
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 800);
-        });
-    }
-}
+            ].forEach(function(key) { localStorage.removeItem(key); });
 
-// Alias por si otro modulo la llama con nombre largo
-window.construirModeloCaracterizacion = construirModelo;
+            window.location.replace('index.html');
+    });
+}
