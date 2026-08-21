@@ -969,7 +969,11 @@ async function approveCurrentExpediente() {
     let googleSheetsUrl = null;
 
     try {
-        const detalleMap = JSON.parse(localStorage.getItem('sigpro_documentos_detalle') || '{}');
+        const detalleMap = JSON.parse(
+            localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE) ||
+            localStorage.getItem('sigpro_documentos_detalle') ||
+            '{}'
+        );
         const detalle = detalleMap[doc.codigo] || detalleMap[doc.id] || {};
         const fichaData = detalle.fichaData || {};
         
@@ -983,6 +987,12 @@ async function approveCurrentExpediente() {
         console.log('📎 Rango extraído del detalle:', range);
     } catch (e) {
         console.warn('No se pudo obtener sheetId del detalle:', e);
+    }
+
+    // Fallback: extraer el sheetId directamente de la URL si no vino explícito
+    if (!sheetId && googleSheetsUrl) {
+        const match = String(googleSheetsUrl).match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (match) sheetId = match[1];
     }
 
     // ── 3. Construir URL con htmlembed si hay sheetId ──
@@ -1007,19 +1017,38 @@ async function approveCurrentExpediente() {
             id: doc.id || doc.codigo,
             code: doc.codigo,
             codigo: doc.codigo,
-            title: doc.descripcion || 'Documento aprobado',
-            descripcion: doc.descripcion || 'Documento aprobado',
-            name: doc.descripcion || 'Documento aprobado',
-            type: doc.tipo || inferirTipo(doc.codigo),
-            tipo: doc.tipo || inferirTipo(doc.codigo),
-            status: 'APPROVED',
-            estado: 'aprobado',
-            faculty: doc.facultad || 'UNMSM',
-            facultad: doc.facultad || 'UNMSM',
-            nombreFacultad: doc.facultad || 'UNMSM',
-            facultyId: doc.facultyId || '',
+            // ...
+            type: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
+            tipo: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
+            // ── NUEVO ──
+            processType: doc.processType || doc.tipoProceso || doc.procesoTipo || '',
+            tipoProceso: doc.tipoProceso || doc.processType || doc.procesoTipo || '',
+            // ───────────
+            faculty: doc.facultad || doc.nombreFacultad || 'UNMSM',
+            facultad:
+                doc.facultad ||
+                doc.nombreFacultad ||
+                fichaData.facultad ||
+                fichaData.nombreFacultad ||
+                'UNMSM',
+
+            nombreFacultad:
+                doc.facultad ||
+                doc.nombreFacultad ||
+                fichaData.facultad ||
+                fichaData.nombreFacultad ||
+                'UNMSM',
+            facultyId:
+                doc.facultyId ||
+                doc.facultadId ||
+                doc.faculty_id ||
+                fichaData.facultyId ||
+                fichaData.facultadId ||
+                '',
             unit: doc.unidad || 'Oficina de Racionalización',
             unidad: doc.unidad || 'Oficina de Racionalización',
+            estado: 'aprobado',
+            progreso: 100,
             // ✅ GUARDAR SHEET ID, RANGO Y URL
             sheetId: sheetId,
             range: range,
@@ -1052,8 +1081,18 @@ async function approveCurrentExpediente() {
         const docItem = {
             id: doc.id || doc.codigo,
             codigo: doc.codigo,
-            tipo: doc.tipo || inferirTipo(doc.codigo),
+            tipo: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
             estado: 'aprobado',
+            facultyId: doc.facultyId || doc.facultadId || '',
+            facultadId: doc.facultyId || doc.facultadId || '',
+            // ── NUEVO ──
+            processType: doc.processType || doc.tipoProceso || '',
+            tipoProceso: doc.tipoProceso || '',
+            // ───────────
+            procesoId: doc.procesoId || '',
+            procesoCodigo: doc.procesoCodigo || '',
+            procesoNombre: doc.procesoNombre || '',
+            // ───────────
             descripcion: doc.descripcion || `Documento ${doc.codigo}`,
             nombre: doc.descripcion || `Documento ${doc.codigo}`,
             fecha: approvedDate.toISOString().split('T')[0],
@@ -1071,13 +1110,21 @@ async function approveCurrentExpediente() {
         if (idxDoc >= 0) docsGlobal[idxDoc] = { ...docsGlobal[idxDoc], ...docItem };
         else docsGlobal.unshift(docItem);
         localStorage.setItem('sigpro_documentos_lista', JSON.stringify(docsGlobal));
+        localStorage.setItem(
+            'local_sigpro_documentos_lista',
+            JSON.stringify(docsGlobal)
+        );
 
         // C) sigpro_expedientes_lista
         const expLista = JSON.parse(localStorage.getItem('sigpro_expedientes_lista') || '[]');
         const expItem = {
             id: doc.id || doc.codigo,
             codigo: doc.codigo,
-            tipo: doc.tipo || inferirTipo(doc.codigo),
+            tipo: doc.tipo || inferDocumentTypeFromCode(doc.codigo),
+            // ── NUEVO ──
+            processType: doc.processType || doc.tipoProceso || '',
+            tipoProceso: doc.tipoProceso || '',
+            // ───────────
             nombre: doc.descripcion || `Expediente ${doc.codigo}`,
             macroProceso: doc.macroProceso || 'Gestión Institucional',
             fechaAprobacion: approvedDate.toISOString(),
@@ -1086,7 +1133,6 @@ async function approveCurrentExpediente() {
 
             publicUrl: publicUrl,
 
-            // Datos de Google Sheets heredados de ficha-caracterizacion
             sheetId: sheetId,
             range: range,
             googleSheetsRange: range,
@@ -1098,6 +1144,10 @@ async function approveCurrentExpediente() {
         if (idxExp >= 0) expLista[idxExp] = { ...expLista[idxExp], ...expItem };
         else expLista.unshift(expItem);
         localStorage.setItem('sigpro_expedientes_lista', JSON.stringify(expLista));
+        localStorage.setItem(
+            'local_sigpro_expedientes_lista',
+            JSON.stringify(expLista)
+        );
 
         // ── 5. Disparar eventos ──
         ['sigpro_approved_docs', 'sigpro_documentos_lista', 'sigpro_expedientes_lista'].forEach(key => {
@@ -1634,6 +1684,20 @@ function normalizeDocument(doc, index) {
         unidad: unit,
         status,
         estado: status,
+
+        processType: doc.processType || doc.tipoProceso || doc.procesoTipo || '',
+        tipoProceso: doc.tipoProceso || doc.processType || doc.procesoTipo || '',
+        procesoId: doc.procesoId || '',
+        procesoCodigo: doc.procesoCodigo || doc.codigoProceso || '',
+        procesoNombre: doc.procesoNombre || '',
+
+        tipo: doc.tipo ||
+            doc.type ||
+            normalizeTipo(
+                doc.tipo || doc.type || '',
+                codigo
+            ),
+
         date,
         fecha: date,
         progress: Number.isFinite(doc.progreso) ? Number(doc.progreso) : inferProgress(status),

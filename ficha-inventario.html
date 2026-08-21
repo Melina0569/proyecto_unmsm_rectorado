@@ -67,23 +67,46 @@
 								placeholder="INV-FISI-2026-001"/>
 						</div>
 
-						<!-- Versión -->
+						<!-- Tipo de Proceso -->
 						<div>
 							<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
-								Versión <span class="text-red-500">*</span>
+								Tipo de Proceso <span class="text-red-500">*</span>
 							</label>
-							<input type="text" name="version" required
-								class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
-								placeholder="Ej. 1.0"/>
+							<div class="relative">
+								<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">account_tree</span>
+								<select name="tipoProceso" id="tipo-proceso" required
+									class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all appearance-none">
+									<option value="">Seleccione el tipo...</option>
+									<option value="strategic">Estratégico</option>
+									<option value="missional">Misional</option>
+									<option value="support">Soporte</option>
+								</select>
+								<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">expand_more</span>
+							</div>
+						</div>
+
+						<!-- Proceso (depende del tipo) -->
+						<div>
+							<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
+								Proceso <span class="text-red-500">*</span>
+							</label>
+							<div class="relative">
+								<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">list</span>
+								<select name="proceso" id="proceso-select" required
+									class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all appearance-none disabled:opacity-50 disabled:cursor-not-allowed">
+									<option value="">Seleccione primero el tipo de proceso...</option>
+								</select>
+								<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">expand_more</span>
+							</div>
 						</div>
 
 						<!-- Fecha -->
-						<div class="md:col-span-2">
+						<div>
 							<label class="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
 								Fecha de elaboración <span class="text-red-500">*</span>
 							</label>
 							<input type="date" name="fechaElaboracion" required
-								class="w-full md:w-1/2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"/>
+								class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"/>
 						</div>
 					</div>
 				</section>

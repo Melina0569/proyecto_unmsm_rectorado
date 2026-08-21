@@ -123,6 +123,40 @@
                 </div>
             </div>
 
+            <!-- ========================================= -->
+            <!-- PANEL DE INVENTARIO DE LA FACULTAD -->
+            <!-- ========================================= -->
+
+            <div id="inventario-section" class="hidden mt-16">
+                <div class="bg-white dark:bg-slate-800 rounded-[2rem] shadow-lg border-[3px] border-[#cbd5e1] dark:border-[#475569] overflow-hidden relative">
+                    <!-- Línea decorativa superior -->
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500"></div>
+                    
+                    <!-- Header -->
+                    <div class="flex justify-between items-start p-8 border-b-[3px] border-[#cbd5e1] dark:border-[#475569] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/40 dark:to-teal-900/40 border-2 border-emerald-200 dark:border-emerald-700/50">
+                                <span class="material-symbols-outlined text-3xl text-emerald-600 dark:text-emerald-400">inventory_2</span>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-black text-slate-900 dark:text-slate-100 mb-1">
+                                    Inventario - <span id="current-inventario-faculty-name" class="text-emerald-600 dark:text-emerald-400">Facultad</span>
+                                </h3>
+                                <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                                    Inventario institucional aprobado correspondiente a esta facultad.
+                                </p>
+                            </div>
+                        </div>
+                        <button onclick="ProcessMap.closeInventario()" class="w-11 h-11 rounded-full flex items-center justify-center transition-all bg-white dark:bg-[#334155] border-2 border-[#94a3b8] dark:border-[#475569] text-[#64748b] dark:text-[#cbd5e1] hover:bg-[#ef4444] hover:border-[#ef4444] hover:text-white hover:rotate-90 hover:scale-110 shadow-md">
+                            <span class="material-symbols-outlined text-xl">close</span>
+                        </button>
+                    </div>
+
+                    <!-- Contenido -->
+                    <div id="inventario-content" class="p-8 bg-[#f8fafc] dark:bg-[#0f172a] min-h-[300px]"></div>
+                </div>
+            </div>
+
             <!-- PANEL DE INDICADORES (debajo del mapa de procesos) -->
             <div id="indicators-section" class="hidden mt-16">
                 <div class="bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">

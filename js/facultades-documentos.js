@@ -3018,7 +3018,11 @@ async function recuperarAdjuntoDesdeFallback(docCode, adjunto) {
     try {
         const detalleRaw = localStorage.getItem('local_sigpro_documentos_detalle') 
                         || localStorage.getItem('sigpro_documentos_detalle') 
-                        || '{}';
+                        || '{}'
+                        localStorage.setItem(
+                            'local_sigpro_documentos_detalle',
+                            JSON.stringify(detalleMap)
+                        );
         const detalles = JSON.parse(detalleRaw);
         
         // Buscar directo por clave

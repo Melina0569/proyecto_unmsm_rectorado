@@ -2,61 +2,622 @@
 
 const ProcessMap = {
         // Panel de Soporte
-        openSoporte(processId) {
-            // Ocultar otros paneles
-            document.getElementById('indicators-section')?.classList.add('hidden');
-            document.getElementById('flowcharts-section')?.classList.add('hidden');
-            document.getElementById('ficha-tecnica-section')?.classList.add('hidden');
-            // Mostrar panel de soporte
-            const soporteSection = document.getElementById('soporte-section');
-            soporteSection?.classList.remove('hidden');
-            // Scroll automático al panel de soporte
-            setTimeout(() => {
-                soporteSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
-            // Actualizar nombre del proceso
+        async openInventario(processId) {
+            const section = document.getElementById('inventario-section');
+            const container = document.getElementById('inventario-content');
+            if (!section || !container) {
+                console.error('❌ No existe el panel de Inventario');
+                return;
+            }
+
+            // ── NUEVO: determinar tipo de proceso del proceso clickeado ──
             const allProcesses = [
                 ...(this.processes?.strategic || []),
                 ...(this.processes?.missional || []),
                 ...(this.processes?.support || [])
             ];
-            const process = allProcesses.find(p => String(p.id) === String(processId));
-            document.getElementById('current-soporte-process-name').textContent = process ? process.name : 'Proceso';
-            // Limpiar buscador
-            const searchInput = document.getElementById('search-soporte');
-            if (searchInput) searchInput.value = '';
-            // Renderizar mensaje vacío (igual que flujogramas)
-            this.renderSoporteList([]);
-        },
+            const selectedProcess = allProcesses.find(p => String(p.id) === String(processId));
+            const processType = selectedProcess?.type || ''; // 'strategic' | 'missional' | 'support'
+            const processCode = selectedProcess?.code || '';
+            // ──────────────────────────────────────────────────────────────
 
-        renderSoporteList(items) {
-        const soporteList = document.getElementById('soporte-list');
-        if (!soporteList) return;
-        if (!items || items.length === 0) {
-            soporteList.innerHTML = `
-                <div class="flex flex-col items-center justify-center w-full h-full">
-                    <div class="rounded-full bg-slate-100 dark:bg-slate-900 w-24 h-24 flex items-center justify-center mb-6">
-                        <span class="material-symbols-outlined text-4xl text-slate-400">support_agent</span>
-                    </div>
-                    <div class="text-base font-bold text-slate-500 dark:text-slate-400 mb-1">No hay recursos de soporte disponibles</div>
-                    <div class="text-base text-slate-500 dark:text-slate-400 text-center">Para este proceso aún no se han registrado recursos de soporte.</div>
+            section.classList.remove('hidden');
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            const facultyId =
+                String(this.facultyId || '');
+
+            const facultyName =
+                this.facultyData?.name ||
+                'Facultad';
+
+            const facultyTitle =
+                document.getElementById(
+                    'current-inventario-faculty-name'
+                );
+
+            if (facultyTitle) {
+                facultyTitle.textContent = facultyName;
+            }
+
+            container.innerHTML = `
+                <div class="text-center py-16">
+
+                    <span class="material-symbols-outlined
+                                text-5xl animate-spin
+                                text-emerald-600">
+                        refresh
+                    </span>
+
+                    <p class="text-slate-500 mt-4">
+                        Buscando inventario aprobado...
+                    </p>
+
                 </div>
             `;
-        } else {
-            // Aquí puedes renderizar la lista de recursos si existen
-            soporteList.innerHTML = items.map(item => `<div>${item}</div>`).join('');
-        }
+
+            try {
+
+                console.log(
+                    '🔎 Buscando Inventario para facultyId:',
+                    facultyId
+                );
+
+                let documentos = [];
+
+                // =====================================================
+                // 1. OBTENER DOCUMENTOS APROBADOS DESDE LA API
+                // =====================================================
+
+                if (
+                    typeof API !== 'undefined' &&
+                    API.expedientes &&
+                    typeof API.expedientes.getAprobados === 'function'
+                ) {
+
+                    try {
+
+                        const response =
+                            await API.expedientes.getAprobados();
+
+                        if (response?.success) {
+
+                            documentos =
+                                Array.isArray(response.data)
+                                    ? response.data
+                                    : [];
+
+                            console.log(
+                                '✅ Expedientes obtenidos desde API:',
+                                documentos
+                            );
+                        }
+
+                    } catch (error) {
+
+                        console.warn(
+                            '⚠️ No se pudo obtener expedientes desde API:',
+                            error
+                        );
+
+                    }
+                }
+
+                // =====================================================
+                // 2. OBTENER DOCUMENTOS DESDE LA LISTA LOCAL
+                // =====================================================
+
+                const clavesDocumentos = [
+                    'local_sigpro_documentos_lista',
+                    'sigpro_documentos_lista',
+                    'sigpro_approved_docs'   // ← NUEVO: también leer docs aprobados
+                ];
+
+                for (const clave of clavesDocumentos) {
+
+                    const raw =
+                        localStorage.getItem(clave);
+
+                    if (!raw) continue;
+
+                    try {
+
+                        const lista =
+                            JSON.parse(raw);
+
+                        if (Array.isArray(lista)) {
+
+                            documentos = [
+                                ...documentos,
+                                ...lista
+                            ];
+
+                            console.log(
+                                `✅ Documentos obtenidos desde ${clave}:`,
+                                lista
+                            );
+                        }
+
+                    } catch (error) {
+
+                        console.warn(
+                            `⚠️ Error leyendo ${clave}:`,
+                            error
+                        );
+
+                    }
+                }
+
+                // =====================================================
+                // 3. ELIMINAR DUPLICADOS
+                // =====================================================
+
+                const documentosUnicos =
+                    Array.from(
+                        new Map(
+                            documentos.map(doc => [
+                                String(
+                                    doc?.codigo ||
+                                    doc?.id ||
+                                    ''
+                                ),
+                                doc
+                            ])
+                        ).values()
+                    );
+
+                console.log(
+                    '📄 Documentos únicos:',
+                    documentosUnicos
+                );
+
+                // =====================================================
+                // 4. BUSCAR INVENTARIO
+                // =====================================================
+
+                let inventario =
+                    documentosUnicos.find(doc => {
+
+                        const codigo =
+                            String(
+                                doc?.codigo ||
+                                doc?.id ||
+                                ''
+                            ).trim();
+
+                        const tipo =
+                            String(
+                                doc?.tipo ||
+                                ''
+                            ).toLowerCase().trim();
+
+                        const estado =
+                            String(
+                                doc?.estado ||
+                                ''
+                            ).toLowerCase().trim();
+
+                        const docFacultyId =
+                            String(
+                                doc?.facultyId ||
+                                doc?.facultadId ||
+                                doc?.faculty?.id ||
+                                ''
+                            );
+
+                        const esInventario =
+                            tipo === 'inventario' ||
+                            codigo.toUpperCase().startsWith('INV-');
+
+                        const estaAprobado =
+                            estado === 'aprobado' ||
+                            estado === 'completado';
+
+                        const perteneceFacultad =
+                            !docFacultyId ||
+                            docFacultyId === facultyId;
+
+                        const docProcessType = String(
+                            doc?.processType ||
+                            doc?.tipoProceso ||
+                            doc?.process_type ||
+                            ''
+                        ).toLowerCase().trim();
+
+                        const perteneceTipoProceso = !processType || !docProcessType || docProcessType === processType;
+
+                        console.log(
+                            '📦 Revisando documento:',
+                            {
+                                codigo,
+                                tipo,
+                                estado,
+                                docFacultyId,
+                                facultyId,
+                                esInventario,
+                                estaAprobado,
+                                perteneceFacultad
+                            }
+                        );
+
+                        return (
+                            esInventario &&
+                            estaAprobado &&
+                            perteneceFacultad &&
+                            perteneceTipoProceso
+                        );
+                    });
+
+                // =====================================================
+                // 5. SI NO LO ENCUENTRA, BUSCAR POR DETALLE
+                // =====================================================
+
+                if (!inventario) {
+
+                    const rawDetalle =
+                        localStorage.getItem(
+                            'local_sigpro_documentos_detalle'
+                        ) ||
+                        localStorage.getItem(
+                            'sigpro_documentos_detalle'
+                        );
+
+                    if (rawDetalle) {
+
+                        try {
+
+                            const detalleMap =
+                                JSON.parse(rawDetalle);
+
+                            const detalleEntries =
+                                Object.entries(
+                                    detalleMap || {}
+                                );
+
+                            for (
+                                const [codigo, detalle]
+                                of detalleEntries
+                            ) {
+
+                                if (
+                                    !String(codigo)
+                                        .toUpperCase()
+                                        .startsWith('INV-')
+                                ) {
+                                    continue;
+                                }
+                                
+                                const fichaData =
+                                    detalle?.fichaData ||
+                                    {};
+
+                                const detalleFacultyId =
+                                    String(
+                                        fichaData.facultyId ||
+                                        fichaData.facultadId ||
+                                        ''
+                                    );
+
+                                const estado =
+                                    String(
+                                        detalle?.estado ||
+                                        ''
+                                    ).toLowerCase().trim();
+
+                                const detalleProcessType = String(
+                                    fichaData.tipoProceso ||
+                                    fichaData.processType ||
+                                    detalle.tipoProceso ||
+                                    detalle.processType ||
+                                    ''
+                                ).toLowerCase().trim();
+
+                                if (processType && detalleProcessType && detalleProcessType !== processType) {
+                                    continue;
+                                }
+
+                                if (
+                                    detalleFacultyId &&
+                                    detalleFacultyId !== facultyId
+                                ) {
+                                    continue;
+                                }
+
+                                if (
+                                    estado &&
+                                    estado !== 'aprobado' &&
+                                    estado !== 'completado'
+                                ) {
+                                    continue;
+                                }
+
+                                inventario = {
+                                    codigo,
+                                    tipo: 'inventario',
+                                    estado: 'aprobado',
+                                    facultyId: detalleFacultyId || facultyId,
+                                    // 🔥 Asegurar que traiga el tipo de proceso desde cualquier campo posible
+                                    processType: detalle.processType || detalle.tipoProceso || fichaData.processType || fichaData.tipoProceso || '',
+                                    tipoProceso: detalle.tipoProceso || detalle.processType || fichaData.tipoProceso || fichaData.processType || '',
+                                    ...detalle,
+                                    ...fichaData
+                                };
+
+                                console.log(
+                                    '✅ Inventario encontrado desde detalle:',
+                                    inventario
+                                );
+
+                                break;
+                            }
+
+                        } catch (error) {
+
+                            console.warn(
+                                '⚠️ Error leyendo documentos_detalle:',
+                                error
+                            );
+
+                        }
+                    }
+                }
+
+                // =====================================================
+                // 6. NO HAY INVENTARIO
+                // =====================================================
+
+                if (!inventario) {
+
+                    console.warn(
+                        '❌ No se encontró Inventario aprobado para facultyId:',
+                        facultyId
+                    );
+
+                    container.innerHTML = `
+                        <div class="text-center py-16">
+
+                            <div class="w-20 h-20 mx-auto
+                                        rounded-full
+                                        bg-slate-100
+                                        dark:bg-slate-800
+                                        flex items-center
+                                        justify-center mb-5">
+
+                                <span class="material-symbols-outlined
+                                            text-4xl text-slate-400">
+
+                                    inventory_2
+
+                                </span>
+
+                            </div>
+
+                            <p class="text-slate-600
+                                    dark:text-slate-300
+                                    font-semibold text-lg">
+
+                                No hay inventario aprobado
+
+                            </p>
+
+                            <p class="text-slate-400
+                                    dark:text-slate-500
+                                    text-sm mt-2">
+
+                                Esta facultad aún no tiene
+                                un inventario aprobado.
+
+                            </p>
+
+                        </div>
+                    `;
+
+                    return;
+                }
+
+                // =====================================================
+                // 7. MOSTRAR GOOGLE SHEETS
+                // =====================================================
+
+                console.log(
+                    '🟢 INVENTARIO ENCONTRADO:',
+                    inventario
+                );
+
+                this.renderInventarioGoogleSheets(
+                    inventario
+                );
+
+            } catch (error) {
+
+                console.error(
+                    '❌ Error cargando Inventario:',
+                    error
+                );
+
+                container.innerHTML = `
+                    <div class="text-center py-16">
+
+                        <p class="text-red-500 font-semibold">
+                            Error al cargar el inventario.
+                        </p>
+
+                        <p class="text-slate-400 text-sm mt-2">
+                            Revisa la consola del navegador.
+                        </p>
+
+                    </div>
+                `;
+            }
         },
 
-        filterSoporte(query) {
-            // Aquí puedes implementar el filtrado real si tienes recursos
-            // Por ahora solo muestra vacío
-            this.renderSoporteList([]);
+        renderInventarioGoogleSheets(doc) {
+
+            const container =
+                document.getElementById('inventario-content');
+
+            if (!container) return;
+
+            let sheetId = doc.sheetId || null;
+            let range =
+                doc.range ||
+                doc.googleSheetsRange ||
+                'A1:Z50';
+
+            let gid = doc.gid || '0';
+
+            let sheetUrl =
+                doc.googleSheetsUrl ||
+                doc.googleSheetsURL ||
+                '';
+
+            /*
+            * Si la URL no existe pero tenemos sheetId,
+            * construirla.
+            */
+            if (!sheetUrl && sheetId) {
+
+                const params = new URLSearchParams({
+                    gid: gid,
+                    range: range,
+                    single: 'true',
+                    widget: 'true',
+                    headers: 'false',
+                    chrome: 'false'
+                });
+
+                sheetUrl =
+                    `https://docs.google.com/spreadsheets/d/${sheetId}/htmlembed?${params.toString()}`;
+            }
+
+            /*
+            * Si tenemos URL de Google Sheets,
+            * reconstruirla usando el rango aprobado.
+            */
+            if (
+                sheetUrl &&
+                sheetUrl.includes('docs.google.com/spreadsheets/d/')
+            ) {
+
+                const match =
+                    sheetUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+
+                if (match) {
+
+                    sheetId = match[1];
+
+                    const params = new URLSearchParams({
+                        gid: gid,
+                        range: range,
+                        single: 'true',
+                        widget: 'true',
+                        headers: 'false',
+                        chrome: 'false'
+                    });
+
+                    sheetUrl =
+                        `https://docs.google.com/spreadsheets/d/${sheetId}/htmlembed?${params.toString()}`;
+                }
+            }
+
+            if (!sheetUrl) {
+
+                container.innerHTML = `
+                    <div class="text-center py-16">
+                        <span class="material-symbols-outlined
+                                    text-5xl text-slate-400">
+                            table_chart
+                        </span>
+
+                        <p class="text-slate-500 mt-4">
+                            El inventario fue aprobado,
+                            pero no tiene un Google Sheets asociado.
+                        </p>
+                    </div>
+                `;
+
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="bg-white dark:bg-slate-900
+                            rounded-2xl border border-slate-200
+                            dark:border-slate-700 overflow-hidden">
+
+                    <div class="px-6 py-4 border-b
+                                border-slate-200 dark:border-slate-700">
+
+                        <div class="flex flex-wrap items-center
+                                    justify-between gap-3">
+
+                            <div>
+                                <h4 class="font-bold text-slate-800
+                                        dark:text-white">
+                                    ${this.facultyData?.name || 'Facultad'}
+                                </h4>
+
+                                <p class="text-sm text-slate-500">
+                                    Inventario aprobado
+                                </p>
+                            </div>
+
+                            <span class="text-xs font-semibold
+                                        px-3 py-1 rounded-full
+                                        bg-emerald-100 text-emerald-700">
+                                Aprobado
+                            </span>
+
+                        </div>
+
+                        <div class="mt-3 text-xs text-slate-400">
+                            Rango: ${range}
+                        </div>
+
+                    </div>
+
+                    <div class="p-4 bg-slate-50 dark:bg-slate-950">
+
+                        <iframe
+                            src="${sheetUrl}"
+                            style="
+                                width: 100%;
+                                height: 650px;
+                                border: none;
+                                border-radius: 12px;
+                                background: white;
+                            "
+                            title="Inventario de la facultad">
+                        </iframe>
+
+                    </div>
+
+                </div>
+            `;
         },
 
-        closeSoportePanel() {
-            document.getElementById('soporte-section')?.classList.add('hidden');
+        closeInventario() {
+            const section = document.getElementById('inventario-section');
+            const container = document.getElementById('inventario-content');
+
+            if (section) {
+                // Animación de salida igual a Ficha Técnica
+                section.style.opacity = '0';
+                section.style.transform = 'translateY(-20px)';
+                section.style.transition = 'all 0.4s ease';
+
+                setTimeout(() => {
+                    section.classList.add('hidden');
+                    section.style.opacity = '';
+                    section.style.transform = '';
+                    section.style.transition = '';
+
+                    if (container) {
+                        container.innerHTML = '';
+                    }
+                }, 400);
+            }
         },
+
     facultyId: null,
     facultyData: null,
     processes: null,
@@ -100,6 +661,7 @@ const ProcessMap = {
     async loadFacultyFromURL() {
         const urlParams = new URLSearchParams(window.location.search);
         this.facultyId = urlParams.get('faculty') || '1';
+        localStorage.setItem('current_faculty_id', this.facultyId);
 
         // Intentar recuperar de sessionStorage primero
         const stored = sessionStorage.getItem('selectedFaculty');
@@ -151,6 +713,7 @@ const ProcessMap = {
                         missional: d.missional || [],
                         support: d.support || []
                     };
+                    try { localStorage.setItem('sigpro_process_map_cache', JSON.stringify(this.processes)); } catch(e) {}
                     
                     // Asignar tipo automáticamente según la categoría
                     this.processes.strategic.forEach(p => p.type = 'strategic');
@@ -202,6 +765,8 @@ const ProcessMap = {
                     support: remoteProcessMap.support || []
                 };
                 
+                try { localStorage.setItem('sigpro_process_map_cache', JSON.stringify(this.processes)); } catch(e) {}
+
                 // Asignar tipo automáticamente según la categoría
                 this.processes.strategic.forEach(p => p.type = 'strategic');
                 this.processes.missional.forEach(p => p.type = 'missional');
@@ -215,6 +780,8 @@ const ProcessMap = {
             const fallback = await window.API?.processes?.getByFaculty?.(this.facultyId);
             if (fallback && fallback.success) {
                 this.processes = fallback.data;
+
+                try { localStorage.setItem('sigpro_process_map_cache', JSON.stringify(this.processes)); } catch(e) {}
                 
                 // Asignar tipo automáticamente si el fallback también viene sin type
                 if (this.processes.strategic) this.processes.strategic.forEach(p => p.type = p.type || 'strategic');
@@ -584,13 +1151,13 @@ const ProcessMap = {
                         <span class="material-symbols-outlined text-xs">monitoring</span>
                         Indicadores
                     </button>
-                    <button class="btn-action-secondary strategic-btn" onclick="ProcessMap.openSoporte && ProcessMap.openSoporte('${p.id}')">
-                        <span class="material-symbols-outlined text-xs">support_agent</span>
-                        Inventario
-                    </button>
                     <button class="btn-action-third strategic-btn" onclick="ProcessMap.openFichatecnica('${p.id}')">
                         <span class="material-symbols-outlined text-xs">description</span>
                         Ficha técnica
+                    </button>
+                    <button class="btn-action-fourth strategic-btn" onclick="ProcessMap.openInventario('${p.id}')">
+                        <span class="material-symbols-outlined text-xs">inventory_2</span>
+                        Inventarios
                     </button>
                 </div>
             </div>
@@ -629,13 +1196,13 @@ const ProcessMap = {
                         <span class="material-symbols-outlined text-xs">monitoring</span>
                         Indicadores
                     </button>
-                    <button class="btn-action-secondary missional-btn" onclick="ProcessMap.openSoporte && ProcessMap.openSoporte('${p.id}')">
-                        <span class="material-symbols-outlined text-xs">support_agent</span>
-                        Inventario
-                    </button>
                     <button class="btn-action-third missional-btn" onclick="ProcessMap.openFichatecnica('${p.id}')">
                         <span class="material-symbols-outlined text-xs">description</span>
                         Ficha técnica
+                    </button>
+                    <button class="btn-action-fourth missional-btn" onclick="ProcessMap.openInventario('${p.id}')">
+                        <span class="material-symbols-outlined text-xs">inventory_2</span>
+                        Inventarios
                     </button>
                 </div>
             </div>
@@ -710,13 +1277,13 @@ const ProcessMap = {
                         <span class="material-symbols-outlined text-xs">monitoring</span>
                         Indicadores
                     </button>
-                    <button class="btn-action-secondary" onclick="ProcessMap.openSoporte && ProcessMap.openSoporte('${p.id}')">
-                        <span class="material-symbols-outlined text-xs">support_agent</span>
-                        Inventario
-                    </button>
                     <button class="btn-action-third" onclick="ProcessMap.openFichatecnica('${p.id}')">
                         <span class="material-symbols-outlined text-xs">description</span>
                         Ficha técnica
+                    </button>
+                    <button class="btn-action-fourth support-btn" onclick="ProcessMap.openInventario('${p.id}')">
+                        <span class="material-symbols-outlined text-xs">inventory_2</span>
+                        Inventarios
                     </button>
                 </div>
             </div>

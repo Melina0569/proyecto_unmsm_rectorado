@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
 let currentExpediente = null;
 let currentAdjuntos = [];
 let currentPreviewUrl = null;
+let currentCodigo = null;
 
 // ==========================================
 // INICIALIZACIÓN
@@ -120,6 +121,7 @@ function initLogoutModal() {
 async function cargarExpediente() {
     const params = new URLSearchParams(window.location.search);
     const codigo = params.get('codigo') || 'INV-2026-001';
+    currentCodigo = codigo;
 
     document.getElementById('codigo-display').textContent = codigo;
 
@@ -315,7 +317,51 @@ function editarRangoGoogleSheets() {
     // Recargar iframe con el nuevo rango
     iframe.src = embedUrl;
 
+    // 🔥 Persistir el nuevo rango para que process-map.js lo refleje
+    persistirRangoGoogleSheets(currentCodigo, rango);
+
     showToast(`Rango actualizado: ${rango}`, 'success');
+}
+
+function persistirRangoGoogleSheets(codigo, rango) {
+    if (!codigo) return;
+    try {
+        // 1) Actualizar el detalle (documentos_detalle) — de aquí lee la ficha original
+        const detalleRaw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
+        const detalleMap = detalleRaw ? JSON.parse(detalleRaw) : {};
+        if (detalleMap[codigo]) {
+            detalleMap[codigo].googleSheetsRange = rango;
+            if (detalleMap[codigo].fichaData) {
+                detalleMap[codigo].fichaData.googleSheetsRange = rango;
+            }
+            localStorage.setItem(STORAGE_KEYS.DOCUMENTOS_DETALLE, JSON.stringify(detalleMap));
+        }
+
+        // 2) Si ya está aprobado, actualizar también su copia pública (la que lee process-map.js)
+        const approvedRaw = localStorage.getItem('sigpro_approved_docs');
+        if (approvedRaw) {
+            const approvedList = JSON.parse(approvedRaw);
+            const idx = approvedList.findIndex(d => d.codigo === codigo || d.code === codigo);
+            if (idx >= 0) {
+                approvedList[idx].range = rango;
+                approvedList[idx].googleSheetsRange = rango;
+                localStorage.setItem('sigpro_approved_docs', JSON.stringify(approvedList));
+            }
+        }
+
+        // 3) También en sigpro_documentos_lista, por si es la fuente que gana en el merge
+        const listaRaw = localStorage.getItem('sigpro_documentos_lista');
+        if (listaRaw) {
+            const lista = JSON.parse(listaRaw);
+            const idx = lista.findIndex(d => d.codigo === codigo || d.code === codigo);
+            if (idx >= 0) {
+                lista[idx].range = rango;
+                localStorage.setItem('sigpro_documentos_lista', JSON.stringify(lista));
+            }
+        }
+    } catch (e) {
+        console.warn('No se pudo persistir el rango de Google Sheets:', e);
+    }
 }
 
 // ==========================================
