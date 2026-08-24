@@ -278,7 +278,7 @@ function construirModelo(codigo, detalle) {
         codigo: codigo,
         titulo: detalle?.titulo || fichaData?.nombreProceso || fichaData?.procesoNombre || fichaData?.macroProcesoNombre || "Caracterizacion " + codigo,
         fechaRegistro: detalle?.fechaRegistro || doc?.fecha || fichaData?.fechaElaboracion || new Date().toISOString().split("T")[0],
-        estado: doc?.estado || detalle?.estado || "aprobado",
+        estado: doc?.estado || detalle?.estado || "pendiente",
         fichaData: fichaData,
         resumenCampos: resumen,
         adjuntos: Array.isArray(detalle?.adjuntos) ? detalle.adjuntos : [],

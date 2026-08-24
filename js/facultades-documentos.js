@@ -1623,7 +1623,7 @@ function loadLocalDocuments() {
         STORAGE_KEYS.DOCUMENTOS_LISTA,   // local_sigpro_documentos_lista
         'sigpro_documentos_lista',
         'remote_sigpro_documentos_lista',
-        'sigpro_reportes',               // ← DONDE LAS FICHAS GUARDAN
+        'sigpro_reportes',
         'sigpro_user_documents',
         'local_sigpro_user_documents'
     ];
@@ -2011,7 +2011,8 @@ function normalizar(value) {
 }
 
 function getLocalDocumentDetail(codigo, doc) {
-    const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE);
+    const raw = localStorage.getItem(STORAGE_KEYS.DOCUMENTOS_DETALLE)
+        || localStorage.getItem('sigpro_documentos_detalle'); // ← clave neutra
     if (!raw) return null;
 
     try {

@@ -743,17 +743,25 @@ window.removeExcelFile = function() {
 function goToDocumentos(codigo) {
     const destino = `facultades-documentos.html?docCode=${encodeURIComponent(codigo)}`;
     
-    // Si estamos dentro de un iframe, notificar al padre para navegación suave
+    // Si estamos dentro de un iframe, intentar notificar al padre PRIMERO
     if (window.parent && window.parent !== window) {
         window.parent.postMessage({
             type: 'navigate-to',
             url: destino,
             docCode: codigo
         }, '*');
+        
+        // 🔥 FIX CRÍTICO: Fallback por si el parent no escucha el postMessage
+        // Abre en nueva pestaña si después de 400ms seguimos visibles
+        setTimeout(() => {
+            if (document.visibilityState === 'visible') {
+                window.open(destino, '_blank');
+            }
+        }, 400);
         return;
     }
     
-    // Si estamos en ventana principal, navegar directamente
+    // Ventana principal: navegación directa
     window.location.href = destino;
 }
 
@@ -910,10 +918,6 @@ function initFormHandler() {
                 console.log('✅ apiId guardado:', apiId, 'para código:', reportPayload.code);
             }
 
-        
-        apiSuccess = true;
-        console.log('✅ Reporte creado en API:', apiResult.data);
-
             // ==========================================
             // PASO 2: Guardar localmente (PDF, adjuntos, documentos)
             // ==========================================
@@ -1025,6 +1029,17 @@ function initFormHandler() {
                 }
             }
 
+            // 🔥 FIX: También guardar en clave NEUTRA para que el dashboard siempre lo encuentre
+            // sin importar si está en modo local o remote
+            try {
+                const neutralDetalleRaw = localStorage.getItem('sigpro_documentos_detalle') || '{}';
+                const neutralDetalle = JSON.parse(neutralDetalleRaw);
+                neutralDetalle[codigo] = detalleReporte;
+                localStorage.setItem('sigpro_documentos_detalle', JSON.stringify(neutralDetalle));
+            } catch (e) {
+                console.warn('No se pudo sincronizar detalle neutral:', e);
+            }
+
             // Mostrar mensaje de éxito
             if (apiSuccess) {
                 showToast('¡Reporte enviado y guardado correctamente!', 'success');
@@ -1048,12 +1063,16 @@ function initFormHandler() {
                 setTimeout(() => {
                     btnFinalizar.style.display = 'none';
                     btnExpedientes.classList.remove('hidden');
-                    btnExpedientes.href = `facultades-documentos.html?docCode=${encodeURIComponent(codigo)}`;
+                    
+                    // Guardar destino para fallback
+                    const destino = `facultades-documentos.html?docCode=${encodeURIComponent(codigo)}`;
+                    btnExpedientes.dataset.href = destino;
+                    
                     btnExpedientes.onclick = (ev) => {
                         ev.preventDefault();
                         goToDocumentos(codigo);
                     };
-                }, REPORT_CONFIG.SHOW_DOCUMENTOS_BUTTON_DELAY_MS);
+                }, REPORT_CONFIG.SHOW_DOCUMENTOS_BUTTON_DELAY_MS); // ← FIX: typo corregido
             } else {
                 goToDocumentos(codigo);
             }

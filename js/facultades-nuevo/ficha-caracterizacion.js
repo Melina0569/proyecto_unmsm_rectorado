@@ -236,8 +236,8 @@ function saveFichaToLocalStorage(payload) {
         codigoProceso: payload.codigoProceso || '',
         descripcion: payload.nombreProceso || payload.macroProcesoNombre || `Caracterizacion ${payload.codigo}`,
         generadoPor: payload.generadoPor || 'Facultad',
-        estado: 'aprobado',  // ← Se guarda como aprobado directamente
-        progreso: 100,
+        estado: 'pendiente',   // ← Al crear debe estar pendiente
+        progreso: 5,           // ← Progreso inicial bajo
         facultadId: payload.facultadId || 1,
         tipo: 'caracterizacion',
         origen: payload.backendId ? 'hibrido' : 'local',
@@ -324,7 +324,7 @@ function saveFichaToLocalStorage(payload) {
         nombre: payload.nombreProceso || payload.macroProcesoNombre || `Caracterizacion ${payload.codigo}`,
         macroProceso: payload.macroProcesoNombre || payload.macroProceso || 'Gestion Institucional',
         fechaAprobacion: docPendiente.fecha,
-        estado: 'aprobado',
+        estado: 'pendiente',
         responsable: payload.unidadOrganica || 'UNMSM',
         // 🔥 AGREGAR ESTO: Guardar sheetId en expediente
         sheetId: payload.sheetId || payload.googleSheetsId || null,

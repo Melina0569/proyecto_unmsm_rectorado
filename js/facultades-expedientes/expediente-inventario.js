@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initThemeToggle();
     initProfileDropdown();
     initLogoutModal();
+    initRepositorioLink();        // ← AGREGAR ESTA LÍNEA
     await cargarPerfilDesdeBackend();
     await cargarExpediente();
 });
@@ -59,21 +60,39 @@ function initProfileDropdown() {
 
     function openProfileDropdown() {
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-        profileDropdown.classList.remove('hidden');
+        profileDropdown.classList.remove('hidden', 'hide-profile');
+        void profileDropdown.offsetWidth;
+        profileDropdown.classList.add('show-profile');
     }
 
-    function closeProfileDropdown() {
+    function closeProfileDropdown(immediate = false) {
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-        profileDropdown.classList.add('hidden');
+        if (immediate) {
+            profileDropdown.classList.remove('show-profile', 'hide-profile');
+            profileDropdown.classList.add('hidden');
+            return;
+        }
+        if (profileDropdown.classList.contains('hidden')) return;
+        profileDropdown.classList.remove('show-profile');
+        profileDropdown.classList.add('hide-profile');
+        hideTimer = setTimeout(() => {
+            profileDropdown.classList.add('hidden');
+            profileDropdown.classList.remove('hide-profile');
+            hideTimer = null;
+        }, 180);
     }
 
     profileBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isHidden = profileDropdown.classList.contains('hidden');
-        if (isHidden) openProfileDropdown(); else closeProfileDropdown();
+        e.preventDefault(); e.stopPropagation();
+        const isVisible = !profileDropdown.classList.contains('hidden') && !profileDropdown.classList.contains('hide-profile');
+        if (isVisible) closeProfileDropdown(); else openProfileDropdown();
     });
 
-    document.addEventListener('click', () => closeProfileDropdown());
+    document.addEventListener('click', (e) => {
+        if (!profileBtn.contains(e.target) && !profileDropdown.contains(e.target)) {
+            closeProfileDropdown();
+        }
+    });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeProfileDropdown();
     });
@@ -93,18 +112,49 @@ function initLogoutModal() {
 
     function abrirModalLogout() {
         logoutModal.classList.remove('hidden');
+        void logoutModal.offsetWidth;
+        logoutModal.classList.add('show-modal');
     }
+
     function cerrarModalLogout() {
-        logoutModal.classList.add('hidden');
+        logoutModal.classList.add('hide-modal');
+        logoutModal.classList.remove('show-modal');
+        setTimeout(() => {
+            if (logoutModal.classList.contains('hide-modal')) {
+                logoutModal.classList.add('hidden');
+                logoutModal.classList.remove('hide-modal');
+            }
+        }, 400);
     }
-    function ejecutarLogout() {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.replace('portal-inicio-facultades.html');
+
+    async function ejecutarLogout() {
+        logoutModal.classList.add('hide-modal');
+        logoutModal.classList.remove('show-modal');
+        setTimeout(async () => {
+            try {
+                if (typeof API !== 'undefined' && API.auth && API.auth.logout) {
+                    await API.auth.logout();
+                }
+            } catch (error) {
+                console.log('Logout backend (silencioso):', error.message);
+            }
+            // 🔥 NO usar localStorage.clear() — eso borra los documentos
+            const authKeys = ['token', 'unmsm_token', 'auth_token', 'accessToken', 'unmsm-token', 'jwt', 'refreshToken'];
+            const profileKeys = ['usuario', 'sigpro_usuario', 'usuario_actual', 'user', 'unmsm_user'];
+            [...authKeys, ...profileKeys].forEach(k => localStorage.removeItem(k));
+            sessionStorage.clear();
+            window.location.replace('portal-inicio-facultades.html');
+        }, 400);
     }
 
     logoutBtn.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation();
+        // Cerrar dropdown primero (sin animación, inmediato)
+        const profileDropdown = document.getElementById('profile-dropdown');
+        if (profileDropdown) {
+            profileDropdown.classList.remove('show-profile', 'hide-profile');
+            profileDropdown.classList.add('hidden');
+        }
         abrirModalLogout();
     });
     if (logoutCancel) logoutCancel.addEventListener('click', cerrarModalLogout);
@@ -112,6 +162,27 @@ function initLogoutModal() {
     logoutModal.addEventListener('click', (e) => {
         if (e.target === logoutModal) cerrarModalLogout();
     });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !logoutModal.classList.contains('hidden')) {
+            cerrarModalLogout();
+        }
+    });
+}
+
+function initRepositorioLink() {
+    // Busca cualquier elemento que diga exactamente "Repositorio"
+    const links = Array.from(document.querySelectorAll('a, button, span, div, li'));
+    const repoLink = links.find(el => el.textContent.trim().toLowerCase() === 'repositorio');
+    
+    if (repoLink) {
+        repoLink.style.cursor = 'pointer';
+        repoLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.href = 'facultades-expedientes.html';
+        });
+        console.log('✅ Link "Repositorio" configurado');
+    }
 }
 
 // ==========================================

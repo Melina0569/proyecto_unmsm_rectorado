@@ -31,13 +31,26 @@ const ProcessMap = {
                 this.facultyData?.name ||
                 'Facultad';
 
+            this.currentInventarioProcess = selectedProcess; // 🔥 para reusarlo en renderInventarioGoogleSheets
+
             const facultyTitle =
                 document.getElementById(
                     'current-inventario-faculty-name'
                 );
 
             if (facultyTitle) {
-                facultyTitle.textContent = facultyName;
+                facultyTitle.textContent = selectedProcess
+                    ? `${selectedProcess.code} ${selectedProcess.name}`.trim()
+                    : 'Inventario';
+            }
+
+            const inventarioSubtitle =
+                document.getElementById('current-inventario-subtitle');
+
+            if (inventarioSubtitle) {
+                inventarioSubtitle.textContent = selectedProcess
+                    ? `Inventario aprobado correspondiente al proceso ${selectedProcess.code} - ${selectedProcess.name}.`
+                    : 'Inventario institucional aprobado correspondiente a esta facultad.';
             }
 
             container.innerHTML = `
@@ -71,35 +84,21 @@ const ProcessMap = {
 
                 if (
                     typeof API !== 'undefined' &&
-                    API.expedientes &&
-                    typeof API.expedientes.getAprobados === 'function'
+                    API.repositorio &&
+                    typeof API.repositorio.getAprobados === 'function'
                 ) {
-
                     try {
-
-                        const response =
-                            await API.expedientes.getAprobados();
+                        const response = await API.repositorio.getAprobados({
+                            facultyId: facultyId  // filtrar por facultad actual
+                        });
 
                         if (response?.success) {
-
-                            documentos =
-                                Array.isArray(response.data)
-                                    ? response.data
-                                    : [];
-
-                            console.log(
-                                '✅ Expedientes obtenidos desde API:',
-                                documentos
-                            );
+                            const apiDocs = Array.isArray(response.data) ? response.data : [];
+                            documentos = [...documentos, ...apiDocs];
+                            console.log('✅ Expedientes obtenidos desde API:', apiDocs);
                         }
-
                     } catch (error) {
-
-                        console.warn(
-                            '⚠️ No se pudo obtener expedientes desde API:',
-                            error
-                        );
-
+                        console.warn('⚠️ No se pudo obtener expedientes desde API:', error);
                     }
                 }
 
@@ -483,7 +482,8 @@ const ProcessMap = {
                     single: 'true',
                     widget: 'true',
                     headers: 'false',
-                    chrome: 'false'
+                    chrome: 'false',
+                    rm: 'minimal'
                 });
 
                 sheetUrl =
@@ -512,7 +512,8 @@ const ProcessMap = {
                         single: 'true',
                         widget: 'true',
                         headers: 'false',
-                        chrome: 'false'
+                        chrome: 'false',
+                        rm: 'minimal'
                     });
 
                     sheetUrl =
@@ -551,9 +552,8 @@ const ProcessMap = {
                                     justify-between gap-3">
 
                             <div>
-                                <h4 class="font-bold text-slate-800
-                                        dark:text-white">
-                                    ${this.facultyData?.name || 'Facultad'}
+                                <h4 class="font-bold text-slate-800 dark:text-white">
+                                    ${this.currentInventarioProcess ? `${this.currentInventarioProcess.code} ${this.currentInventarioProcess.name}` : (this.facultyData?.name || 'Facultad')}
                                 </h4>
 
                                 <p class="text-sm text-slate-500">
@@ -567,10 +567,6 @@ const ProcessMap = {
                                 Aprobado
                             </span>
 
-                        </div>
-
-                        <div class="mt-3 text-xs text-slate-400">
-                            Rango: ${range}
                         </div>
 
                     </div>
@@ -2867,7 +2863,8 @@ const ProcessMap = {
                             single: 'true',
                             widget: 'true',
                             headers: 'false',
-                            chrome: 'false'
+                            chrome: 'false',
+                            rm: 'minimal'
                         });
                         sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/htmlembed?${params.toString()}`;
                     }
@@ -2886,7 +2883,8 @@ const ProcessMap = {
                                 single: 'true',
                                 widget: 'true',
                                 headers: 'false',
-                                chrome: 'false'
+                                chrome: 'false',
+                                rm: 'minimal'
                             });
                             
                             sheetUrl = `https://docs.google.com/spreadsheets/d/${id}/htmlembed?${params.toString()}`;
@@ -2913,7 +2911,8 @@ const ProcessMap = {
                                     single: 'true',
                                     widget: 'true',
                                     headers: 'false',
-                                    chrome: 'false'
+                                    chrome: 'false',
+                                    rm: 'minimal'
                                 });
                                 sheetUrl = `https://docs.google.com/spreadsheets/d/${id}/htmlembed?${params.toString()}`;
                             } else {
