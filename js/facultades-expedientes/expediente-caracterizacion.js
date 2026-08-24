@@ -202,7 +202,8 @@ function obtenerExtension(nombre, src) {
 document.addEventListener("DOMContentLoaded", function() {
     initTheme();
     initThemeToggle();
-    initProfile();  
+    initProfileDropdown();
+    initLogoutModal();
     if (!cargarCaracterizacion()) {
         mostrarEstadoVacio();
         return;
@@ -801,7 +802,11 @@ function showToast(message, type, duration) {
 // PERFIL / DROPDOWN DE USUARIO
 // ============================================================
 
-function initProfile() {
+// ============================================================
+// PERFIL / DROPDOWN DE USUARIO  (animación fluida)
+// ============================================================
+
+function initProfileDropdown() {
     const btn = document.getElementById('profile-btn');
     const menu = document.getElementById('profile-dropdown');
     if (!btn || !menu) return;
@@ -814,13 +819,11 @@ function initProfile() {
         }
     } catch (e) { /* silent */ }
 
-    // Fallback a localStorage si API no responde
     const userName = user?.nombre || user?.name || user?.username || localStorage.getItem('sigpro_user_name') || localStorage.getItem('current_user_name') || 'Usuario';
     const userEmail = user?.correo || user?.email || localStorage.getItem('sigpro_user_email') || 'usuario@unmsm.edu.pe';
     const userRole = user?.rol || user?.role || 'Usuario Facultad';
     const facultyName = user?.facultad || user?.nombreFacultad || localStorage.getItem('current_faculty_name') || 'Facultad';
 
-    // 2. Iniciales para el avatar
     const initials = String(userName)
         .split(' ')
         .map(n => n[0])
@@ -828,7 +831,7 @@ function initProfile() {
         .substring(0, 2)
         .toUpperCase();
 
-    // 3. Renderizar el menú con la misma estructura visual de Inventario.
+    // 2. Renderizar menú
     menu.innerHTML = `
         <div class="p-4 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
             <div class="flex items-center gap-3">
@@ -857,44 +860,83 @@ function initProfile() {
             </button>
         </div>`;
 
-    // 4. Toggle del dropdown
+    // 3. Toggle con animación fluida
+    let hideTimer = null;
+
+    function openMenu() {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        menu.classList.remove('hidden', 'hide-profile');
+        void menu.offsetWidth; // reflow
+        menu.classList.add('show-profile');
+    }
+
+    function closeMenu(immediate) {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        if (immediate) {
+            menu.classList.remove('show-profile', 'hide-profile');
+            menu.classList.add('hidden');
+            return;
+        }
+        if (menu.classList.contains('hidden')) return;
+        menu.classList.remove('show-profile');
+        menu.classList.add('hide-profile');
+        hideTimer = setTimeout(function() {
+            menu.classList.add('hidden');
+            menu.classList.remove('hide-profile');
+            hideTimer = null;
+        }, 180);
+    }
+
     btn.addEventListener('click', function(e) {
+        e.preventDefault();
         e.stopPropagation();
-        menu.classList.toggle('hidden');
+        var isVisible = !menu.classList.contains('hidden') && !menu.classList.contains('hide-profile');
+        if (isVisible) closeMenu(); else openMenu();
     });
 
     document.addEventListener('click', function(e) {
         if (!menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
-            menu.classList.add('hidden');
+            closeMenu();
         }
     });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeMenu();
+    });
+}
 
-    // 5. Confirmación de cierre de sesión, igual que Inventario.
-    const btnLogout = document.getElementById('logout-btn');
+// ============================================================
+// MODAL LOGOUT  (animación fluida)
+// ============================================================
+
+function initLogoutModal() {
+    const logoutBtn = document.getElementById('logout-btn');
     const logoutModal = document.getElementById('logout-modal');
     const logoutCancel = document.getElementById('logout-cancel');
     const logoutConfirm = document.getElementById('logout-confirm');
 
+    if (!logoutBtn || !logoutModal) return;
+
+    function abrirModalLogout() {
+        logoutModal.classList.remove('hidden');
+        void logoutModal.offsetWidth;
+        logoutModal.classList.add('show-modal');
+    }
+
     function cerrarModalLogout() {
-        logoutModal?.classList.add('hidden');
+        logoutModal.classList.add('hide-modal');
+        logoutModal.classList.remove('show-modal');
+        setTimeout(function() {
+            if (logoutModal.classList.contains('hide-modal')) {
+                logoutModal.classList.add('hidden');
+                logoutModal.classList.remove('hide-modal');
+            }
+        }, 400);
     }
 
-    if (btnLogout) {
-        btnLogout.addEventListener('click', function() {
-            menu.classList.add('hidden');
-            logoutModal?.classList.remove('hidden');
-        });
-    }
-
-    logoutCancel?.addEventListener('click', cerrarModalLogout);
-    logoutModal?.addEventListener('click', function(event) {
-        if (event.target === logoutModal) cerrarModalLogout();
-    });
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') cerrarModalLogout();
-    });
-
-    logoutConfirm?.addEventListener('click', async function() {
+    async function ejecutarLogout() {
+        logoutModal.classList.add('hide-modal');
+        logoutModal.classList.remove('show-modal');
+        setTimeout(async function() {
             try {
                 if (typeof API !== 'undefined' && API.auth && typeof API.auth.logout === 'function') {
                     await API.auth.logout();
@@ -911,5 +953,28 @@ function initProfile() {
             ].forEach(function(key) { localStorage.removeItem(key); });
 
             window.location.replace('index.html');
+        }, 400);
+    }
+
+    logoutBtn.addEventListener('click', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        // Cerrar dropdown primero (inmediato)
+        var menu = document.getElementById('profile-dropdown');
+        if (menu) {
+            menu.classList.remove('show-profile', 'hide-profile');
+            menu.classList.add('hidden');
+        }
+        abrirModalLogout();
+    });
+
+    if (logoutCancel) logoutCancel.addEventListener('click', cerrarModalLogout);
+    if (logoutConfirm) logoutConfirm.addEventListener('click', ejecutarLogout);
+    logoutModal.addEventListener('click', function(e) {
+        if (e.target === logoutModal) cerrarModalLogout();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !logoutModal.classList.contains('hidden')) {
+            cerrarModalLogout();
+        }
     });
 }

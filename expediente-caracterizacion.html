@@ -28,6 +28,7 @@
     </script>
 
     <style>
+        /* ===== TOASTS ===== */
         .toast { display:flex; align-items:center; gap:0.5rem; padding:0.75rem 1rem; border-radius:0.5rem; background:white; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); border:1px solid #e2e8f0; font-size:0.875rem; animation:slideIn 0.3s ease; }
         .toast.success { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
         .toast.error { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
@@ -36,10 +37,58 @@
         .toast.hiding { animation:slideOut 0.3s ease forwards; }
         @keyframes slideIn { from { transform:translateX(100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
         @keyframes slideOut { from { transform:translateX(0); opacity:1; } to { transform:translateX(100%); opacity:0; } }
+
+        /* ===== FADE IN UP ===== */
         @keyframes fadeInUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
         .fade-in-up { animation:fadeInUp 0.4s ease forwards; }
+
+        /* ===== DROPDOWN PERFIL (animación fluida) ===== */
+        #profile-dropdown {
+            transition: opacity 0.18s ease, transform 0.18s ease;
+            opacity: 0;
+            transform: translateY(-8px) scale(0.96);
+            pointer-events: none;
+        }
+        #profile-dropdown.show-profile {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+        #profile-dropdown.hide-profile {
+            opacity: 0;
+            transform: translateY(-8px) scale(0.96);
+            pointer-events: none;
+        }
+
+        /* ===== MODAL LOGOUT (animación fluida) ===== */
+        #logout-modal {
+            transition: opacity 0.3s ease;
+            opacity: 0;
+        }
+        #logout-modal.show-modal {
+            opacity: 1;
+        }
+        #logout-modal.show-modal #logout-modal-content {
+            animation: modalIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        #logout-modal.hide-modal {
+            opacity: 0;
+        }
+        #logout-modal.hide-modal #logout-modal-content {
+            animation: modalOut 0.25s ease forwards;
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes modalOut {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to   { opacity: 0; transform: translateY(-20px) scale(0.95); }
+        }
+
         .gsheets-frame { min-height:65vh; border:0; display:block; }
     </style>
+<base target="_blank">
 <base target="_blank">
 </head>
 <body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
@@ -86,8 +135,9 @@
                 </div>
             </header>
 
-            <div id="logout-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-200">
-                <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm mx-4">
+            <!-- MODAL LOGOUT -->
+            <div id="logout-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                <div id="logout-modal-content" class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm mx-4">
                     <div class="mx-auto w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
                         <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-3xl">logout</span>
                     </div>
@@ -139,7 +189,7 @@
                         </div>
                     </section>
 
-                    <!-- GOOGLE SHEETS: muestra la pestaña y el rango reales del expediente -->
+                    <!-- GOOGLE SHEETS -->
                     <section id="gsheets-section" class="hidden bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
                         <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                             <div class="flex items-center gap-2">
@@ -216,7 +266,7 @@
                 </div>
             </main>
 
-            <!-- Footer -->
+            <!-- FOOTER -->
             <footer class="bg-[#1a365d] dark:bg-slate-950 text-white/70 py-10 mt-12 relative z-10 border-t border-slate-700">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                     <div class="flex items-center justify-center gap-3 mb-4">
