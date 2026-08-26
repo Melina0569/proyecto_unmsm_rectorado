@@ -12,19 +12,47 @@
 
     <script>
         tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        primary: "#1978e5",
-                        accent: "#1a365d",
-                        "background-light": "#f6f7f8",
-                        "background-dark": "#111821",
-                    },
-                    fontFamily: { display: ["Inter", "sans-serif"] },
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    primary: "#1a365d",
+                    accent: "#2563eb",
+                    "background-light": "#f8fafc",
+                    "background-dark": "#0f172a",
                 },
+                fontFamily: {
+                    display: ["Inter", "sans-serif"],
+                },
+                borderRadius: {
+                    DEFAULT: "0.75rem",
+                    'xl': '1.25rem',
+                    '2xl': '1.5rem',
+                },
+                animation: {
+                    'blob': 'blob 7s infinite',
+                    'levitate': 'levitate 3s ease-in-out infinite',
+                    'float': 'float 6s ease-in-out infinite',
+                },
+                keyframes: {
+                    blob: {
+                        '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                        '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                        '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                        '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                    },
+                    levitate: {
+                        '0%, 100%': { transform: 'translateY(0)', filter: 'drop-shadow(0 5px 15px rgba(0,0,0,0.1))' },
+                        '50%': { transform: 'translateY(-10px)', filter: 'drop-shadow(0 25px 15px rgba(0,0,0,0.2))' },
+                    },
+                    float: {
+                        '0%, 100%': { transform: 'translateY(0)' },
+                        '50%': { transform: 'translateY(-20px)' },
+                    }
+                }
             },
-        };
+        },
+    };
     </script>
 
     <style>
@@ -99,7 +127,8 @@
             <!-- HEADER -->
             <header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60 sticky top-0 z-50">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-
+                    
+                    <!-- Logo -->
                     <div class="flex items-center gap-2">
                         <div class="bg-gradient-to-br from-primary to-blue-800 p-1.5 rounded-lg shadow-lg">
                             <span class="material-symbols-outlined text-white text-2xl">analytics</span>
@@ -122,30 +151,70 @@
                             <span class="material-symbols-outlined text-slate-300 hidden dark:block">light_mode</span>
                         </button>
 
-                        <!-- Dropdown Perfil -->
+                        <!-- PERFIL CON DROPDOWN -->
                         <div class="relative" id="profile-container">
-                            <button type="button" id="profile-btn" 
-                                class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center border border-slate-300 dark:border-slate-600 hover:border-primary dark:hover:border-primary transition-colors"
-                                aria-label="Perfil">
+                            <button id="profile-btn" type="button" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center border border-slate-300 dark:border-slate-600 hover:border-primary dark:hover:border-primary transition-colors">
                                 <span class="material-symbols-outlined text-slate-500 dark:text-slate-400 text-sm">person</span>
                             </button>
-                            <div id="profile-dropdown" class="hidden absolute right-0 mt-2 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50"></div>
+                            <div id="profile-dropdown" class="hidden absolute right-0 mt-2 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50">
+                                <div class="p-4 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
+                                    <div class="flex items-center gap-3">
+                                        <div id="profile-avatar" class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                                            <span id="profile-iniciales">JP</span>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <div id="profile-nombre" class="font-semibold text-slate-900 dark:text-white text-sm">Juan Pérez</div>
+                                            <div id="profile-email" class="text-xs text-slate-500 dark:text-slate-400 truncate">juan@unmsm.edu.pe</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 flex flex-wrap gap-1">
+                                        <span id="profile-rol" class="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">Administrador</span>
+                                        <span id="profile-facultad" class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">Ingenieria de Sistemas</span>
+                                    </div>
+                                </div>
+                                <div class="p-2">
+                                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-300">
+                                        <span class="material-symbols-outlined text-slate-400 text-sm">settings</span>
+                                        Configuración
+                                    </a>
+                                    <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-300">
+                                        <span class="material-symbols-outlined text-slate-400 text-sm">school</span>
+                                        Cambiar facultad
+                                    </a>
+                                </div>
+                                <div class="p-2 border-t border-slate-200 dark:border-slate-700">
+                                    <button id="logout-btn" class="logout-action w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 transition-all duration-300">
+                                        <span class="material-symbols-outlined text-sm">logout</span>
+                                        Cerrar sesión
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </header>
 
-            <!-- MODAL LOGOUT -->
+            <!-- Modal de Cerrar Sesión -->
             <div id="logout-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
                 <div id="logout-modal-content" class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm mx-4">
                     <div class="mx-auto w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
                         <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-3xl">logout</span>
                     </div>
-                    <h3 class="text-xl font-bold text-center text-slate-900 dark:text-white mb-2">¿Cerrar sesión?</h3>
-                    <p class="text-sm text-center text-slate-500 dark:text-slate-400 mb-6 px-2">¿Estás seguro de que deseas salir de tu cuenta? Deberás iniciar sesión nuevamente.</p>
+
+                    <h3 class="text-xl font-bold text-center text-slate-900 dark:text-white mb-2">
+                        ¿Cerrar sesión?
+                    </h3>
+                    <p class="text-sm text-center text-slate-500 dark:text-slate-400 mb-6 px-2">
+                        ¿Estás seguro de que deseas salir de tu cuenta? Deberás iniciar sesión nuevamente.
+                    </p>
+
                     <div class="flex gap-3">
-                        <button id="logout-cancel" type="button" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
-                        <button id="logout-confirm" type="button" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 transition-colors shadow-lg shadow-red-600/30">Sí, cerrar sesión</button>
+                        <button id="logout-cancel" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                            Cancelar
+                        </button>
+                        <button id="logout-confirm" class="flex-1 px-4 py-3 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 transition-colors shadow-lg shadow-red-600/30 hover:shadow-red-600/40">
+                            Sí, cerrar sesión
+                        </button>
                     </div>
                 </div>
             </div>
@@ -266,7 +335,7 @@
                 </div>
             </main>
 
-            <!-- FOOTER -->
+            <!-- Footer -->
             <footer class="bg-[#1a365d] dark:bg-slate-950 text-white/70 py-10 mt-12 relative z-10 border-t border-slate-700">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                     <div class="flex items-center justify-center gap-3 mb-4">

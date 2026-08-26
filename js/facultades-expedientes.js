@@ -235,35 +235,35 @@ async function cargarExpedientes() {
         // Datos de demostracion
         expedientes = [
             {
-                id: '1', codigo: 'IND-2026-001', tipo: 'indicador',
+                id: '1', codigo: 'IND-FM-2026-1', tipo: 'indicador',
                 nombre: 'Indice de Ejecucion Presupuestal',
                 macroProceso: 'Gestion de Recursos Economicos',
                 fechaAprobacion: '2026-03-15', estado: 'aprobado',
                 responsable: 'Oficina de Planificacion'
             },
             {
-                id: '2', codigo: 'FLU-2026-001', tipo: 'flujograma',
+                id: '2', codigo: 'FL-FM-2026-1', tipo: 'flujograma',
                 nombre: 'Proceso de Admision de Estudiantes',
                 macroProceso: 'Gestion de Admision y Matricula',
                 fechaAprobacion: '2026-03-10', estado: 'aprobado',
                 responsable: 'Direccion de Admision'
             },
             {
-                id: '3', codigo: 'CAR-2026-001', tipo: 'caracterizacion',
-                nombre: 'Ficha de Caracterizacion - Proceso de Investigacion',
+                id: '3', codigo: 'FC-FM-2026-1', tipo: 'caracterizacion',
+                nombre: 'Proceso de Investigacion',
                 macroProceso: 'Gestion de Investigacion',
                 fechaAprobacion: '2026-03-05', estado: 'aprobado',
                 responsable: 'Vicerrectorado de Investigacion'
             },
             {
-                id: '4', codigo: 'REP-2026-001', tipo: 'reporte',
-                nombre: 'Hoja de Reporte Mensual - Matricula',
+                id: '4', codigo: 'HR-FM-2026-1', tipo: 'reporte',
+                nombre: 'Matricula',
                 macroProceso: 'Gestion de Admision y Matricula',
                 fechaAprobacion: '2026-02-28', estado: 'aprobado',
                 responsable: 'Direccion de Registros Academicos'
             },
             {
-                id: '5', codigo: 'INV-2026-001', tipo: 'inventario',
+                id: '5', codigo: 'INV-FM-2026-1', tipo: 'inventario',
                 nombre: 'Inventario Institucional de Procesos',
                 macroProceso: 'Gestion de Inventarios',
                 fechaAprobacion: '2026-03-20', estado: 'aprobado',
@@ -311,6 +311,29 @@ function sincronizarExpedientesADocumentosLista(expedientes) {
     }
 }
 
+function limpiarTituloRepetido(nombre, tipo) {
+    if (!nombre) return '';
+    const n = String(nombre);
+    
+    // Prefijos que se quitarán del título según el tipo
+    const prefijos = {
+        caracterizacion: ['Ficha de Caracterizacion', 'Ficha de Caracterización', 'Ficha Tecnica', 'Ficha Técnica', 'Caracterizacion', 'Caracterización'],
+        indicador: ['Indicador', 'Indice de', 'Índice de'],
+        flujograma: ['Flujograma', 'Proceso de'],
+        reporte: ['Hoja de Reporte', 'Reporte'],
+        inventario: ['Inventario Institucional de', 'Inventario de', 'Ficha de Inventario']
+    };
+    
+    const lista = prefijos[tipo] || [];
+    for (const pref of lista) {
+        const regex = new RegExp(`^\\s*${pref}\\s*[-–—:]\\s*`, 'i');
+        if (regex.test(n)) {
+            return n.replace(regex, '').trim();
+        }
+    }
+    return n;
+}
+
 // ==========================================
 // RENDERIZAR EXPEDIENTES (sin cambios visuales)
 // ==========================================
@@ -335,38 +358,6 @@ function renderizarExpedientes(filtrarPor = 'todos') {
     grid.innerHTML = filtrados.map(exp => {
         const icono = getIconoPorTipo(exp.tipo);
         const color = getColorPorTipo(exp.tipo);
-        const procesoConCodigo = exp.tipo === 'indicador'
-            ? obtenerProcesoIndicadorConCodigo(exp.proceso || exp.macroProceso || 'No registrado')
-            : '';
-        const infoIndicador = exp.tipo === 'indicador'
-            ? `
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <span class="material-symbols-outlined text-slate-400 text-sm">tune</span>
-                    <span class="truncate">Tipo de proceso: ${exp.tipoProceso || 'No registrado'}</span>
-                </div>
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <span class="material-symbols-outlined text-slate-400 text-sm">account_tree</span>
-                    <span class="truncate">Proceso: ${procesoConCodigo}</span>
-                </div>
-                <div class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                    <span class="material-symbols-outlined text-slate-400 text-sm">calendar_today</span>
-                    <span>Aprobado: ${formatearFecha(exp.fechaAprobacion)}</span>
-                </div>
-            `
-            : `
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <span class="material-symbols-outlined text-slate-400 text-sm">account_tree</span>
-                    <span class="truncate">${exp.macroProceso}</span>
-                </div>
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <span class="material-symbols-outlined text-slate-400 text-sm">business</span>
-                    <span class="truncate">${exp.responsable}</span>
-                </div>
-                <div class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                    <span class="material-symbols-outlined text-slate-400 text-sm">calendar_today</span>
-                    <span>Aprobado: ${formatearFecha(exp.fechaAprobacion)}</span>
-                </div>
-            `;
 
         return `
             <div class="expediente-card bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 transition-all hover:-translate-y-1 cursor-pointer group flex flex-col h-full overflow-hidden"
@@ -380,14 +371,16 @@ function renderizarExpedientes(filtrarPor = 'todos') {
                             ${exp.estado}
                         </span>
                     </div>
-                    <h3 class="mt-4 font-bold text-slate-900 dark:text-white text-lg leading-tight group-hover:text-primary transition-colors">
-                        ${exp.tipo === 'indicador' ? (exp.nombreIndicador || exp.nombre) : exp.nombre}
+                    <h3 class="mt-4 font-bold text-slate-900 dark:text-white text-lg leading-tight group-hover:text-primary transition-colors line-clamp-2 min-h-[3.5rem]">
+                        ${exp.tipo === 'indicador' 
+                            ? limpiarTituloRepetido(exp.nombreIndicador || exp.nombre, exp.tipo) 
+                            : limpiarTituloRepetido(exp.nombre, exp.tipo)}
                     </h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1">${exp.codigo}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1 min-h-[1.25rem]">${exp.codigo}</p>
                 </div>
-                <div class="p-6 space-y-3 flex-1">
-                    ${infoIndicador}
-                </div>
+                
+                <!-- SECCIÓN MEDIO ELIMINADA: antes mostraba macroProceso, responsable, fecha -->
+
                 <div class="px-6 py-4 bg-slate-50 dark:bg-slate-700/30 border-t border-slate-100 dark:border-slate-700">
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
@@ -527,9 +520,9 @@ function getColorPorTipo(tipo) {
 
 function getNombreTipo(tipo) {
     const nombres = {
-        indicador: 'Indicador',
+        indicador: 'Ficha de Indicador',
         flujograma: 'Flujograma',
-        caracterizacion: 'Ficha de Caracterizacion',
+        caracterizacion: 'Ficha Técnica',
         reporte: 'Hoja de Reporte',
         inventario: 'Ficha de Inventario'
     };

@@ -7,6 +7,7 @@ const App = {
         this.initAnimations();
         this.initPublicStats();
         this.initHeroHueLab();
+        this.initModulesCarousel(); // ← nuevo
     },
 
     async initPublicStats() {
@@ -467,6 +468,114 @@ const App = {
 
         applyHue(hueFromT());
         requestAnimationFrame(frame);
+    },
+
+// Carrusel de Módulos de Encuestas
+    initModulesCarousel() {
+        const viewport = document.getElementById('modules-carousel-viewport');
+        const track = document.getElementById('modules-carousel-track');
+        const dotsContainer = document.getElementById('modules-carousel-dots');
+        const prevBtn = document.getElementById('carousel-prev');
+        const nextBtn = document.getElementById('carousel-next');
+
+        if (!viewport || !track || !dotsContainer) {
+            return;
+        }
+
+        const slides = Array.from(track.children);
+        const intervalMs = 4000;
+        let currentIndex = 0;
+        let slidesPerView = getSlidesPerView();
+        let autoplayTimer = null;
+
+        function getSlidesPerView() {
+            const width = window.innerWidth;
+            if (width >= 1024) return 3; // lg
+            if (width >= 640) return 2;  // sm
+            return 1;
+        }
+
+        function maxIndex() {
+            return Math.max(0, slides.length - slidesPerView);
+        }
+
+        function buildDots() {
+            dotsContainer.innerHTML = '';
+            const totalDots = maxIndex() + 1;
+            for (let i = 0; i < totalDots; i += 1) {
+                const dot = document.createElement('button');
+                dot.setAttribute('aria-label', `Ir a la diapositiva ${i + 1}`);
+                dot.className = 'w-3 h-3 rounded-full transition-colors ' +
+                    (i === currentIndex ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600 hover:bg-primary/50');
+                dot.addEventListener('click', () => {
+                    goToSlide(i);
+                    restartAutoplay();
+                });
+                dotsContainer.appendChild(dot);
+            }
+        }
+
+        function updateDots() {
+            Array.from(dotsContainer.children).forEach((dot, i) => {
+                dot.classList.toggle('bg-primary', i === currentIndex);
+                dot.classList.toggle('bg-slate-300', i !== currentIndex);
+                dot.classList.toggle('dark:bg-slate-600', i !== currentIndex);
+            });
+        }
+
+        function goToSlide(index) {
+            currentIndex = Math.max(0, Math.min(index, maxIndex()));
+            const slideWidth = slides[0].getBoundingClientRect().width; // ya incluye el padding
+            const offset = currentIndex * slideWidth;
+            track.style.transform = `translateX(-${offset}px)`;
+            updateDots();
+        }
+
+        function nextSlide() {
+            const next = currentIndex >= maxIndex() ? 0 : currentIndex + 1;
+            goToSlide(next);
+        }
+
+        function prevSlide() {
+            const prev = currentIndex <= 0 ? maxIndex() : currentIndex - 1;
+            goToSlide(prev);
+        }
+
+        function startAutoplay() {
+            stopAutoplay();
+            autoplayTimer = setInterval(nextSlide, intervalMs);
+        }
+
+        function stopAutoplay() {
+            if (autoplayTimer) clearInterval(autoplayTimer);
+        }
+
+        function restartAutoplay() {
+            startAutoplay();
+        }
+
+        prevBtn?.addEventListener('click', () => {
+            prevSlide();
+            restartAutoplay();
+        });
+
+        nextBtn?.addEventListener('click', () => {
+            nextSlide();
+            restartAutoplay();
+        });
+
+        viewport.addEventListener('mouseenter', stopAutoplay);
+        viewport.addEventListener('mouseleave', startAutoplay);
+
+        window.addEventListener('resize', () => {
+            slidesPerView = getSlidesPerView();
+            buildDots();
+            goToSlide(Math.min(currentIndex, maxIndex()));
+        });
+
+        buildDots();
+        goToSlide(0);
+        startAutoplay();
     }
 };
 
