@@ -860,3 +860,222 @@ body {
     }
 
 }
+
+/* =========================================================
+   ENCUESTA - PREGUNTAS
+========================================================= */
+
+#questionsContainer {
+    display: none;
+}
+
+
+/* ---------------------------------------------------------
+   TÍTULO DEL BLOQUE
+--------------------------------------------------------- */
+
+.survey-block-title {
+
+    font-size: 25px;
+    line-height: 1.3;
+    font-weight: 800;
+
+    color: var(--text);
+
+    margin-bottom: 12px;
+
+}
+
+
+/* ---------------------------------------------------------
+   TEXTO DE ENTRADA
+--------------------------------------------------------- */
+
+.survey-block-intro {
+
+    font-size: 14px;
+    line-height: 1.7;
+
+    color: var(--text-secondary);
+
+    margin-bottom: 25px;
+
+}
+
+
+/* ---------------------------------------------------------
+   PREGUNTA
+--------------------------------------------------------- */
+
+.survey-question {
+
+    padding: 24px 0;
+
+    border-bottom: 1px solid #e1e4eb;
+
+}
+
+
+.question-text {
+
+    font-size: 15px;
+    line-height: 1.6;
+
+    font-weight: 600;
+
+    color: var(--text);
+
+    margin-bottom: 18px;
+
+}
+
+
+/* ---------------------------------------------------------
+   OPCIONES
+--------------------------------------------------------- */
+
+.question-options {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 10px;
+
+}
+
+
+.question-option {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    padding: 12px 14px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 9px;
+
+    background: #ffffff;
+
+    cursor: pointer;
+
+    transition: all 0.2s ease;
+
+}
+
+
+.question-option:hover {
+
+    border-color: var(--module-color);
+
+    background: var(--module-color-light);
+
+}
+
+
+.question-option input {
+
+    width: 16px;
+    height: 16px;
+
+    accent-color: var(--module-color);
+
+}
+
+
+.question-option span {
+
+    font-size: 14px;
+
+    color: var(--text);
+
+    line-height: 1.5;
+
+}
+
+
+/* ---------------------------------------------------------
+   PREGUNTA ABIERTA
+--------------------------------------------------------- */
+
+.survey-textarea {
+
+    width: 100%;
+
+    padding: 14px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 9px;
+
+    background: #ffffff;
+
+    color: var(--text);
+
+    font-family: "Inter", sans-serif;
+
+    font-size: 14px;
+
+    line-height: 1.5;
+
+    resize: vertical;
+
+    outline: none;
+
+    transition: all 0.2s ease;
+
+}
+
+
+.survey-textarea:hover {
+
+    border-color: var(--module-color);
+
+}
+
+
+.survey-textarea:focus {
+
+    border-color: var(--module-color);
+
+    box-shadow:
+        0 0 0 3px var(--module-color-light);
+
+}
+
+
+/* ---------------------------------------------------------
+   SEPARACIÓN ENTRE BLOQUES
+--------------------------------------------------------- */
+
+.survey-block-title:not(:first-child) {
+
+    margin-top: 40px;
+
+}
+
+/* =========================================================
+   NAVEGACIÓN ENTRE BLOQUES
+========================================================= */
+
+.survey-navigation {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    align-items: center;
+
+    gap: 14px;
+
+    margin-top: 35px;
+
+    padding-top: 25px;
+
+    border-top: 1px solid #e1e4eb;
+
+}

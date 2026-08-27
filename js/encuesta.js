@@ -84,6 +84,13 @@ const modules = {
 
                 ]
 
+            },
+
+            {
+                id: "planEstudios",
+                label: "Año del Plan de Estudios",
+                placeholder: "Ingrese el año de su plan de estudios",
+                type: "number"
             }
 
         ]
@@ -525,6 +532,432 @@ const modules = {
 
 };
 
+const surveyBlocks = {
+
+    ID01: {
+
+        title: "Currículo y Plan de Estudios",
+
+        target: {
+            cycles: ["9", "10"]
+        },
+
+        intro:
+            "A continuación, le presentamos una serie de enunciados sobre el currículo y plan de estudios de su programa. Por favor, califique cada ítem según su percepción y experiencia. Si algún punto no aplica a su caso, seleccione la opción \"No aplica\".",
+
+        questions: [
+
+            {
+                number: 1,
+                text: "Las asignaturas del plan curricular cubren los conocimientos necesarios para mi formación profesional.",
+
+                options: [
+                    ["1", "No los cubren"],
+                    ["2", "Los cubren en poca medida"],
+                    ["3", "Los cubren parcialmente"],
+                    ["4", "Los cubren en gran medida"],
+                    ["5", "Los cubren en su totalidad"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+            {
+                number: 2,
+                text: "Los conocimientos adquiridos en las asignaturas de prerrequisito son suficientes para comprender los temas de las asignaturas posteriores.",
+
+                options: [
+                    ["1", "Totalmente insuficientes"],
+                    ["2", "Insuficientes"],
+                    ["3", "Medianamente suficientes"],
+                    ["4", "Suficientes"],
+                    ["5", "Totalmente suficientes"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+            {
+                number: 3,
+                text: "Los contenidos de las asignaturas son pertinentes para las exigencias actuales del mercado laboral.",
+
+                options: [
+                    ["1", "Nada pertinentes"],
+                    ["2", "Poco pertinentes"],
+                    ["3", "Parcialmente pertinentes"],
+                    ["4", "Pertinentes"],
+                    ["5", "Totalmente pertinentes"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+            {
+                number: 4,
+                text: "La distribución de las asignaturas planificadas por semestre en el plan de estudios es equilibrada.",
+
+                options: [
+                    ["1", "Totalmente desequilibrada"],
+                    ["2", "Desequilibrada"],
+                    ["3", "Medianamente equilibrada"],
+                    ["4", "Equilibrada"],
+                    ["5", "Totalmente equilibrada"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+            {
+                number: 5,
+                text: "Los mecanismos que ofrece la facultad para expresar mi opinión sobre el plan curricular son suficientes.",
+
+                options: [
+                    ["1", "Totalmente insuficientes"],
+                    ["2", "Insuficientes"],
+                    ["3", "Medianamente suficientes"],
+                    ["4", "Suficientes"],
+                    ["5", "Totalmente suficientes"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+            {
+                number: 6,
+                text: "La formación recibida con mi plan curricular me brinda las herramientas necesarias para ejercer el pensamiento crítico.",
+
+                options: [
+                    ["1", "Totalmente insuficientes"],
+                    ["2", "Insuficientes"],
+                    ["3", "Medianamente suficientes"],
+                    ["4", "Suficientes"],
+                    ["5", "Totalmente suficientes"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+            {
+                number: 7,
+                text: "La formación recibida con mi plan curricular me brinda las herramientas necesarias para asumir mi responsabilidad social.",
+
+                options: [
+                    ["1", "Totalmente insuficientes"],
+                    ["2", "Insuficientes"],
+                    ["3", "Medianamente suficientes"],
+                    ["4", "Suficientes"],
+                    ["5", "Totalmente suficientes"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+            {
+                number: 8,
+                text: "¿Qué aspectos se deberían mejorar con respecto al plan curricular?",
+
+                type: "textarea"
+            }
+
+        ]
+
+    },
+
+    ID02: {
+
+        title: "Desempeño Docente",
+
+        intro:
+            "A continuación, se le presentan diversos aspectos del desempeño pedagógico del cuerpo docente durante el presente semestre. Considerando su experiencia general con el conjunto de docentes que le dictaron clases este semestre, por favor califique cada enunciado seleccionando la alternativa que mejor describa su experiencia.",
+
+        questions: [
+
+            {
+                number: 1,
+
+                text:
+                    "Los docentes demuestran dominio teórico de los contenidos de sus asignaturas.",
+
+                options: [
+                    ["1", "Ningún dominio"],
+                    ["2", "Dominio bajo"],
+                    ["3", "Dominio medio"],
+                    ["4", "Dominio alto"],
+                    ["5", "Dominio total"]
+                ]
+            },
+
+            {
+                number: 2,
+
+                text:
+                    "Los docentes están actualizados en sus conocimientos.",
+
+                options: [
+                    ["1", "Nada actualizados"],
+                    ["2", "Poco actualizados"],
+                    ["3", "Medianamente actualizados"],
+                    ["4", "Actualizados"],
+                    ["5", "Totalmente actualizados"]
+                ]
+            },
+
+            {
+                number: 3,
+
+                text:
+                    "Los docentes son capaces de transmitir y explicar adecuadamente sus conocimientos.",
+
+                options: [
+                    ["1", "Nada adecuada"],
+                    ["2", "Poco adecuada"],
+                    ["3", "Medianamente adecuada"],
+                    ["4", "Adecuada"],
+                    ["5", "Totalmente adecuada"]
+                ]
+            },
+
+            {
+                number: 4,
+
+                text:
+                    "Los docentes vinculan sus experiencias profesionales con la asignatura.",
+
+                options: [
+                    ["1", "Nunca"],
+                    ["2", "Raramente"],
+                    ["3", "Algunas veces"],
+                    ["4", "Frecuentemente"],
+                    ["5", "Siempre"]
+                ]
+            },
+
+            {
+                number: 5,
+
+                text:
+                    "El material (en clase o aula virtual) entregado por los docentes es útil para el desarrollo de la asignatura.",
+
+                options: [
+                    ["1", "Nada útil"],
+                    ["2", "Poco útil"],
+                    ["3", "Medianamente útil"],
+                    ["4", "Útil"],
+                    ["5", "Totalmente útil"]
+                ]
+            },
+
+            {
+                number: 6,
+
+                text:
+                    "Los docentes presentan con claridad las competencias de la asignatura al inicio del semestre.",
+
+                options: [
+                    ["1", "Nada claras"],
+                    ["2", "Poco claras"],
+                    ["3", "Medianamente claras"],
+                    ["4", "Claras"],
+                    ["5", "Totalmente claras"]
+                ]
+            },
+
+            {
+                number: 7,
+
+                text:
+                    "Los docentes fomentan mi participación en las clases.",
+
+                options: [
+                    ["1", "Nunca"],
+                    ["2", "Raramente"],
+                    ["3", "Algunas veces"],
+                    ["4", "Frecuentemente"],
+                    ["5", "Siempre"]
+                ]
+            },
+
+            {
+                number: 8,
+
+                text:
+                    "Los docentes respetan y cumplen los horarios establecidos para el inicio y fin de las clases.",
+
+                options: [
+                    ["1", "Nunca"],
+                    ["2", "Raramente"],
+                    ["3", "Algunas veces"],
+                    ["4", "Frecuentemente"],
+                    ["5", "Siempre"]
+                ]
+            },
+
+            {
+                number: 9,
+
+                text:
+                    "Los docentes están disponibles para orientarme dentro del horario de atención establecido.",
+
+                options: [
+                    ["1", "Nunca"],
+                    ["2", "Raramente"],
+                    ["3", "Algunas veces"],
+                    ["4", "Frecuentemente"],
+                    ["5", "Siempre"]
+                ]
+            },
+
+            {
+                number: 10,
+
+                text:
+                    "Los docentes orientan adecuadamente a los estudiantes en los trabajos, proyectos e investigaciones.",
+
+                options: [
+                    ["1", "Nada adecuada"],
+                    ["2", "Poco adecuada"],
+                    ["3", "Medianamente adecuada"],
+                    ["4", "Adecuada"],
+                    ["5", "Totalmente adecuada"]
+                ]
+            },
+
+            {
+                number: 11,
+
+                text:
+                    "Existen suficientes mecanismos para que yo, como estudiante, pueda manifestar mi opinión sobre el desempeño docente.",
+
+                options: [
+                    ["1", "Totalmente insuficientes"],
+                    ["2", "Insuficientes"],
+                    ["3", "Medianamente suficientes"],
+                    ["4", "Suficientes"],
+                    ["5", "Totalmente suficientes"]
+                ]
+            },
+
+            {
+                number: 12,
+
+                text:
+                    "¿Qué aspectos se deberían mejorar con respecto al desempeño docente?",
+
+                type: "textarea"
+            }
+
+        ]
+
+    },
+
+    ID05: {
+
+        title: "Actividades de Asesoría y/o Tutoría",
+
+        target: {
+            cycles: ["9", "10"]
+        },
+
+        intro:
+            "A continuación, le presentamos una serie de enunciados sobre las actividades de asesoría y/o tutoría para la obtención del título profesional. Por favor, califique cada ítem según su percepción y experiencia. Si algún punto no aplica a su caso, seleccione la opción \"No aplica\".",
+
+        questions: [
+
+            {
+                number: 1,
+
+                text:
+                    "El asesor (docente de la asignatura) y/o tutor tiene dominio del tema o área de conocimiento sobre mi trabajo de investigación o tesis.",
+
+                options: [
+                    ["1", "Ningún dominio"],
+                    ["2", "Dominio bajo"],
+                    ["3", "Dominio medio"],
+                    ["4", "Dominio alto"],
+                    ["5", "Dominio total"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+
+            {
+                number: 2,
+
+                text:
+                    "Las correcciones, observaciones y sugerencias realizadas por mi asesor/tutor son claras.",
+
+                options: [
+                    ["1", "Nada claras"],
+                    ["2", "Poco claras"],
+                    ["3", "Medianamente claras"],
+                    ["4", "Claras"],
+                    ["5", "Totalmente claras"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+
+            {
+                number: 3,
+
+                text:
+                    "Las actividades de asesoría y/o tutoría son útiles para el desarrollo de mi trabajo de investigación o tesis.",
+
+                options: [
+                    ["1", "Nada útiles"],
+                    ["2", "Poco útiles"],
+                    ["3", "Medianamente útiles"],
+                    ["4", "Útiles"],
+                    ["5", "Totalmente útiles"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+
+            {
+                number: 4,
+
+                text:
+                    "La orientación técnica y metodológica brindada por el asesor y/o tutor para estructurar y desarrollar mi trabajo de investigación o tesis es adecuada.",
+
+                options: [
+                    ["1", "Nada adecuada"],
+                    ["2", "Poco adecuada"],
+                    ["3", "Medianamente adecuada"],
+                    ["4", "Adecuada"],
+                    ["5", "Totalmente adecuada"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+
+            {
+                number: 5,
+
+                text:
+                    "La frecuencia de las reuniones de asesoría/tutoría es suficiente para el avance de mi trabajo de investigación o tesis.",
+
+                options: [
+                    ["1", "Totalmente insuficiente"],
+                    ["2", "Insuficiente"],
+                    ["3", "Medianamente suficiente"],
+                    ["4", "Suficiente"],
+                    ["5", "Totalmente suficiente"],
+                    ["0", "No aplica"]
+                ]
+            },
+
+
+            {
+                number: 6,
+
+                text:
+                    "¿Qué aspectos se deberían mejorar con respecto a las actividades de asesoría y/o tutoría para la obtención del título profesional?",
+
+                type: "textarea"
+            }
+
+        ]
+
+    }
+
+
+
+};
+
 
 /* =========================================================
    OBTENER MÓDULO DESDE LA URL
@@ -539,6 +972,28 @@ const moduleId = params.get("modulo") || "estudiantes";
 const currentModule =
     modules[moduleId] || modules.estudiantes;
 
+    
+/* =========================================================
+   DETERMINAR BLOQUES DE ENCUESTA
+========================================================= */
+
+const perfil =
+    JSON.parse(localStorage.getItem("encuestaPerfil"));
+
+const ciclo = perfil?.ciclo;
+
+let bloques = [];
+
+if (ciclo === "9" || ciclo === "10") {
+
+    bloques.push("ID01");
+    bloques.push("ID05");
+
+} else {
+
+    bloques.push("ID02");
+
+}
 
 /* =========================================================
    ELEMENTOS DEL DOM
@@ -564,6 +1019,9 @@ const profileForm =
 
 const cancelButton =
     document.getElementById("cancelButton");
+
+const questionsContainer =
+    document.getElementById("questionsContainer");
 
 
 /* =========================================================
@@ -635,14 +1093,12 @@ function renderFields() {
 
     fieldsContainer.innerHTML = "";
 
-
     currentModule.fields.forEach(field => {
 
         const formGroup =
             document.createElement("div");
 
-        formGroup.className =
-            "form-group";
+        formGroup.className = "form-group";
 
 
         /* LABEL */
@@ -650,103 +1106,546 @@ function renderFields() {
         const label =
             document.createElement("label");
 
-        label.setAttribute(
-            "for",
-            field.id
-        );
+        label.setAttribute("for", field.id);
 
         label.innerHTML =
             `${field.label} <span>*</span>`;
 
 
-        /* SELECT WRAPPER */
+        /* CONTENEDOR */
 
-        const selectWrapper =
+        const inputWrapper =
             document.createElement("div");
 
-        selectWrapper.className =
+        inputWrapper.className =
             "select-wrapper";
 
 
-        /* SELECT */
+        /* =========================================
+           CAMPO NUMÉRICO
+        ========================================= */
 
-        const select =
-            document.createElement("select");
+        if (field.type === "number") {
 
-        select.className =
-            "form-select";
+            const input =
+                document.createElement("input");
 
-        select.id =
-            field.id;
+            input.type = "number";
 
-        select.name =
-            field.id;
+            input.className = "form-select";
 
-        select.required = true;
+            input.id = field.id;
 
+            input.name = field.id;
 
-        /* OPTION INICIAL */
+            input.placeholder =
+                field.placeholder;
 
-        const defaultOption =
-            document.createElement("option");
+            input.required = true;
 
-        defaultOption.value = "";
+            input.min = "2000";
 
-        defaultOption.textContent =
-            field.placeholder;
+            input.max = "2100";
 
-        defaultOption.disabled = true;
+            inputWrapper.appendChild(input);
 
-        defaultOption.selected = true;
-
-        select.appendChild(
-            defaultOption
-        );
+        }
 
 
-        /* OPCIONES */
+        /* =========================================
+           SELECT
+        ========================================= */
 
-        field.options.forEach(option => {
+        else {
 
-            const optionElement =
+            const select =
+                document.createElement("select");
+
+            select.className = "form-select";
+
+            select.id = field.id;
+
+            select.name = field.id;
+
+            select.required = true;
+
+
+            /* OPCIÓN INICIAL */
+
+            const defaultOption =
                 document.createElement("option");
 
-            optionElement.value =
-                option[0];
+            defaultOption.value = "";
 
-            optionElement.textContent =
-                option[1];
+            defaultOption.textContent =
+                field.placeholder;
 
-            select.appendChild(
-                optionElement
-            );
+            defaultOption.disabled = true;
 
-        });
+            defaultOption.selected = true;
 
-
-        /* ICONO */
-
-        const arrow =
-            document.createElement("span");
-
-        arrow.className =
-            "material-symbols-outlined select-arrow";
-
-        arrow.textContent =
-            "expand_more";
+            select.appendChild(defaultOption);
 
 
-        selectWrapper.appendChild(select);
+            /* OPCIONES */
 
-        selectWrapper.appendChild(arrow);
+            field.options.forEach(option => {
+
+                const optionElement =
+                    document.createElement("option");
+
+                optionElement.value =
+                    option[0];
+
+                optionElement.textContent =
+                    option[1];
+
+                select.appendChild(optionElement);
+
+            });
+
+
+            /* AGREGAR SELECT */
+
+            inputWrapper.appendChild(select);
+
+
+            /* FLECHA */
+
+            const arrow =
+                document.createElement("span");
+
+            arrow.className =
+                "material-symbols-outlined select-arrow";
+
+            arrow.textContent =
+                "expand_more";
+
+            inputWrapper.appendChild(arrow);
+        }
+
+        /* =========================================
+           AGREGAR AL FORMULARIO
+        ========================================= */
 
         formGroup.appendChild(label);
 
-        formGroup.appendChild(selectWrapper);
+        formGroup.appendChild(inputWrapper);
 
         fieldsContainer.appendChild(formGroup);
 
     });
+
+}
+
+let bloquesActuales = [];
+let bloqueActual = 0;
+
+/* =========================================================
+   MOSTRAR ENCUESTA
+========================================================= */
+
+function mostrarEncuesta() {
+
+    const perfil =
+        JSON.parse(
+            localStorage.getItem("encuestaPerfil")
+        );
+
+    const ciclo =
+        perfil?.ciclo;
+
+
+    /* Determinar bloques */
+
+    bloquesActuales = [];
+
+    if (
+        ciclo === "9" ||
+        ciclo === "10"
+    ) {
+
+        bloquesActuales.push("ID01");
+        bloquesActuales.push("ID05");
+
+    } else {
+
+        bloquesActuales.push("ID02");
+
+    }
+
+
+    /* Empezamos desde el primer bloque */
+
+    bloqueActual = 0;
+
+
+    /* Ocultar perfil */
+
+    profileForm.style.display =
+        "none";
+
+
+    /* Mostrar preguntas */
+
+    questionsContainer.style.display =
+        "block";
+
+
+    /* Cambiar encabezado */
+
+    surveyTitle.textContent =
+        "Encuesta";
+
+    surveyDescription.textContent =
+        "Responda las siguientes preguntas según su experiencia y percepción.";
+
+
+    /* Mostrar primer bloque */
+
+    mostrarBloqueActual();
+
+}
+
+/* =========================================================
+   GENERAR BLOQUES DE ENCUESTA
+========================================================= */
+
+function mostrarBloqueActual() {
+
+    questionsContainer.innerHTML = "";
+
+
+    /* Obtener ID del bloque actual */
+
+    const blockId =
+        bloquesActuales[bloqueActual];
+
+
+    const block =
+        surveyBlocks[blockId];
+
+
+    if (!block) return;
+
+
+    /* =========================================
+       TÍTULO DEL BLOQUE
+    ========================================= */
+
+    const title =
+        document.createElement("h2");
+
+    title.className =
+        "survey-block-title";
+
+    title.textContent =
+        block.title;
+
+    questionsContainer.appendChild(
+        title
+    );
+
+
+    /* =========================================
+       TEXTO DE ENTRADA
+    ========================================= */
+
+    const intro =
+        document.createElement("p");
+
+    intro.className =
+        "survey-block-intro";
+
+    intro.textContent =
+        block.intro;
+
+    questionsContainer.appendChild(
+        intro
+    );
+
+
+    /* =========================================
+       PREGUNTAS
+    ========================================= */
+
+    block.questions.forEach(
+        question => {
+
+            renderQuestion(
+                question,
+                blockId
+            );
+
+        }
+    );
+
+
+    /* =========================================
+       NAVEGACIÓN
+    ========================================= */
+
+    const navigation =
+        document.createElement("div");
+
+    navigation.className =
+        "survey-navigation";
+
+
+    /* Botón anterior */
+
+    if (bloqueActual > 0) {
+
+        const previousButton =
+            document.createElement("button");
+
+        previousButton.type =
+            "button";
+
+        previousButton.className =
+            "btn btn-secondary";
+
+        previousButton.textContent =
+            "Anterior";
+
+        previousButton.addEventListener(
+            "click",
+            () => {
+
+                bloqueActual--;
+
+                mostrarBloqueActual();
+
+            }
+        );
+
+        navigation.appendChild(
+            previousButton
+        );
+
+    }
+
+
+    /* Botón siguiente / finalizar */
+
+    const nextButton =
+        document.createElement("button");
+
+    nextButton.type =
+        "button";
+
+    nextButton.className =
+        "btn btn-primary";
+
+
+    if (
+        bloqueActual <
+        bloquesActuales.length - 1
+    ) {
+
+        nextButton.innerHTML = `
+            <span>Siguiente</span>
+
+            <span class="material-symbols-outlined">
+                arrow_forward
+            </span>
+        `;
+
+        nextButton.addEventListener(
+            "click",
+            siguienteBloque
+        );
+
+    } else {
+
+        nextButton.innerHTML = `
+            <span>Finalizar encuesta</span>
+
+            <span class="material-symbols-outlined">
+                check
+            </span>
+        `;
+
+        nextButton.addEventListener(
+            "click",
+            finalizarEncuesta
+        );
+
+    }
+
+
+    navigation.appendChild(
+        nextButton
+    );
+
+
+    questionsContainer.appendChild(
+        navigation
+    );
+
+
+    /* Volver arriba */
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+
+}
+
+function siguienteBloque() {
+
+    /*
+       Aquí posteriormente podemos validar
+       que todas las preguntas del bloque
+       estén respondidas.
+    */
+
+    bloqueActual++;
+
+    mostrarBloqueActual();
+
+}
+
+function finalizarEncuesta() {
+
+    alert(
+        "La encuesta ha sido completada."
+    );
+
+}
+
+/* =========================================================
+   GENERAR UNA PREGUNTA
+========================================================= */
+
+function renderQuestion(
+    question,
+    blockId
+) {
+
+    const questionGroup =
+        document.createElement("div");
+
+    questionGroup.className =
+        "survey-question";
+
+
+    /* TEXTO */
+
+    const questionText =
+        document.createElement("p");
+
+    questionText.className =
+        "question-text";
+
+    questionText.textContent =
+        `${question.number}. ${question.text}`;
+
+    questionGroup.appendChild(
+        questionText
+    );
+
+
+    /* =========================================
+       PREGUNTA ABIERTA
+    ========================================= */
+
+    if (
+        question.type === "textarea"
+    ) {
+
+        const textarea =
+            document.createElement("textarea");
+
+        textarea.className =
+            "survey-textarea";
+
+        textarea.name =
+            `${blockId}_${question.number}`;
+
+        textarea.placeholder =
+            "Escriba su respuesta aquí...";
+
+        textarea.rows = 5;
+
+        questionGroup.appendChild(
+            textarea
+        );
+
+    }
+
+
+    /* =========================================
+       PREGUNTA CON OPCIONES
+    ========================================= */
+
+    else {
+
+        const optionsContainer =
+            document.createElement("div");
+
+        optionsContainer.className =
+            "question-options";
+
+
+        question.options.forEach(
+            option => {
+
+                const label =
+                    document.createElement("label");
+
+                label.className =
+                    "question-option";
+
+
+                const radio =
+                    document.createElement("input");
+
+                radio.type =
+                    "radio";
+
+                radio.name =
+                    `${blockId}_${question.number}`;
+
+                radio.value =
+                    option[0];
+
+
+                const text =
+                    document.createElement("span");
+
+                text.textContent =
+                    option[1];
+
+
+                label.appendChild(
+                    radio
+                );
+
+                label.appendChild(
+                    text
+                );
+
+
+                optionsContainer.appendChild(
+                    label
+                );
+
+            }
+        );
+
+
+        questionGroup.appendChild(
+            optionsContainer
+        );
+
+    }
+
+
+    questionsContainer.appendChild(
+        questionGroup
+    );
 
 }
 
@@ -774,14 +1673,13 @@ profileForm.addEventListener(
 
 
         /* -------------------------------------------------
-           GUARDAR PERFIL
+        GUARDAR PERFIL
         ------------------------------------------------- */
 
         const formData =
             new FormData(profileForm);
 
         const profileData = {};
-
 
         formData.forEach(
             (value, key) => {
@@ -800,7 +1698,6 @@ profileForm.addEventListener(
             moduleId
         );
 
-
         localStorage.setItem(
             "encuestaPerfil",
             JSON.stringify(profileData)
@@ -808,11 +1705,10 @@ profileForm.addEventListener(
 
 
         /* -------------------------------------------------
-           IR A LAS PREGUNTAS
+        MOSTRAR LAS PREGUNTAS EN EL MISMO PANEL
         ------------------------------------------------- */
 
-        window.location.href =
-            `preguntas.html?modulo=${moduleId}`;
+        mostrarEncuesta();
 
     }
 );
