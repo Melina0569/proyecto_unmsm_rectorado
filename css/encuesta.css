@@ -1079,3 +1079,464 @@ body {
     border-top: 1px solid #e1e4eb;
 
 }
+
+/* =========================================================
+   MATRIZ DE ENCUESTA
+========================================================= */
+
+.survey-matrix {
+
+    width: 100%;
+
+    border-collapse: collapse;
+
+    margin-top: 25px;
+
+    table-layout: fixed;
+
+    border: 1px solid #222;
+
+}
+
+
+/* =========================================================
+   CABECERA
+========================================================= */
+
+.survey-matrix th {
+
+    border: 1px solid #222;
+
+    background: #f4f6f8;
+
+    padding: 10px 8px;
+
+    font-size: 12px;
+
+    font-weight: 700;
+
+}
+
+
+.matrix-item-header {
+
+    width: 38%;
+
+    text-align: left !important;
+
+}
+
+
+.matrix-scale-header {
+
+    text-align: center;
+
+    font-size: 13px !important;
+
+}
+
+
+/* =========================================================
+   FILAS
+========================================================= */
+
+.matrix-question-row td {
+
+    border: 1px solid #222;
+
+    vertical-align: middle;
+
+}
+
+
+/* =========================================================
+   TEXTO DE LA PREGUNTA
+========================================================= */
+
+.matrix-question-text {
+
+    padding: 12px 8px;
+
+    font-size: 12px;
+
+    line-height: 1.4;
+
+    font-weight: 500;
+
+    text-align: left;
+
+}
+
+
+/* =========================================================
+   OPCIONES
+========================================================= */
+
+.matrix-option {
+
+    padding: 8px 5px;
+
+    text-align: center;
+
+    font-size: 10px;
+
+    line-height: 1.25;
+
+}
+
+
+.matrix-option-number {
+
+    display: inline-block;
+
+    font-weight: 700;
+
+    margin-right: 3px;
+
+    vertical-align: top;
+
+}
+
+
+.matrix-option-description {
+
+    display: inline;
+
+    color: #1f2937;
+
+}
+
+
+/* =========================================================
+   RADIO
+========================================================= */
+
+.matrix-option input {
+
+    display: block;
+
+    margin: 8px auto 0 auto;
+
+    width: 16px;
+
+    height: 16px;
+
+    cursor: pointer;
+
+    accent-color: var(--module-color);
+
+}
+
+
+/* =========================================================
+   HOVER
+========================================================= */
+
+.matrix-option:hover {
+
+    background: var(--module-color-light);
+
+}
+
+
+/* =========================================================
+   PREGUNTA ABIERTA
+========================================================= */
+
+.matrix-textarea-cell {
+
+    padding: 12px;
+
+}
+
+
+.matrix-textarea-cell .survey-textarea {
+
+    width: 100%;
+
+    box-sizing: border-box;
+
+}
+
+
+/* =========================================================
+   NAVEGACIÓN
+========================================================= */
+
+.survey-navigation {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    align-items: center;
+
+    gap: 12px;
+
+    margin-top: 30px;
+
+    padding-top: 25px;
+
+    border-top: 1px solid #e5e7eb;
+
+}
+
+/* =========================================================
+   ENCUESTA PASO A PASO
+========================================================= */
+
+.survey-progress {
+
+    margin-bottom: 30px;
+
+}
+
+
+.progress-info {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    margin-bottom: 8px;
+
+    font-size: 13px;
+
+    font-weight: 600;
+
+    color: var(--text-secondary);
+
+}
+
+
+.progress-bar {
+
+    width: 100%;
+
+    height: 7px;
+
+    background: #e5e7eb;
+
+    border-radius: 20px;
+
+    overflow: hidden;
+
+}
+
+
+.progress-fill {
+
+    height: 100%;
+
+    background: var(--module-color);
+
+    border-radius: 20px;
+
+    transition: width 0.4s ease;
+
+}
+
+
+/* =========================================================
+   BLOQUE ACTUAL
+========================================================= */
+
+.current-block-title {
+
+    font-size: 14px;
+
+    font-weight: 700;
+
+    color: var(--module-color);
+
+    margin-bottom: 25px;
+
+}
+
+
+/* =========================================================
+   TARJETA DE PREGUNTA
+========================================================= */
+
+.question-slide {
+
+    opacity: 0;
+
+    transform: translateX(35px);
+
+    transition:
+        opacity 0.35s ease,
+        transform 0.35s ease;
+
+}
+
+
+.question-slide.question-visible {
+
+    opacity: 1;
+
+    transform: translateX(0);
+
+}
+
+
+/* =========================================================
+   NÚMERO DE PREGUNTA
+========================================================= */
+
+.question-number {
+
+    font-size: 13px;
+
+    font-weight: 700;
+
+    color: var(--module-color);
+
+    margin-bottom: 12px;
+
+}
+
+
+/* =========================================================
+   TEXTO
+========================================================= */
+
+.question-slide-text {
+
+    font-size: 22px;
+
+    line-height: 1.45;
+
+    font-weight: 700;
+
+    color: var(--text);
+
+    margin-bottom: 30px;
+
+}
+
+
+/* =========================================================
+   OPCIONES
+========================================================= */
+
+.slide-options {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 12px;
+
+}
+
+
+.slide-option {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 14px;
+
+    padding: 17px 18px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 10px;
+
+    background: #ffffff;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        transform 0.2s ease;
+
+}
+
+
+.slide-option:hover {
+
+    border-color: var(--module-color);
+
+    background: var(--module-color-light);
+
+    transform: translateX(3px);
+
+}
+
+
+.slide-option input {
+
+    width: 18px;
+
+    height: 18px;
+
+    flex-shrink: 0;
+
+    accent-color: var(--module-color);
+
+}
+
+
+.slide-option span {
+
+    font-size: 14px;
+
+    line-height: 1.4;
+
+    color: var(--text);
+
+}
+
+
+/* =========================================================
+   OPCIÓN SELECCIONADA
+========================================================= */
+
+.slide-option:has(
+    input:checked
+) {
+
+    border-color: var(--module-color);
+
+    background: var(--module-color-light);
+
+}
+
+
+/* =========================================================
+   NAVEGACIÓN
+========================================================= */
+
+.question-navigation {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    margin-top: 40px;
+
+    padding-top: 25px;
+
+    border-top: 1px solid var(--border);
+
+}
+
+
+/* =========================================================
+   BOTÓN DESHABILITADO
+========================================================= */
+
+.question-navigation
+button:disabled {
+
+    opacity: 0.45;
+
+    cursor: not-allowed;
+
+}

@@ -1240,6 +1240,8 @@ function renderFields() {
 
 let bloquesActuales = [];
 let bloqueActual = 0;
+let preguntaActual = 0;
+let respuestasEncuesta = {};
 
 /* =========================================================
    MOSTRAR ENCUESTA
@@ -1256,7 +1258,9 @@ function mostrarEncuesta() {
         perfil?.ciclo;
 
 
-    /* Determinar bloques */
+    /* =========================================
+       DETERMINAR BLOQUES
+    ========================================= */
 
     bloquesActuales = [];
 
@@ -1275,24 +1279,27 @@ function mostrarEncuesta() {
     }
 
 
-    /* Empezamos desde el primer bloque */
+    /* =========================================
+       INICIAR ENCUESTA
+    ========================================= */
 
     bloqueActual = 0;
 
+    preguntaActual = 0;
 
-    /* Ocultar perfil */
+    respuestasEncuesta = {};
+
+
+    /* =========================================
+       CAMBIAR VISTA
+    ========================================= */
 
     profileForm.style.display =
         "none";
 
-
-    /* Mostrar preguntas */
-
     questionsContainer.style.display =
         "block";
 
-
-    /* Cambiar encabezado */
 
     surveyTitle.textContent =
         "Encuesta";
@@ -1301,83 +1308,298 @@ function mostrarEncuesta() {
         "Responda las siguientes preguntas según su experiencia y percepción.";
 
 
-    /* Mostrar primer bloque */
-
-    mostrarBloqueActual();
+    mostrarPreguntaActual();
 
 }
 
-/* =========================================================
-   GENERAR BLOQUES DE ENCUESTA
-========================================================= */
-
-function mostrarBloqueActual() {
-
-    questionsContainer.innerHTML = "";
-
-
-    /* Obtener ID del bloque actual */
+function mostrarPreguntaActual() {
 
     const blockId =
         bloquesActuales[bloqueActual];
 
-
     const block =
         surveyBlocks[blockId];
 
-
     if (!block) return;
+
+
+    const question =
+        block.questions[preguntaActual];
+
+
+    if (!question) {
+
+        siguienteBloque();
+
+        return;
+
+    }
+
+
+    /* =========================================
+       CONTENEDOR
+    ========================================= */
+
+    questionsContainer.innerHTML = "";
+
+
+    /* =========================================
+       PROGRESO
+    ========================================= */
+
+    const totalPreguntas =
+        block.questions.length;
+
+    const numeroPregunta =
+        preguntaActual + 1;
+
+
+    const progressContainer =
+        document.createElement("div");
+
+    progressContainer.className =
+        "survey-progress";
+
+
+    const progressInfo =
+        document.createElement("div");
+
+    progressInfo.className =
+        "progress-info";
+
+
+    progressInfo.innerHTML = `
+        <span>
+            Pregunta ${numeroPregunta} de ${totalPreguntas}
+        </span>
+
+        <span>
+            ${Math.round(
+                (numeroPregunta / totalPreguntas) * 100
+            )}%
+        </span>
+    `;
+
+
+    const progressBar =
+        document.createElement("div");
+
+    progressBar.className =
+        "progress-bar";
+
+
+    const progressFill =
+        document.createElement("div");
+
+    progressFill.className =
+        "progress-fill";
+
+
+    progressFill.style.width =
+        `${(numeroPregunta / totalPreguntas) * 100}%`;
+
+
+    progressBar.appendChild(
+        progressFill
+    );
+
+    progressContainer.appendChild(
+        progressInfo
+    );
+
+    progressContainer.appendChild(
+        progressBar
+    );
+
+
+    questionsContainer.appendChild(
+        progressContainer
+    );
 
 
     /* =========================================
        TÍTULO DEL BLOQUE
     ========================================= */
 
-    const title =
-        document.createElement("h2");
+    const blockTitle =
+        document.createElement("div");
 
-    title.className =
-        "survey-block-title";
+    blockTitle.className =
+        "current-block-title";
 
-    title.textContent =
+    blockTitle.textContent =
         block.title;
 
+
     questionsContainer.appendChild(
-        title
+        blockTitle
     );
 
 
     /* =========================================
-       TEXTO DE ENTRADA
+       TARJETA DE PREGUNTA
     ========================================= */
 
-    const intro =
-        document.createElement("p");
+    const questionCard =
+        document.createElement("div");
 
-    intro.className =
-        "survey-block-intro";
+    questionCard.className =
+        "question-slide";
 
-    intro.textContent =
-        block.intro;
 
-    questionsContainer.appendChild(
-        intro
+    const questionNumber =
+        document.createElement("div");
+
+    questionNumber.className =
+        "question-number";
+
+    questionNumber.textContent =
+        `Pregunta ${numeroPregunta}`;
+
+
+    const questionText =
+        document.createElement("h2");
+
+    questionText.className =
+        "question-slide-text";
+
+    questionText.textContent =
+        question.text;
+
+
+    questionCard.appendChild(
+        questionNumber
+    );
+
+    questionCard.appendChild(
+        questionText
     );
 
 
     /* =========================================
-       PREGUNTAS
+       OPCIONES
     ========================================= */
 
-    block.questions.forEach(
-        question => {
+    if (
+        question.type === "textarea"
+    ) {
 
-            renderQuestion(
-                question,
-                blockId
-            );
+        const textarea =
+            document.createElement("textarea");
+
+        textarea.className =
+            "survey-textarea";
+
+        textarea.name =
+            `${blockId}_${question.number}`;
+
+        textarea.placeholder =
+            "Escriba su respuesta aquí...";
+
+        textarea.rows = 6;
+
+
+        /* Recuperar respuesta */
+
+        if (
+            respuestasEncuesta[
+                `${blockId}_${question.number}`
+            ]
+        ) {
+
+            textarea.value =
+                respuestasEncuesta[
+                    `${blockId}_${question.number}`
+                ];
 
         }
+
+
+        questionCard.appendChild(
+            textarea
+        );
+
+    }
+
+    else {
+
+        const options =
+            document.createElement("div");
+
+        options.className =
+            "slide-options";
+
+
+        question.options.forEach(
+            option => {
+
+                const label =
+                    document.createElement("label");
+
+                label.className =
+                    "slide-option";
+
+
+                const radio =
+                    document.createElement("input");
+
+                radio.type =
+                    "radio";
+
+                radio.name =
+                    `${blockId}_${question.number}`;
+
+                radio.value =
+                    option[0];
+
+
+                /* Recuperar respuesta */
+
+                if (
+                    respuestasEncuesta[
+                        `${blockId}_${question.number}`
+                    ] === option[0]
+                ) {
+
+                    radio.checked =
+                        true;
+
+                }
+
+
+                const text =
+                    document.createElement("span");
+
+                text.textContent =
+                    option[1];
+
+
+                label.appendChild(
+                    radio
+                );
+
+                label.appendChild(
+                    text
+                );
+
+
+                options.appendChild(
+                    label
+                );
+
+            }
+        );
+
+
+        questionCard.appendChild(
+            options
+        );
+
+    }
+
+
+    questionsContainer.appendChild(
+        questionCard
     );
 
 
@@ -1389,44 +1611,59 @@ function mostrarBloqueActual() {
         document.createElement("div");
 
     navigation.className =
-        "survey-navigation";
+        "question-navigation";
 
 
-    /* Botón anterior */
+    /* ANTERIOR */
 
-    if (bloqueActual > 0) {
+    const previousButton =
+        document.createElement("button");
 
-        const previousButton =
-            document.createElement("button");
+    previousButton.type =
+        "button";
 
-        previousButton.type =
-            "button";
+    previousButton.className =
+        "btn btn-secondary";
 
-        previousButton.className =
-            "btn btn-secondary";
+    previousButton.innerHTML = `
+        <span class="material-symbols-outlined">
+            arrow_back
+        </span>
 
-        previousButton.textContent =
-            "Anterior";
+        <span>Anterior</span>
+    `;
 
-        previousButton.addEventListener(
-            "click",
-            () => {
 
-                bloqueActual--;
+    previousButton.addEventListener(
+        "click",
+        preguntaAnterior
+    );
 
-                mostrarBloqueActual();
 
-            }
-        );
+    /*
+       Deshabilitar si estamos
+       en la primera pregunta
+    */
 
-        navigation.appendChild(
-            previousButton
-        );
+    if (
+        bloqueActual === 0 &&
+        preguntaActual === 0
+    ) {
+
+        previousButton.disabled =
+            true;
 
     }
 
 
-    /* Botón siguiente / finalizar */
+    navigation.appendChild(
+        previousButton
+    );
+
+
+    /* =========================================
+       SIGUIENTE / FINALIZAR
+    ========================================= */
 
     const nextButton =
         document.createElement("button");
@@ -1438,25 +1675,20 @@ function mostrarBloqueActual() {
         "btn btn-primary";
 
 
+    const ultimaPregunta =
+        preguntaActual ===
+        block.questions.length - 1;
+
+
+    const ultimoBloque =
+        bloqueActual ===
+        bloquesActuales.length - 1;
+
+
     if (
-        bloqueActual <
-        bloquesActuales.length - 1
+        ultimaPregunta &&
+        ultimoBloque
     ) {
-
-        nextButton.innerHTML = `
-            <span>Siguiente</span>
-
-            <span class="material-symbols-outlined">
-                arrow_forward
-            </span>
-        `;
-
-        nextButton.addEventListener(
-            "click",
-            siguienteBloque
-        );
-
-    } else {
 
         nextButton.innerHTML = `
             <span>Finalizar encuesta</span>
@@ -1473,6 +1705,23 @@ function mostrarBloqueActual() {
 
     }
 
+    else {
+
+        nextButton.innerHTML = `
+            <span>Siguiente</span>
+
+            <span class="material-symbols-outlined">
+                arrow_forward
+            </span>
+        `;
+
+        nextButton.addEventListener(
+            "click",
+            siguientePregunta
+        );
+
+    }
+
 
     navigation.appendChild(
         nextButton
@@ -1484,12 +1733,162 @@ function mostrarBloqueActual() {
     );
 
 
-    /* Volver arriba */
+    /* =========================================
+       ANIMACIÓN
+    ========================================= */
 
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    });
+    requestAnimationFrame(
+        () => {
+
+            questionCard.classList.add(
+                "question-visible"
+            );
+
+        }
+    );
+
+}
+
+function siguientePregunta() {
+
+    guardarRespuestaActual();
+
+
+    const blockId =
+        bloquesActuales[bloqueActual];
+
+    const block =
+        surveyBlocks[blockId];
+
+
+    if (
+        preguntaActual <
+        block.questions.length - 1
+    ) {
+
+        preguntaActual++;
+
+        mostrarPreguntaActual();
+
+        return;
+
+    }
+
+
+    /* Terminó el bloque */
+
+    if (
+        bloqueActual <
+        bloquesActuales.length - 1
+    ) {
+
+        bloqueActual++;
+
+        preguntaActual = 0;
+
+        mostrarPreguntaActual();
+
+    }
+
+}
+
+function preguntaAnterior() {
+
+    guardarRespuestaActual();
+
+
+    if (
+        preguntaActual > 0
+    ) {
+
+        preguntaActual--;
+
+        mostrarPreguntaActual();
+
+        return;
+
+    }
+
+
+    /* Si estamos al inicio de un bloque,
+       regresar al bloque anterior */
+
+    if (
+        bloqueActual > 0
+    ) {
+
+        bloqueActual--;
+
+        const previousBlock =
+            surveyBlocks[
+                bloquesActuales[bloqueActual]
+            ];
+
+
+        preguntaActual =
+            previousBlock.questions.length - 1;
+
+
+        mostrarPreguntaActual();
+
+    }
+
+}
+
+function guardarRespuestaActual() {
+
+    const blockId =
+        bloquesActuales[bloqueActual];
+
+    const block =
+        surveyBlocks[blockId];
+
+    const question =
+        block.questions[preguntaActual];
+
+
+    const key =
+        `${blockId}_${question.number}`;
+
+
+    /* Pregunta abierta */
+
+    if (
+        question.type === "textarea"
+    ) {
+
+        const textarea =
+            document.querySelector(
+                `textarea[name="${key}"]`
+            );
+
+
+        if (textarea) {
+
+            respuestasEncuesta[key] =
+                textarea.value;
+
+        }
+
+        return;
+
+    }
+
+
+    /* Pregunta con alternativas */
+
+    const selected =
+        document.querySelector(
+            `input[name="${key}"]:checked`
+        );
+
+
+    if (selected) {
+
+        respuestasEncuesta[key] =
+            selected.value;
+
+    }
 
 }
 
@@ -1509,51 +1908,70 @@ function siguienteBloque() {
 
 function finalizarEncuesta() {
 
+    guardarRespuestaActual();
+
+
+    localStorage.setItem(
+        "encuestaRespuestas",
+        JSON.stringify(
+            respuestasEncuesta
+        )
+    );
+
+
+    console.log(
+        "Respuestas:",
+        respuestasEncuesta
+    );
+
+
     alert(
-        "La encuesta ha sido completada."
+        "La encuesta ha sido completada correctamente."
     );
 
 }
 
 /* =========================================================
-   GENERAR UNA PREGUNTA
+   GENERAR UNA PREGUNTA EN FORMATO MATRIZ
 ========================================================= */
 
 function renderQuestion(
     question,
-    blockId
+    blockId,
+    tbody
 ) {
 
-    const questionGroup =
-        document.createElement("div");
+    const row =
+        document.createElement("tr");
 
-    questionGroup.className =
-        "survey-question";
-
-
-    /* TEXTO */
-
-    const questionText =
-        document.createElement("p");
-
-    questionText.className =
-        "question-text";
-
-    questionText.textContent =
-        `${question.number}. ${question.text}`;
-
-    questionGroup.appendChild(
-        questionText
-    );
+    row.className =
+        "matrix-question-row";
 
 
-    /* =========================================
+    /* =====================================================
        PREGUNTA ABIERTA
-    ========================================= */
+    ===================================================== */
 
-    if (
-        question.type === "textarea"
-    ) {
+    if (question.type === "textarea") {
+
+        const questionCell =
+            document.createElement("td");
+
+        questionCell.className =
+            "matrix-question-text";
+
+        questionCell.textContent =
+            `${question.number}. ${question.text}`;
+
+
+        const answerCell =
+            document.createElement("td");
+
+        answerCell.className =
+            "matrix-textarea-cell";
+
+        answerCell.colSpan = 6;
+
 
         const textarea =
             document.createElement("textarea");
@@ -1567,84 +1985,128 @@ function renderQuestion(
         textarea.placeholder =
             "Escriba su respuesta aquí...";
 
-        textarea.rows = 5;
+        textarea.rows = 4;
 
-        questionGroup.appendChild(
+
+        answerCell.appendChild(
             textarea
         );
 
-    }
 
+        row.appendChild(
+            questionCell
+        );
 
-    /* =========================================
-       PREGUNTA CON OPCIONES
-    ========================================= */
-
-    else {
-
-        const optionsContainer =
-            document.createElement("div");
-
-        optionsContainer.className =
-            "question-options";
-
-
-        question.options.forEach(
-            option => {
-
-                const label =
-                    document.createElement("label");
-
-                label.className =
-                    "question-option";
-
-
-                const radio =
-                    document.createElement("input");
-
-                radio.type =
-                    "radio";
-
-                radio.name =
-                    `${blockId}_${question.number}`;
-
-                radio.value =
-                    option[0];
-
-
-                const text =
-                    document.createElement("span");
-
-                text.textContent =
-                    option[1];
-
-
-                label.appendChild(
-                    radio
-                );
-
-                label.appendChild(
-                    text
-                );
-
-
-                optionsContainer.appendChild(
-                    label
-                );
-
-            }
+        row.appendChild(
+            answerCell
         );
 
 
-        questionGroup.appendChild(
-            optionsContainer
+        tbody.appendChild(
+            row
         );
 
+        return;
     }
 
 
-    questionsContainer.appendChild(
-        questionGroup
+    /* =====================================================
+       TEXTO DEL ÍTEM
+    ===================================================== */
+
+    const questionCell =
+        document.createElement("td");
+
+    questionCell.className =
+        "matrix-question-text";
+
+    questionCell.textContent =
+        `${question.number}. ${question.text}`;
+
+    row.appendChild(
+        questionCell
+    );
+
+
+    /* =====================================================
+       OPCIONES PROPIAS DE ESTA PREGUNTA
+    ===================================================== */
+
+    question.options.forEach(
+        option => {
+
+            const cell =
+                document.createElement("td");
+
+            cell.className =
+                "matrix-option";
+
+
+            /* Número */
+
+            const number =
+                document.createElement("span");
+
+            number.className =
+                "matrix-option-number";
+
+            number.textContent =
+                `${option[0]}.`;
+
+
+            /* Texto */
+
+            const description =
+                document.createElement("span");
+
+            description.className =
+                "matrix-option-description";
+
+            description.textContent =
+                option[1];
+
+
+            /* Radio */
+
+            const radio =
+                document.createElement("input");
+
+            radio.type =
+                "radio";
+
+            radio.name =
+                `${blockId}_${question.number}`;
+
+            radio.value =
+                option[0];
+
+            radio.required =
+                true;
+
+
+            cell.appendChild(
+                number
+            );
+
+            cell.appendChild(
+                description
+            );
+
+            cell.appendChild(
+                radio
+            );
+
+
+            row.appendChild(
+                cell
+            );
+
+        }
+    );
+
+
+    tbody.appendChild(
+        row
     );
 
 }
