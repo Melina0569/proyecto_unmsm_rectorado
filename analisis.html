@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Encuestas para los indicadores</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Material Symbols -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0"
+        rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/analisis.css">
+
+</head>
+
+
+<body>
+
+
+<!-- =========================================================
+     NAVBAR
+========================================================= -->
+
+<nav class="navbar">
+
+    <div class="navbar-container">
+
+        <div class="brand">
+            Encuestas para los indicadores
+        </div>
+
+        <div class="nav-links">
+
+            <a href="index.html">
+                Inicio
+            </a>
+
+            <a href="encuesta.html">
+                Módulos
+            </a>
+
+            <a href="analisis.html" class="active">
+                Análisis
+            </a>
+
+            <a href="#">
+                Reportes
+            </a>
+
+        </div>
+
+        <div class="nav-actions">
+
+            <button class="icon-button">
+
+                <span class="material-symbols-outlined">
+                    notifications
+                </span>
+
+            </button>
+
+            <button class="icon-button">
+
+                <span class="material-symbols-outlined">
+                    help
+                </span>
+
+            </button>
+
+        </div>
+
+    </div>
+
+</nav>
+
+
+
+<!-- =========================================================
+     CONTENIDO
+========================================================= -->
+
+<main class="analytics-container">
+
+
+    <!-- =====================================================
+         CABECERA
+    ====================================================== -->
+
+    <section class="page-header">
+
+        <div>
+
+            <span class="section-label">
+                <span class="material-symbols-outlined">
+                    analytics
+                </span>
+
+                ANÁLISIS DE INDICADORES
+            </span>
+
+            <h1>
+                Métricas de estudiantes
+            </h1>
+
+            <p>
+                Analiza los resultados de las encuestas,
+                indicadores y niveles de satisfacción.
+            </p>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         FILTROS
+    ====================================================== -->
+
+    <section class="filters-card">
+
+        <div class="filter-group">
+
+            <label for="tipoEncuestado">
+                Tipo de encuestado
+            </label>
+
+            <select id="tipoEncuestado">
+
+                <option value="estudiantes">
+                    Estudiantes de pregrado
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="filter-group">
+
+            <label for="indicadorSelect">
+                Indicador
+            </label>
+
+            <select id="indicadorSelect">
+
+                <option value="ID01">
+                    ID01 - Satisfacción con el currículo
+                </option>
+
+                <option value="ID02">
+                    ID02 - Satisfacción con el desempeño docente
+                </option>
+
+                <option value="ID05">
+                    ID05 - Satisfacción con asesoría/tutoría
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="filter-group">
+
+            <label for="facultadSelect">
+                Facultad
+            </label>
+
+            <select id="facultadSelect">
+
+                <option value="todas">
+                    Todas las facultades
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="filter-group">
+
+            <label for="escuelaSelect">
+                Escuela profesional
+            </label>
+
+            <select id="escuelaSelect">
+
+                <option value="todas">
+                    Todas las escuelas
+                </option>
+
+            </select>
+
+        </div>
+
+</section>
+
+
+
+<!-- =========================================================
+     INDICADOR PRINCIPAL
+========================================================= -->
+
+<section class="indicator-card">
+
+    <div class="indicator-info">
+
+        <span class="indicator-code" id="indicatorCode">
+            ID01
+        </span>
+
+        <h2 id="indicatorTitle">
+            Porcentaje de estudiantes satisfechos con el currículo
+        </h2>
+
+        <p id="indicatorDescription">
+            Resultado obtenido a partir de las respuestas
+            satisfactorias de los estudiantes.
+        </p>
+
+    </div>
+
+
+    <div class="indicator-result">
+
+        <span class="result-label">
+            RESULTADO
+        </span>
+
+        <strong id="indicatorPercentage">
+            0.00%
+        </strong>
+
+        <span class="result-status" id="indicatorStatus">
+            Sin datos
+        </span>
+
+    </div>
+
+</section>
+
+
+
+<!-- =========================================================
+     NUMERADOR / DENOMINADOR
+========================================================= -->
+
+<section class="metrics-grid">
+
+
+    <div class="metric-card">
+
+        <div class="metric-icon">
+
+            <span class="material-symbols-outlined">
+                check_circle
+            </span>
+
+        </div>
+
+        <div>
+
+            <span class="metric-title">
+                Numerador
+            </span>
+
+            <strong id="numerador">
+                0
+            </strong>
+
+            <small>
+                Respuestas satisfactorias
+            </small>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="metric-card">
+
+        <div class="metric-icon">
+
+            <span class="material-symbols-outlined">
+                groups
+            </span>
+
+        </div>
+
+        <div>
+
+            <span class="metric-title">
+                Denominador
+            </span>
+
+            <strong id="denominador">
+                0
+            </strong>
+
+            <small>
+                Respuestas válidas
+            </small>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="metric-card">
+
+        <div class="metric-icon">
+
+            <span class="material-symbols-outlined">
+                assignment
+            </span>
+
+        </div>
+
+        <div>
+
+            <span class="metric-title">
+                Respuestas
+            </span>
+
+            <strong id="totalRespuestas">
+                0
+            </strong>
+
+            <small>
+                Registros analizados
+            </small>
+
+        </div>
+
+    </div>
+
+
+</section>
+
+
+
+<!-- =========================================================
+     GRÁFICOS
+========================================================= -->
+
+<section class="charts-grid">
+
+
+    <!-- DISTRIBUCIÓN -->
+
+    <div class="chart-card">
+
+        <div class="chart-header">
+
+            <div>
+
+                <span class="chart-label">
+                    DISTRIBUCIÓN
+                </span>
+
+                <h3>
+                    Distribución de respuestas
+                </h3>
+
+            </div>
+
+        </div>
+
+        <div class="chart-container">
+
+            <canvas id="distributionChart"></canvas>
+
+        </div>
+
+    </div>
+
+    <div class="chart-card">
+
+        <div class="chart-header">
+            <span>PARTICIPACIÓN</span>
+
+            <h3>
+                ¿Qué día contestaron la encuesta?
+            </h3>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="fechaChart"></canvas>
+        </div>
+
+    </div>
+
+    <!-- COMPARACIÓN -->
+
+    <div class="chart-card">
+
+        <div class="chart-header">
+
+            <div>
+
+                <span class="chart-label">
+                    COMPARACIÓN
+                </span>
+
+                <h3>
+                    Satisfacción por facultad
+                </h3>
+
+            </div>
+
+        </div>
+
+        <div class="chart-container">
+
+            <canvas id="facultyChart"></canvas>
+
+        </div>
+
+    </div>
+
+
+</section>
+
+
+
+<!-- =========================================================
+     ESCUELAS
+========================================================= -->
+
+<section class="chart-card full-width">
+
+    <div class="chart-header">
+
+        <div>
+
+            <span class="chart-label">
+                NIVEL ESPECÍFICO
+            </span>
+
+            <h3 id="schoolChartTitle">
+                Satisfacción por escuela profesional
+            </h3>
+
+        </div>
+
+    </div>
+
+
+    <div class="chart-container school-chart">
+
+        <canvas id="schoolChart"></canvas>
+
+    </div>
+
+</section>
+
+
+
+<!-- =========================================================
+     ANÁLISIS POR PREGUNTA
+========================================================= -->
+
+<section class="questions-card">
+
+    <div class="chart-header">
+
+        <div>
+
+            <span class="chart-label">
+                ANÁLISIS DETALLADO
+            </span>
+
+            <h3>
+                Resultado por pregunta
+            </h3>
+
+            <p>
+                Porcentaje de respuestas satisfactorias
+                en cada pregunta del indicador.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <div id="questionsAnalysis">
+
+        <!-- Se genera mediante JavaScript -->
+
+    </div>
+
+</section>
+
+
+
+</main>
+
+
+
+<!-- =========================================================
+     FOOTER
+========================================================= -->
+
+<footer class="footer">
+
+    <div class="footer-container">
+
+        <strong>
+            DataInsight
+        </strong>
+
+        <span>
+            © 2026 DataInsight Analytics.
+        </span>
+
+    </div>
+
+</footer>
+
+
+
+<!-- JAVASCRIPT -->
+
+<script src="js/analisis.js"></script>
+
+</body>
+
+</html>

@@ -1908,22 +1908,103 @@ function siguienteBloque() {
 
 function finalizarEncuesta() {
 
+    // Guardar la última respuesta
     guardarRespuestaActual();
 
 
+    // =========================================
+    // OBTENER PERFIL DEL ESTUDIANTE
+    // =========================================
+
+    const perfil =
+        JSON.parse(
+            localStorage.getItem("encuestaPerfil")
+        ) || {};
+
+
+    // =========================================
+    // CREAR REGISTRO DE LA ENCUESTA
+    // =========================================
+
+    const encuesta = {
+
+        id:
+            `ENC-${Date.now()}`,
+
+        modulo:
+            moduleId,
+
+        fecha:
+            new Date().toISOString(),
+
+        perfil:
+            perfil,
+
+        bloques:
+            [...bloquesActuales],
+
+        respuestas:
+            {...respuestasEncuesta}
+
+    };
+
+
+    // =========================================
+    // OBTENER ENCUESTAS ANTERIORES
+    // =========================================
+
+    const encuestasGuardadas =
+        JSON.parse(
+            localStorage.getItem("encuestasEstudiantes")
+        ) || [];
+
+
+    // =========================================
+    // AGREGAR LA NUEVA ENCUESTA
+    // =========================================
+
+    encuestasGuardadas.push(encuesta);
+
+
+    // =========================================
+    // GUARDAR TODAS LAS ENCUESTAS
+    // =========================================
+
+    localStorage.setItem(
+        "encuestasEstudiantes",
+        JSON.stringify(encuestasGuardadas)
+    );
+
+
+    // =========================================
+    // TAMBIÉN CONSERVAMOS LAS RESPUESTAS
+    // ACTUALES
+    // =========================================
+
     localStorage.setItem(
         "encuestaRespuestas",
-        JSON.stringify(
-            respuestasEncuesta
-        )
+        JSON.stringify(respuestasEncuesta)
     );
 
+
+    // =========================================
+    // MOSTRAR RESULTADO EN CONSOLA
+    // =========================================
 
     console.log(
-        "Respuestas:",
-        respuestasEncuesta
+        "Encuesta registrada:",
+        encuesta
     );
 
+    console.log(
+        "Todas las encuestas:",
+        encuestasGuardadas
+    );
+
+
+    // =========================================
+    // MENSAJE
+    // =========================================
 
     alert(
         "La encuesta ha sido completada correctamente."
