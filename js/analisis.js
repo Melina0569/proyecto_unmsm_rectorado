@@ -152,12 +152,63 @@ document.addEventListener(
     }
 );
 
-function crearGraficoFecha() {
-
-    const encuestas =
-        obtenerRespuestas();
+function crearGraficoFecha(
+    encuestas,
+    indicador
+) {
 
     const fechas = {};
+
+    // Cantidad de preguntas del indicador seleccionado
+    const totalPreguntas =
+        indicadores[indicador].preguntas;
+
+
+    // ============================================
+    // FILTROS
+    // ============================================
+
+    const facultad =
+        facultadSelect.value;
+
+    const escuela =
+        escuelaSelect.value;
+
+
+    // ============================================
+    // TEXTO DE FILTROS
+    // ============================================
+
+    const participationFilters =
+        document.getElementById(
+            "participationFilters"
+        );
+
+    if (participationFilters) {
+
+        const nombreIndicador =
+            indicadorSelect.options[
+                indicadorSelect.selectedIndex
+            ].text;
+
+        const nombreFacultad =
+            facultad === "todas"
+                ? "Todas las facultades"
+                : facultad;
+
+        const nombreEscuela =
+            escuela === "todas"
+                ? "Todas las escuelas"
+                : escuela;
+
+        participationFilters.textContent =
+            `${nombreIndicador} · ${nombreFacultad} · ${nombreEscuela}`;
+    }
+
+
+    // ============================================
+    // RECORRER ENCUESTAS
+    // ============================================
 
     encuestas.forEach(encuesta => {
 
@@ -165,8 +216,66 @@ function crearGraficoFecha() {
             return;
         }
 
+
+        // ========================================
+        // VERIFICAR QUE RESPONDIÓ EL INDICADOR
+        // ========================================
+
+        const respuestas =
+            encuesta.respuestas || {};
+
+        let indicadorCompleto = true;
+
+
+        for (
+            let i = 1;
+            i <= totalPreguntas;
+            i++
+        ) {
+
+            const clave =
+                `${indicador}_${i}`;
+
+            const valor =
+                Number(respuestas[clave]);
+
+
+            // Si falta una pregunta,
+            // no cuenta para participación
+            if (
+                valor < 1 ||
+                valor > 5
+            ) {
+
+                indicadorCompleto = false;
+
+                break;
+            }
+        }
+
+
+        // No respondió completamente
+        // este indicador
+        if (!indicadorCompleto) {
+            return;
+        }
+
+
+        // ========================================
+        // FECHA
+        // ========================================
+
         const fecha =
             new Date(encuesta.fecha);
+
+        if (
+            Number.isNaN(
+                fecha.getTime()
+            )
+        ) {
+            return;
+        }
+
 
         const fechaFormateada =
             fecha.toLocaleDateString(
@@ -177,10 +286,18 @@ function crearGraficoFecha() {
                 }
             );
 
+
         fechas[fechaFormateada] =
-            (fechas[fechaFormateada] || 0) + 1;
+            (
+                fechas[fechaFormateada] || 0
+            ) + 1;
 
     });
+
+
+    // ============================================
+    // DATOS
+    // ============================================
 
     const labels =
         Object.keys(fechas);
@@ -189,6 +306,7 @@ function crearGraficoFecha() {
         labels.map(
             fecha => fechas[fecha]
         );
+
 
     const ctx =
         document.getElementById(
@@ -199,9 +317,16 @@ function crearGraficoFecha() {
         return;
     }
 
+
+    // Destruir gráfico anterior
     if (fechaChart) {
         fechaChart.destroy();
     }
+
+
+    // ============================================
+    // CREAR GRÁFICO
+    // ============================================
 
     fechaChart =
         new Chart(
@@ -217,22 +342,18 @@ function crearGraficoFecha() {
                     datasets: [{
 
                         label:
-                            "Respuestas",
+                            "Respuestas válidas",
 
                         data:
                             valores,
 
-                        fill:
-                            true,
+                        fill: true,
 
-                        tension:
-                            0.4,
+                        tension: 0.4,
 
-                        pointRadius:
-                            5,
+                        pointRadius: 5,
 
-                        pointHoverRadius:
-                            7,
+                        pointHoverRadius: 7,
 
                         backgroundColor:
                             "rgba(66, 183, 245, 0.25)",
@@ -246,8 +367,7 @@ function crearGraficoFecha() {
                         pointBorderColor:
                             "#68e86b",
 
-                        borderWidth:
-                            3
+                        borderWidth: 3
 
                     }]
 
@@ -257,8 +377,7 @@ function crearGraficoFecha() {
 
                     responsive: true,
 
-                    maintainAspectRatio:
-                        false,
+                    maintainAspectRatio: false,
 
                     animation: {
 
@@ -281,7 +400,7 @@ function crearGraficoFecha() {
 
                                 label:
                                     context =>
-                                        `${context.raw} respuestas`
+                                        `${context.raw} respuestas válidas`
 
                             }
 
@@ -296,7 +415,9 @@ function crearGraficoFecha() {
                             beginAtZero: true,
 
                             ticks: {
+
                                 precision: 0
+
                             }
 
                         },
@@ -304,7 +425,9 @@ function crearGraficoFecha() {
                         x: {
 
                             grid: {
+
                                 display: false
+
                             }
 
                         }
@@ -492,7 +615,10 @@ function cargarAnalisis() {
         indicador
     );
 
-    crearGraficoFecha();
+    crearGraficoFecha(
+        respuestas,
+        indicador
+    );
 
     crearGraficoFacultades(
         indicador
@@ -581,37 +707,13 @@ function calcularIndicador(
             i <= totalPreguntas;
             i++
         ) {
+            const clave = `${indicador}_${i}`;
+            const valor = Number(respuestas[clave]);
 
-            const clave =
-                `${indicador}_${i}`;
-
-            const valor =
-                Number(respuestas[clave]);
-
-            /*
-               0 = No aplica
-               1 - 5 = escala válida
-            */
-
-            if (
-                valor >= 1 &&
-                valor <= 5
-            ) {
-
-                respuestasPersona.push(
-                    valor
-                );
-
+            if (valor >= 1 && valor <= 5) {
+                respuestasPersona.push(valor);
             } else {
-
-                /*
-                   Si falta una respuesta o es
-                   "No aplica", la persona no
-                   entra al cálculo del indicador.
-                */
-
                 encuestaValida = false;
-
                 break;
             }
         }

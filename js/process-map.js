@@ -645,7 +645,48 @@ const ProcessMap = {
         documentosLista: 'sigpro_documentos_lista',
         documentosDetalle: 'sigpro_documentos_detalle',
         indicadoresDetalle: 'sigpro_indicadores_detalle',
-        historialPrefix: 'sigpro_historial_datos_'
+        historialPrefix: 'sigpro_historial_datos_',
+        encuestasEstudiantes: 'encuestasEstudiantes'
+    },
+
+    // =========================================================
+// INDICADOR FICTICIO DE PRUEBA
+// PM.01 -> ID01
+// =========================================================
+    demoIndicator: {
+        id: 'DEMO-ID01',
+        code: 'ID01',
+
+        processCode: 'PM.01',
+        type: 'missional',
+
+        proceso: 'PM.01 Gestión de la Formación Académica',
+
+        version: '1.0',
+
+        responsable: 'Oficina de Calidad Académica',
+
+        frecuencia: 'Semestral',
+
+        indicadorNombre:
+            'Porcentaje de estudiantes satisfechos con el currículo',
+
+        description:
+            'Mide el nivel de satisfacción de los estudiantes con el currículo y plan de estudios.',
+
+        objetivo:
+            'Evaluar el nivel de satisfacción de los estudiantes respecto al currículo y plan de estudios.',
+
+        variableN:
+            'N° estudiantes satisfechos con todos los ítems (4 o 5)',
+
+        variableD:
+            'N° estudiantes con encuesta completa y válida',
+
+        fuente:
+            'Encuesta a estudiantes',
+
+        meta: '90'
     },
 
     async init() {
@@ -1908,10 +1949,45 @@ const ProcessMap = {
         `;
         
         try {
-            const indicatorsToRender = this.loadIndicatorsFromStorage(processId, processType, processCode);
+            let indicatorsToRender =
+                    this.loadIndicatorsFromStorage(
+                        processId,
+                        processType,
+                        processCode
+                    );
 
-            this.allIndicators = indicatorsToRender;
-            this.renderIndicatorsList(indicatorsToRender);
+
+                // =====================================================
+                // INDICADOR FICTICIO PARA PRUEBAS
+                // SOLO PARA PM.01
+                // =====================================================
+
+                if (
+                    (
+                        !indicatorsToRender ||
+                        indicatorsToRender.length === 0
+                    )
+                    &&
+                    String(processCode || '')
+                        .toUpperCase() === 'PM.01'
+                ) {
+
+                    indicatorsToRender = [
+                        this.buildDemoIndicatorFromSurvey()
+                    ];
+
+                    console.log(
+                        '🧪 Indicador demo ID01 cargado para PM.01'
+                    );
+                }
+
+
+                this.allIndicators =
+                    indicatorsToRender;
+
+                this.renderIndicatorsList(
+                    indicatorsToRender
+                );
             console.log('Indicadores cargados:', indicatorsToRender.length, 'tipo:', processType, 'codigo:', processCode);
             
         } catch (error) {
@@ -1991,7 +2067,7 @@ const ProcessMap = {
     viewIndicator(indicatorId) {
         console.log('Visualizando indicador:', indicatorId);
         
-        const indicator = this.allIndicators.find(ind => 
+        let indicator = this.allIndicators.find(ind => 
             ind.id === parseInt(indicatorId) || ind.id === indicatorId
         );
         
@@ -1999,6 +2075,20 @@ const ProcessMap = {
             console.error('Indicador no encontrado:', indicatorId);
             this.showError('Indicador no encontrado');
             return;
+        }
+
+        // =====================================================
+        // DEMO: RECALCULAR N/D AL ABRIR LA FICHA
+        // =====================================================
+
+        if (
+            indicator.code === 'ID01' &&
+            indicator.processCode === 'PM.01'
+        ) {
+
+            indicator =
+                this.buildDemoIndicatorFromSurvey();
+
         }
 
         this.currentIndicator = indicator;
@@ -3444,8 +3534,300 @@ const ProcessMap = {
         } else {
             alert(message);
         }
+    },
+
+    // =========================================================
+    // CALCULAR INDICADOR FICTICIO DESDE LAS ENCUESTAS
+    // =========================================================
+
+    buildDemoIndicatorFromSurvey() {
+
+        const base = {
+            ...this.demoIndicator
+        };
+
+        const resultado =
+            this.calculateDemoSurveyIndicator();
+
+        base.N =
+            resultado.numerador;
+
+        base.D =
+            resultado.denominador;
+
+        base.valorActual =
+            resultado.porcentaje;
+
+        base.seguimiento =
+            resultado.seguimiento;
+
+        return base;
+    },
+
+
+    calculateDemoSurveyIndicator() {
+
+        const raw =
+            localStorage.getItem(
+                this.storageKeys.encuestasEstudiantes
+            );
+
+        let encuestas = [];
+
+        try {
+
+            const datos =
+                raw
+                    ? JSON.parse(raw)
+                    : [];
+
+            encuestas =
+                Array.isArray(datos)
+                    ? datos
+                    : [];
+
+        } catch (error) {
+
+            console.warn(
+                'No se pudieron leer las encuestas:',
+                error
+            );
+
+            return {
+                numerador: 0,
+                denominador: 0,
+                porcentaje: 0,
+                seguimiento: []
+            };
+        }
+
+
+        let numerador = 0;
+
+        let denominador = 0;
+
+        const periodos = {};
+
+
+        // ============================================
+        // RECORRER ENCUESTAS
+        // ============================================
+
+        encuestas.forEach(encuesta => {
+
+            const respuestas =
+                encuesta?.respuestas || {};
+
+            const valores = [];
+
+
+            // ID01 tiene 7 preguntas
+            for (
+                let i = 1;
+                i <= 7;
+                i++
+            ) {
+
+                const valor =
+                    Number(
+                        respuestas[`ID01_${i}`]
+                    );
+
+
+                // 0 = No aplica
+                // 1-5 = respuesta válida
+                if (
+                    valor < 1 ||
+                    valor > 5
+                ) {
+
+                    return;
+                }
+
+
+                valores.push(valor);
+            }
+
+
+            // ========================================
+            // DENOMINADOR
+            // ========================================
+
+            denominador++;
+
+
+            // ========================================
+            // NUMERADOR
+            // ========================================
+
+            const satisfecha =
+                valores.every(
+                    valor =>
+                        valor === 4 ||
+                        valor === 5
+                );
+
+
+            if (satisfecha) {
+
+                numerador++;
+
+            }
+
+
+            // ========================================
+            // SEGUIMIENTO POR PERÍODO
+            // ========================================
+
+            const fecha =
+                encuesta?.fecha
+                    ? new Date(encuesta.fecha)
+                    : new Date();
+
+
+            if (
+                Number.isNaN(
+                    fecha.getTime()
+                )
+            ) {
+
+                return;
+            }
+
+
+            const periodo =
+                fecha.toLocaleDateString(
+                    'es-PE',
+                    {
+                        month: 'short',
+                        year: 'numeric'
+                    }
+                );
+
+
+            if (!periodos[periodo]) {
+
+                periodos[periodo] = {
+                    N: 0,
+                    D: 0
+                };
+
+            }
+
+
+            periodos[periodo].D++;
+
+
+            if (satisfecha) {
+
+                periodos[periodo].N++;
+
+            }
+
+        });
+
+
+        // ============================================
+        // PORCENTAJE
+        // ============================================
+
+        const porcentaje =
+            denominador > 0
+                ? (
+                    numerador /
+                    denominador
+                ) * 100
+                : 0;
+
+
+        // ============================================
+        // HISTORIAL
+        // ============================================
+
+        const seguimiento =
+            Object.entries(
+                periodos
+            ).map(
+                ([periodo, dato]) => {
+
+                    const valor =
+                        dato.D > 0
+                            ? (
+                                dato.N /
+                                dato.D
+                            ) * 100
+                            : 0;
+
+
+                    let estado =
+                        'Crítico';
+
+
+                    if (
+                        valor >= 90
+                    ) {
+
+                        estado =
+                            'Óptimo';
+
+                    } else if (
+                        valor >= 75
+                    ) {
+
+                        estado =
+                            'Riesgo';
+
+                    }
+
+
+                    return {
+
+                        periodo,
+
+                        N:
+                            dato.N,
+
+                        D:
+                            dato.D,
+
+                        meta:
+                            90,
+
+                        valor:
+                            Number(
+                                valor.toFixed(2)
+                            ),
+
+                        estado,
+
+                        observaciones:
+                            'Calculado automáticamente desde la encuesta ID01.'
+
+                    };
+
+                }
+            );
+
+
+        return {
+
+            numerador,
+
+            denominador,
+
+            porcentaje,
+
+            seguimiento
+
+        };
+
     }
+
+    
 };
+
+// Hacer ProcessMap accesible desde los onclick del HTML
+window.ProcessMap = ProcessMap;
 
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => ProcessMap.init());
